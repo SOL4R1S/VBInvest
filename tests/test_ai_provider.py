@@ -1,6 +1,8 @@
 import json
 
-from scripts.lib.ai_provider import AIProviderConfig, OpenAICompatibleResearchClient
+import pytest
+
+from scripts.lib.ai_provider import AIProviderConfig, AIProviderConfigError, OpenAICompatibleResearchClient
 
 
 class FakeResponse:
@@ -63,6 +65,74 @@ def test_ai_provider_config_prefers_macos_keychain_secret():
 
     assert config is not None
     assert config.api_key == "keychain-token"
+
+
+def test_local_loopback_provider_allows_empty_api_key():
+    config = AIProviderConfig.from_env(
+        {
+            "AI_PROVIDER_BASE_URL": "http://127.0.0.1:11434/v1",
+            "AI_PROVIDER_MODEL": "qwen2.5",
+            "AI_PROVIDER_NAME": "ollama",
+        }
+    )
+
+    assert config is not None
+    assert config.api_key == ""
+    assert config.name == "ollama"
+    assert config.base_url == "http://127.0.0.1:11434/v1"
+
+
+def test_local_keyless_request_omits_authorization_header():
+    opener = CapturingUrlopen(
+        {
+            "choices": [
+                {
+                    "message": {
+                        "content": json.dumps(
+                            {
+                                "opinion": "중립",
+                                "thesis": "DB 소스만 사용한 중립 관점입니다.",
+                                "rationale": ["가격 지표가 혼재되어 있습니다."],
+                                "bull": "수요 회복 가능성",
+                                "base": "관망",
+                                "bear": "수요 둔화",
+                                "risks": ["변동성"],
+                                "triggers": ["실적"],
+                                "confidence": 0.5,
+                            },
+                            ensure_ascii=False,
+                        )
+                    }
+                }
+            ]
+        }
+    )
+    config = AIProviderConfig(
+        name="ollama",
+        api_key="",
+        base_url="http://127.0.0.1:11434/v1",
+        model="qwen2.5",
+    )
+    client = OpenAICompatibleResearchClient(config, urlopen=opener)
+
+    client.generate_research(
+        {"symbol": "NVDA", "display_name_ko": "엔비디아"},
+        {"close": 100, "rsi14": 55},
+        {"sources": [{"kind": "db_price_indicator", "symbol": "NVDA"}], "source_gap": False},
+    )
+
+    assert opener.request is not None
+    assert opener.request.get_header("Authorization") is None
+
+
+def test_cloud_ai_provider_requires_api_key():
+    with pytest.raises(AIProviderConfigError, match="AI provider API key is required for non-local providers"):
+        AIProviderConfig.from_env(
+            {
+                "AI_PROVIDER_BASE_URL": "https://api.example.com/v1",
+                "AI_PROVIDER_MODEL": "research-model",
+            }
+        )
 
 
 def test_openai_compatible_research_client_sends_chat_completion_and_parses_json():

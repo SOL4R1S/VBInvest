@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field
 from typing import Mapping, Protocol, TypeAlias
@@ -58,17 +59,21 @@ class AIProviderConfig:
             system_name=system_name,
             store=secret_store,
         )
-        if not api_key:
-            return None
         model = _first_env(env, "AI_PROVIDER_MODEL", "DEEPSEEK_MODEL", "OPENAI_MODEL")
+        base_url = _first_env(env, "AI_PROVIDER_BASE_URL", "DEEPSEEK_BASE_URL", "OPENAI_BASE_URL")
+        provider_name = _first_env(env, "AI_PROVIDER_NAME") or _provider_name(env)
+        if not api_key and not model and not base_url and not _first_env(env, "AI_PROVIDER_NAME"):
+            return None
         if not model:
             raise AIProviderConfigError("AI_PROVIDER_MODEL is required when an AI provider API key is set")
-        provider_name = _first_env(env, "AI_PROVIDER_NAME") or _provider_name(env)
-        base_url = _first_env(env, "AI_PROVIDER_BASE_URL", "DEEPSEEK_BASE_URL", "OPENAI_BASE_URL") or _default_base_url(env)
+        base_url = base_url or _default_base_url(env)
+        normalized_base_url = base_url.rstrip("/")
+        if not api_key and not _is_keyless_local_provider(provider_name, normalized_base_url):
+            raise AIProviderConfigError("AI provider API key is required for non-local providers")
         return AIProviderConfig(
             name=provider_name,
             api_key=api_key,
-            base_url=base_url.rstrip("/"),
+            base_url=normalized_base_url,
             model=model,
             timeout_seconds=_timeout_seconds(env),
         )
@@ -98,14 +103,16 @@ class OpenAICompatibleResearchClient:
                 {"role": "user", "content": json.dumps({"asset": asset, "latest": latest, "packet": packet}, ensure_ascii=False)},
             ],
         }
+        headers = {
+            "Content-Type": "application/json",
+            "User-Agent": "VBinvest/0.1",
+        }
+        if self._config.api_key:
+            headers["Authorization"] = f"Bearer {self._config.api_key}"
         request = urllib.request.Request(
             f"{self._config.base_url}/chat/completions",
             data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
-            headers={
-                "Authorization": f"Bearer {self._config.api_key}",
-                "Content-Type": "application/json",
-                "User-Agent": "VBinvest/0.1",
-            },
+            headers=headers,
             method="POST",
         )
         try:
@@ -181,6 +188,13 @@ def _default_base_url(env: Mapping[str, str]) -> str:
     if env.get("OPENAI_API_KEY"):
         return "https://api.openai.com/v1"
     raise AIProviderConfigError("AI_PROVIDER_BASE_URL is required for custom AI providers")
+
+
+def _is_keyless_local_provider(provider_name: str, base_url: str) -> bool:
+    if provider_name.strip().lower() == "ollama":
+        return True
+    host = urllib.parse.urlparse(base_url).hostname
+    return host in {"localhost", "127.0.0.1", "::1"}
 
 
 def _timeout_seconds(env: Mapping[str, str]) -> int:
