@@ -8,7 +8,9 @@ VBinvest is not a hosted SaaS by default. Users run it locally, store data local
 
 ## Quick Start
 
-Local program mode is the primary path.
+Local program mode is the primary path. Follow only the section for your operating system.
+
+### macOS Users
 
 ```bash
 git clone https://github.com/SOL4R1S/VBInvest.git
@@ -17,11 +19,17 @@ chmod +x VBinvest.command
 ./VBinvest.command
 ```
 
-On macOS, `VBinvest.command` starts both the backend and the web UI. On Windows:
+`VBinvest.command` starts both the backend and the web UI, then opens the browser.
+
+### Windows Users
 
 ```powershell
+git clone https://github.com/SOL4R1S/VBInvest.git
+cd VBInvest
 VBinvest.bat
 ```
+
+`VBinvest.bat` starts both the backend and the web UI, then opens the browser.
 
 The launcher starts the local backend on `127.0.0.1`, chooses free ports, opens the web UI, and shows the first-run setup wizard.
 

@@ -64,6 +64,23 @@ def test_readme_documents_cross_platform_launch_paths():
         assert required in english
 
 
+def test_readme_separates_launch_instructions_by_operating_system():
+    korean = (ROOT / "README.md").read_text(encoding="utf-8")
+    english = (ROOT / "README.en.md").read_text(encoding="utf-8")
+
+    korean_macos = korean.index("### macOS 사용자")
+    korean_windows = korean.index("### Windows 사용자")
+    assert korean_macos < korean_windows
+    assert "./VBinvest.command" in korean[korean_macos:korean_windows]
+    assert "VBinvest.bat" in korean[korean_windows:]
+
+    english_macos = english.index("### macOS Users")
+    english_windows = english.index("### Windows Users")
+    assert english_macos < english_windows
+    assert "./VBinvest.command" in english[english_macos:english_windows]
+    assert "VBinvest.bat" in english[english_windows:]
+
+
 def test_readme_documents_startup_sources_and_report_source_gap():
     korean = (ROOT / "README.md").read_text(encoding="utf-8")
     english = (ROOT / "README.en.md").read_text(encoding="utf-8")
