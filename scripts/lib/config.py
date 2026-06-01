@@ -183,6 +183,36 @@ def redact_url_password(value: str) -> str:
     return urlunsplit((parsed.scheme, netloc, parsed.path, parsed.query, parsed.fragment))
 
 
+def resolve_opendart_api_key(
+    environ: Mapping[str, str],
+    *,
+    system_name: str | None = None,
+    store: SecretStore | None = None,
+    config_value: str = "",
+) -> str:
+    return (
+        resolve_secret(environ, "OPENDART_API_KEY", aliases=("DART_API_KEY",), system_name=system_name, store=store)
+        or config_value.strip()
+    )
+
+
+def load_opendart_api_key(
+    config_path: Path | None = None,
+    environ: Mapping[str, str] | None = None,
+    system_name: str | None = None,
+    secret_store: SecretStore | None = None,
+) -> str:
+    env = os.environ if environ is None else environ
+    path = config_path or config_path_from_env(env)
+    providers = _table(_read_toml(path), "providers")
+    return resolve_opendart_api_key(
+        env,
+        system_name=system_name,
+        store=secret_store,
+        config_value=_text(providers, "opendart_api_key", ""),
+    )
+
+
 def _read_toml(path: Path) -> TomlTable:
     if not path.exists():
         return {}
@@ -225,13 +255,12 @@ def _parse_providers(
         if parsed.scheme not in {"http", "https"} or not parsed.netloc:
             raise ConfigError("providers.ai_base_url", "must be an http(s) URL")
     return ProviderSettings(
-        opendart_api_key=resolve_secret(
+        opendart_api_key=resolve_opendart_api_key(
             environ,
-            "OPENDART_API_KEY",
             system_name=system_name,
             store=secret_store,
-        )
-        or _text(raw, "opendart_api_key", ""),
+            config_value=_text(raw, "opendart_api_key", ""),
+        ),
         ai_base_url=ai_base_url,
         ai_api_key=resolve_secret(
             environ,

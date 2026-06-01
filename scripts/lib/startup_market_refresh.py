@@ -49,6 +49,7 @@ def run_startup_market_refresh(
     limit: int,
     force: bool = False,
     lock_holder: str = "api-startup",
+    dart_api_key: str | None = None,
 ) -> StartupRefreshResult:
     effective_store = store
     try:
@@ -107,6 +108,7 @@ def run_startup_market_refresh(
             job_name=None if dry_run else f"startup-market-refresh:{watchlist}",
             lock_holder=lock_holder,
             include_news=include_news,
+            dart_api_key=dart_api_key,
         ),
     )
     locked = result.status == "locked"

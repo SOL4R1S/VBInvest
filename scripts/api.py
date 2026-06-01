@@ -20,7 +20,7 @@ from scripts.lib.auth import AuthError, AuthUser, verify_bearer_token
 from scripts.lib.db import DatabaseConfig, VBinvestDB
 from scripts.lib.entitlements import WebhookSignatureError, verify_webhook_signature
 from scripts.lib.startup_market_refresh import run_startup_market_refresh
-from scripts.lib.config import ConfigError, load_local_config
+from scripts.lib.config import ConfigError, load_local_config, load_opendart_api_key
 from scripts.lib.version import load_version_metadata
 
 VERSION_METADATA = load_version_metadata()
@@ -129,8 +129,9 @@ def startup_market_refresh(
             include_news=include_news,
             limit=limit,
             force=force,
+            dart_api_key=load_opendart_api_key(),
         )
-    except ValueError as exc:
+    except (ConfigError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {
         "status": result.status,

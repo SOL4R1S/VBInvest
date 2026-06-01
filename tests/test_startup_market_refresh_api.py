@@ -5,6 +5,8 @@ from fastapi.testclient import TestClient
 from psycopg import OperationalError
 
 from scripts import api
+from scripts import startup_market_refresh as ingest_module
+from scripts.lib import startup_market_refresh as refresh_module
 
 
 class FakeStartupRefreshDB:
@@ -151,6 +153,73 @@ def test_startup_refresh_skips_when_recent_success_exists_unless_forced(monkeypa
     assert forced.json()["status"] == "ok"
     assert forced.json()["stale"] is False
     assert forced.json()["price_rows"] > 0
+
+
+def test_api_refresh_passes_resolved_opendart_key(monkeypatch):
+    fake_db = FakeStartupRefreshDB()
+    captured = {}
+
+    def fake_ingest_assets(assets, db, options):
+        captured["dart_api_key"] = options.dart_api_key
+        return ingest_module.IngestResult(
+            status="ok",
+            failures=[],
+            price_rows=0,
+            indicator_rows=0,
+            news_items=0,
+            disclosures=0,
+            provider_disabled=[],
+        )
+
+    monkeypatch.setattr(api, "load_opendart_api_key", lambda: "resolved-dart-key")
+    monkeypatch.setattr(refresh_module, "ingest_assets", fake_ingest_assets)
+    client = client_with_db(monkeypatch, fake_db)
+
+    response = client.post(
+        "/api/startup/market-refresh?watchlist=semiconductor-core&dry_run=true&no_network=true&include_news=true&limit=1",
+    )
+
+    assert response.status_code == 200
+    assert captured == {"dart_api_key": "resolved-dart-key"}
+
+
+def test_api_refresh_reads_opendart_key_without_validating_unrelated_provider_config(monkeypatch, tmp_path):
+    config_path = tmp_path / "config.toml"
+    config_path.write_text(
+        "\n".join(
+            [
+                "[providers]",
+                'opendart_api_key = "config-dart-key"',
+                'ai_base_url = "not a url"',
+            ]
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("VBINVEST_CONFIG_PATH", str(config_path))
+    fake_db = FakeStartupRefreshDB()
+    captured = {}
+
+    def fake_ingest_assets(assets, db, options):
+        captured["dart_api_key"] = options.dart_api_key
+        return ingest_module.IngestResult(
+            status="ok",
+            failures=[],
+            price_rows=0,
+            indicator_rows=0,
+            news_items=0,
+            disclosures=0,
+            provider_disabled=[],
+        )
+
+    monkeypatch.setattr(refresh_module, "ingest_assets", fake_ingest_assets)
+    client = client_with_db(monkeypatch, fake_db)
+
+    response = client.post(
+        "/api/startup/market-refresh?watchlist=semiconductor-core&dry_run=true&no_network=true&include_news=true&limit=1",
+    )
+
+    assert response.status_code == 200
+    assert captured == {"dart_api_key": "config-dart-key"}
 
 
 def test_startup_market_refresh_concurrent_run_returns_skipped(monkeypatch):

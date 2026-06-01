@@ -3,6 +3,7 @@ from __future__ import annotations
 import subprocess
 
 from scripts.lib.keychain import KeychainSecretStore, WindowsCredentialStore, platform_secret_store, resolve_secret
+from scripts.lib import config
 
 
 def test_keychain_store_reads_secret_without_logging_value() -> None:
@@ -127,3 +128,33 @@ def test_resolve_secret_prefers_windows_credential_manager() -> None:
     )
 
     assert value == "from-windows"
+
+
+def test_resolve_opendart_key_prefers_secure_storage() -> None:
+    class FakeStore:
+        def get(self, account: str) -> str:
+            return "from-secure-storage" if account == "OPENDART_API_KEY" else ""
+
+    value = config.resolve_opendart_api_key(
+        {"OPENDART_API_KEY": "from-env", "DART_API_KEY": "from-alias"},
+        system_name="Darwin",
+        store=FakeStore(),
+        config_value="from-config",
+    )
+
+    assert value == "from-secure-storage"
+
+
+def test_resolve_opendart_key_accepts_dart_api_key_env_alias() -> None:
+    class FakeStore:
+        def get(self, account: str) -> str:
+            return ""
+
+    value = config.resolve_opendart_api_key(
+        {"DART_API_KEY": "from-alias"},
+        system_name="Darwin",
+        store=FakeStore(),
+        config_value="from-config",
+    )
+
+    assert value == "from-alias"

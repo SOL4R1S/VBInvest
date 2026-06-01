@@ -14,6 +14,7 @@ if __package__ is None or __package__ == "":
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from scripts.lib.db import DatabaseConfig, VBinvestDB, build_indicator_rows, build_price_rows
+from scripts.lib.config import ConfigError, load_opendart_api_key
 from scripts.lib.disclosures import collect_disclosures_for_asset
 from scripts.lib.indicators import add_indicators
 from scripts.lib.market_calendar import summarize_trade_dates
@@ -214,6 +215,11 @@ def main() -> int:
 
     db = None if args.dry_run else VBinvestDB(config)
     assets = load_assets(args, db)
+    try:
+        dart_api_key = load_opendart_api_key(environ=os.environ)
+    except ConfigError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
     result = ingest_assets(
         assets,
         db,
@@ -226,7 +232,7 @@ def main() -> int:
             job_name=None if args.dry_run else f"startup-market-refresh:{args.watchlist}",
             lock_holder=f"pid:{os.getpid()}",
             include_news=args.include_news,
-            dart_api_key=os.environ.get("DART_API_KEY") or os.environ.get("OPENDART_API_KEY"),
+            dart_api_key=dart_api_key,
         ),
     )
 
