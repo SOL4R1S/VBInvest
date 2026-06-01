@@ -167,3 +167,30 @@ def test_ingest_assets_counts_mocked_news_and_disclosures():
     assert result.news_items == 1
     assert result.disclosures == 1
     assert result.provider_disabled == []
+
+
+def test_ingest_assets_skips_source_collection_when_include_news_false():
+    assets = [{"asset_id": 1, "symbol": "NVDA", "exchange": "NASDAQ"}]
+    calls = []
+
+    def news_collector(asset, *, no_network):
+        calls.append(("news", asset["symbol"], no_network))
+        return NewsFetchResult(status="ok", items=[], provider_disabled=[])
+
+    def disclosure_collector(asset, *, no_network, dart_api_key):
+        calls.append(("disclosure", asset["symbol"], no_network, dart_api_key))
+        return DisclosureFetchResult(status="ok", items=[], provider_disabled=[])
+
+    result = ingest_assets(
+        assets,
+        db=None,
+        options=IngestOptions(no_network=True, synthetic=True, include_news=False),
+        news_collector=news_collector,
+        disclosure_collector=disclosure_collector,
+    )
+
+    assert result.status == "ok"
+    assert calls == []
+    assert result.news_items == 0
+    assert result.disclosures == 0
+    assert result.provider_disabled == []

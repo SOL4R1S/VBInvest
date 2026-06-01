@@ -47,7 +47,7 @@ class IngestResult:
     indicator_rows: int
     news_items: int = 0
     disclosures: int = 0
-    provider_disabled: list[str] | None = None
+    provider_disabled: list[dict[str, str]] | None = None
 
 
 def parse_args() -> argparse.Namespace:
@@ -100,7 +100,7 @@ def ingest_assets(
     disclosure_collector=collect_disclosures_for_asset,
 ) -> IngestResult:
     failures: list[str] = []
-    provider_disabled: list[str] = []
+    provider_disabled: list[dict[str, str]] = []
     price_rows = 0
     indicator_rows = 0
     news_items = 0
@@ -138,8 +138,8 @@ def ingest_assets(
                         no_network=options.no_network,
                         dart_api_key=options.dart_api_key,
                     )
-                    provider_disabled.extend(f"{symbol}:{item}" for item in news_result.provider_disabled)
-                    provider_disabled.extend(f"{symbol}:{item}" for item in disclosure_result.provider_disabled)
+                    provider_disabled.extend(_provider_disabled(symbol, item) for item in news_result.provider_disabled)
+                    provider_disabled.extend(_provider_disabled(symbol, item) for item in disclosure_result.provider_disabled)
                     if news_result.status == "failed":
                         failures.append(f"{symbol}:NewsFetchError")
                     if disclosure_result.status == "failed":
@@ -186,6 +186,17 @@ def _fetch_for_asset(symbol: str, options: IngestOptions, fetch_history: Callabl
 def _is_retryable_price_error(exc: PriceFetchError) -> bool:
     message = str(exc).lower()
     return "429" in message or "rate limit" in message or "timeout" in message
+
+
+def _provider_disabled(symbol: str, value: str) -> dict[str, str]:
+    provider, separator, reason = value.partition(":")
+    return {"symbol": symbol, "provider": provider, "reason": reason if separator else "disabled"}
+
+
+def _format_provider_disabled(items: list[dict[str, str]] | None) -> str:
+    if not items:
+        return "none"
+    return ",".join(f"{item['symbol']}:{item['provider']}:{item['reason']}" for item in items)
 
 
 def main() -> int:
@@ -242,7 +253,7 @@ def main() -> int:
     print(f"trade_dates={summarize_trade_dates(assets, at_kst)}")
     print(
         f"news_items={result.news_items} disclosures={result.disclosures} "
-        f"provider_disabled={','.join(result.provider_disabled or []) if result.provider_disabled else 'none'}"
+        f"provider_disabled={_format_provider_disabled(result.provider_disabled)}"
     )
     print(f"db={config.safe_summary()}")
     print("failed=" + (",".join(result.failures) if result.failures else "none"))

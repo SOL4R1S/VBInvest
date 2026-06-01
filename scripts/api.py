@@ -116,7 +116,8 @@ def startup_market_refresh(
     watchlist: str = "semiconductor-core",
     dry_run: bool = False,
     no_network: bool = False,
-    include_news: bool = False,
+    include_news: bool = True,
+    force: bool = False,
     limit: int = 0,
 ):
     try:
@@ -127,6 +128,7 @@ def startup_market_refresh(
             no_network=no_network,
             include_news=include_news,
             limit=limit,
+            force=force,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -135,10 +137,15 @@ def startup_market_refresh(
         "watchlist": result.watchlist,
         "dry_run": result.dry_run,
         "locked": result.locked,
+        "stale": result.stale,
         "price_rows": result.price_rows,
         "indicator_rows": result.indicator_rows,
-        "failed": result.failures,
-        "report_run": result.report_run_id,
+        "news_items": result.news_items,
+        "disclosures": result.disclosures,
+        "provider_disabled": result.provider_disabled,
+        "failures": result.failures,
+        "report_run_id": result.report_run_id,
+        "last_success_at": result.last_success_at,
     }
 
 
