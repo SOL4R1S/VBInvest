@@ -1,3 +1,5 @@
+from datetime import date
+
 import pandas as pd
 
 from scripts.lib.prices import PriceFetchError, fetch_price_history, normalize_yfinance_history, parse_yahoo_chart, synthetic_history
@@ -25,6 +27,20 @@ def yahoo_payload():
                 }
             ]
         }
+    }
+
+
+def _price_row(current: date, *, provider: str = "test") -> dict:
+    return {
+        "date": current,
+        "open": 100.0,
+        "high": 101.0,
+        "low": 99.0,
+        "close": 100.5,
+        "adj_close": 100.5,
+        "volume": 1000,
+        "currency": "USD",
+        "provider": provider,
     }
 
 
@@ -75,6 +91,64 @@ def test_fetch_price_history_uses_provider_fallback_order():
     frame = fetch_price_history("NVDA", yahoo_fetcher=yahoo, yfinance_fetcher=yfinance_fetch, stooq_fetcher=stooq)
 
     assert calls == [("yahoo", "NVDA"), ("yfinance", "NVDA")]
+    assert frame.loc[0, "provider"] == "yfinance"
+
+
+def test_fetch_price_history_passes_window_to_yfinance_and_filters_rows():
+    calls = []
+
+    def yahoo(symbol: str):
+        calls.append(("yahoo", symbol))
+        raise PriceFetchError("yahoo down")
+
+    def yfinance_fetch(symbol: str, *, start_date: date | None = None, end_date: date | None = None):
+        calls.append(("yfinance", symbol, start_date, end_date))
+        return pd.DataFrame(
+            [
+                _price_row(date(2026, 5, 29), provider="yfinance"),
+                _price_row(date(2026, 5, 31), provider="yfinance"),
+                _price_row(date(2026, 6, 2), provider="yfinance"),
+                _price_row(date(2026, 6, 3), provider="yfinance"),
+            ]
+        )
+
+    def stooq(symbol: str):
+        calls.append(("stooq", symbol))
+        return synthetic_history(symbol, days=2).assign(provider="stooq")
+
+    frame = fetch_price_history(
+        "NVDA",
+        start_date=date(2026, 5, 31),
+        end_date=date(2026, 6, 2),
+        yahoo_fetcher=yahoo,
+        yfinance_fetcher=yfinance_fetch,
+        stooq_fetcher=stooq,
+    )
+
+    assert calls == [
+        ("yahoo", "NVDA"),
+        ("yfinance", "NVDA", date(2026, 5, 31), date(2026, 6, 2)),
+    ]
+    assert list(frame["date"]) == [date(2026, 5, 31), date(2026, 6, 2)]
+    assert frame.loc[0, "provider"] == "yfinance"
+
+
+def test_fetch_price_history_falls_back_when_provider_has_no_rows_in_window():
+    def yahoo(symbol: str):
+        return pd.DataFrame([_price_row(date(2025, 1, 1), provider="yahoo-chart")])
+
+    def yfinance_fetch(symbol: str, *, start_date: date | None = None, end_date: date | None = None):
+        return pd.DataFrame([_price_row(date(2026, 6, 1), provider="yfinance")])
+
+    frame = fetch_price_history(
+        "NVDA",
+        start_date=date(2026, 6, 1),
+        end_date=date(2026, 6, 2),
+        yahoo_fetcher=yahoo,
+        yfinance_fetcher=yfinance_fetch,
+    )
+
+    assert list(frame["date"]) == [date(2026, 6, 1)]
     assert frame.loc[0, "provider"] == "yfinance"
 
 

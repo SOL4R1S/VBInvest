@@ -77,14 +77,27 @@ def fetch_yahoo_chart(symbol: str, *, range_: str = "1y", interval: str = "1d", 
     return parse_yahoo_chart(symbol, payload)
 
 
-def fetch_yfinance_history(symbol: str) -> pd.DataFrame:
+def fetch_yfinance_history(
+    symbol: str,
+    *,
+    start_date: date | None = None,
+    end_date: date | None = None,
+) -> pd.DataFrame:
     try:
         import yfinance as yf
     except ImportError as exc:
         raise PriceFetchError(f"{symbol}: yfinance unavailable: {exc}") from exc
     try:
         ticker = yf.Ticker(symbol)
-        frame = ticker.history(period="1y", interval="1d", auto_adjust=False)
+        if start_date is None and end_date is None:
+            frame = ticker.history(period="1y", interval="1d", auto_adjust=False)
+        else:
+            history_kwargs = {"interval": "1d", "auto_adjust": False}
+            if start_date is not None:
+                history_kwargs["start"] = start_date.isoformat()
+            if end_date is not None:
+                history_kwargs["end"] = (end_date + timedelta(days=1)).isoformat()
+            frame = ticker.history(**history_kwargs)
         info = ticker.fast_info
     except (AttributeError, KeyError, RuntimeError, TypeError, ValueError) as exc:
         raise PriceFetchError(f"{symbol}: yfinance fetch failed: {exc}") from exc
@@ -157,6 +170,8 @@ def fetch_stooq_history(symbol: str) -> pd.DataFrame:
 def fetch_price_history(
     symbol: str,
     *,
+    start_date: date | None = None,
+    end_date: date | None = None,
     synthetic: bool = False,
     no_network: bool = False,
     yahoo_fetcher=fetch_yahoo_chart,
@@ -164,7 +179,10 @@ def fetch_price_history(
     stooq_fetcher=fetch_stooq_history,
 ) -> pd.DataFrame:
     if synthetic or no_network:
-        return synthetic_history(symbol)
+        if start_date is not None and end_date is not None:
+            days = max(0, (end_date - start_date).days + 1)
+            return synthetic_history(symbol, days=days, start_date=start_date)
+        return filter_price_history_window(synthetic_history(symbol), start_date=start_date, end_date=end_date)
 
     failures: list[str] = []
     for provider, fetcher in (
@@ -173,21 +191,42 @@ def fetch_price_history(
         ("stooq", stooq_fetcher),
     ):
         try:
-            frame = fetcher(symbol)
+            if provider == "yfinance" and (start_date is not None or end_date is not None):
+                frame = fetcher(symbol, start_date=start_date, end_date=end_date)
+            else:
+                frame = fetcher(symbol)
         except PriceFetchError as exc:
             failures.append(f"{provider} failed: {exc}")
             continue
-        if frame.empty:
+        filtered = filter_price_history_window(frame, start_date=start_date, end_date=end_date)
+        if filtered.empty:
             failures.append(f"{provider} failed: empty frame")
             continue
-        return frame
+        return filtered
     raise PriceFetchError(f"{symbol}: all price providers failed: {'; '.join(failures)}")
 
 
-def synthetic_history(symbol: str, *, days: int = 260) -> pd.DataFrame:
+def filter_price_history_window(
+    frame: pd.DataFrame,
+    *,
+    start_date: date | None,
+    end_date: date | None,
+) -> pd.DataFrame:
+    if frame.empty:
+        return frame
+    result = frame.copy()
+    result["date"] = pd.to_datetime(result["date"]).dt.date
+    if start_date is not None:
+        result = result[result["date"] >= start_date]
+    if end_date is not None:
+        result = result[result["date"] <= end_date]
+    return result.sort_values("date").reset_index(drop=True)
+
+
+def synthetic_history(symbol: str, *, days: int = 260, start_date: date | None = None) -> pd.DataFrame:
     """Deterministic non-market sample data for tests and offline demos."""
     rng = random.Random(symbol)
-    start = date(2025, 1, 1)
+    start = start_date or date(2025, 1, 1)
     price = 80.0 + rng.random() * 50
     rows = []
     for offset in range(days):

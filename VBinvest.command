@@ -27,6 +27,29 @@ save_secret() {
 save_secret "AI_API_KEY"
 save_secret "OPENDART_API_KEY"
 
+load_docker_postgres_env() {
+  if [[ -n "${POSTGRES_PASSWORD:-}${VBINVEST_DB_PASSWORD:-}" ]]; then
+    return
+  fi
+  if ! command -v docker >/dev/null 2>&1; then
+    return
+  fi
+  if ! docker ps --format '{{.Names}}' | grep -qx 'vbinvest-postgres'; then
+    return
+  fi
+
+  export VBINVEST_DB_HOST="${VBINVEST_DB_HOST:-127.0.0.1}"
+  local db_name db_user db_password
+  db_name="$(docker exec vbinvest-postgres printenv POSTGRES_DB 2>/dev/null || true)"
+  db_user="$(docker exec vbinvest-postgres printenv POSTGRES_USER 2>/dev/null || true)"
+  db_password="$(docker exec vbinvest-postgres printenv POSTGRES_PASSWORD 2>/dev/null || true)"
+  [[ -n "$db_name" && -z "${POSTGRES_DB:-}" ]] && export POSTGRES_DB="$db_name"
+  [[ -n "$db_user" && -z "${POSTGRES_USER:-}" ]] && export POSTGRES_USER="$db_user"
+  [[ -n "$db_password" ]] && export POSTGRES_PASSWORD="$db_password"
+}
+
+load_docker_postgres_env
+
 find_free_port() {
   "$PYTHON_BIN" - <<'PY'
 import socket

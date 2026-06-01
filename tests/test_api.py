@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 
+import pandas as pd
 from fastapi.testclient import TestClient
 
 from scripts import api
@@ -40,6 +41,61 @@ class FakeResearchDB:
 
     def generate_research_for_asset(self, auth_user_id: str, symbol: str):
         raise AIProviderConfigError("AI provider API key is required for non-local providers")
+
+
+class FakeDashboardDB:
+    def fetch_dashboard_items(self, slug: str, *, days: int = 260):
+        assert slug == "semiconductor-core"
+        assert days == 260
+        return [
+            {
+                "asset": {
+                    "asset_id": 1,
+                    "symbol": "NVDA",
+                    "display_name_ko": "엔비디아",
+                    "exchange": "NASDAQ",
+                    "currency": "USD",
+                },
+                "history": pd.DataFrame(
+                    [
+                        {
+                            "date": datetime(2026, 5, 29, tzinfo=timezone.utc).date(),
+                            "open": 100.0,
+                            "high": 104.0,
+                            "low": 99.0,
+                            "close": 103.0,
+                            "volume": 1000,
+                            "source": "yfinance",
+                            "return_1d": 0.01,
+                            "return_1m": 0.08,
+                            "ma5": 101.0,
+                            "ma20": 98.0,
+                            "ma50": 95.0,
+                            "ma120": None,
+                            "rsi14": 62.5,
+                        },
+                        {
+                            "date": datetime(2026, 6, 1, tzinfo=timezone.utc).date(),
+                            "open": 103.0,
+                            "high": 108.0,
+                            "low": 102.0,
+                            "close": 107.0,
+                            "volume": 1200,
+                            "source": "yfinance",
+                            "return_1d": 0.0388,
+                            "return_1m": 0.125,
+                            "ma5": 102.0,
+                            "ma20": 99.0,
+                            "ma50": 96.0,
+                            "ma120": None,
+                            "rsi14": 64.2,
+                        },
+                    ]
+                ),
+                "opinion": "아웃퍼폼",
+                "thesis": "실제 DB 가격을 기반으로 합니다.",
+            }
+        ]
 
 
 def client_with_db(monkeypatch, fake_db):
@@ -122,3 +178,50 @@ def test_generate_research_returns_503_for_cloud_ai_missing_key(monkeypatch):
 
     assert response.status_code == 503
     assert response.json()["detail"] == "AI provider API key is required for non-local providers"
+
+
+def test_watchlist_dashboard_api_includes_serialized_history(monkeypatch):
+    client = client_with_db(monkeypatch, FakeDashboardDB())
+
+    response = client.get("/api/watchlists/semiconductor-core/dashboard?days=260")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["watchlist"] == "semiconductor-core"
+    assert payload["items"][0]["asset"]["symbol"] == "NVDA"
+    assert payload["items"][0]["latest"]["close"] == 107.0
+    assert payload["items"][0]["latest"]["rsi14"] == 64.2
+    assert payload["items"][0]["history"] == [
+        {
+            "date": "2026-05-29",
+            "open": 100.0,
+            "high": 104.0,
+            "low": 99.0,
+            "close": 103.0,
+            "volume": 1000,
+            "source": "yfinance",
+            "return_1d": 0.01,
+            "return_1m": 0.08,
+            "ma5": 101.0,
+            "ma20": 98.0,
+            "ma50": 95.0,
+            "ma120": None,
+            "rsi14": 62.5,
+        },
+        {
+            "date": "2026-06-01",
+            "open": 103.0,
+            "high": 108.0,
+            "low": 102.0,
+            "close": 107.0,
+            "volume": 1200,
+            "source": "yfinance",
+            "return_1d": 0.0388,
+            "return_1m": 0.125,
+            "ma5": 102.0,
+            "ma20": 99.0,
+            "ma50": 96.0,
+            "ma120": None,
+            "rsi14": 64.2,
+        },
+    ]

@@ -8,7 +8,7 @@ describe("frontend scaffold", () => {
     const packageJson = readFileSync(join(root, "package.json"), "utf8");
 
     expect(packageJson).toContain('"dev": "next dev -p 3000"');
-    expect(readFileSync(join(root, "app", "page.tsx"), "utf8")).toContain("data-testid=\"create-watchlist\"");
+    expect(readFileSync(join(root, "app", "page.tsx"), "utf8")).toContain("WatchlistDashboard");
     expect(readFileSync(join(root, "app", "layout.tsx"), "utf8")).toContain("lang=\"ko\"");
   });
 });

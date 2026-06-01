@@ -10,7 +10,15 @@ import {
   type ProviderSummary,
   type StartupRefreshView,
 } from "@/lib/startup-status";
-import { ASSETS, WATCHLISTS, buildSeries } from "@/lib/mock-data";
+import {
+  DEFAULT_WATCHLISTS,
+  fallbackAsset,
+  fetchDashboardData,
+  formatMa,
+  formatNumber,
+  type AssetCard,
+  type ChartPoint,
+} from "@/lib/dashboard-data";
 import { ChartShell } from "@/components/ChartShell";
 import { ResearchCard } from "@/components/ResearchCard";
 import { signInWithProvider } from "@/lib/supabase-auth";
@@ -21,21 +29,12 @@ type Watchlist = {
   readonly symbols: readonly string[];
 };
 
-function fallbackAsset(symbol: string) {
-  return {
-    symbol,
-    displayNameKo: symbol,
-    opinion: "중립" as const,
-    price: 0,
-    delta1d: "0.00%",
-    delta1m: "0.00%",
-  };
-}
-
 export function WatchlistDashboard() {
-  const [watchlists, setWatchlists] = useState<readonly Watchlist[]>(WATCHLISTS);
-  const [selectedWatchlist, setSelectedWatchlist] = useState(WATCHLISTS[0]?.id ?? "default");
-  const [selectedSymbol, setSelectedSymbol] = useState(WATCHLISTS[0]?.symbols[0] ?? "NVDA");
+  const [watchlists, setWatchlists] = useState<readonly Watchlist[]>(DEFAULT_WATCHLISTS);
+  const [selectedWatchlist, setSelectedWatchlist] = useState(DEFAULT_WATCHLISTS[0]?.id ?? "semiconductor-core");
+  const [selectedSymbol, setSelectedSymbol] = useState(DEFAULT_WATCHLISTS[0]?.symbols[0] ?? "NVDA");
+  const [assetCards, setAssetCards] = useState<Record<string, AssetCard>>({});
+  const [seriesBySymbol, setSeriesBySymbol] = useState<Record<string, ChartPoint[]>>({});
   const [newWatchlist, setNewWatchlist] = useState("");
   const [newSymbol, setNewSymbol] = useState("");
   const [startupRefresh, setStartupRefresh] = useState<StartupRefreshView>(INITIAL_STARTUP_REFRESH);
@@ -43,11 +42,24 @@ export function WatchlistDashboard() {
 
   const activeWatchlist = watchlists.find((item) => item.id === selectedWatchlist) ?? watchlists[0];
   const currentSymbol = activeWatchlist?.symbols.includes(selectedSymbol) ? selectedSymbol : activeWatchlist?.symbols[0] ?? "NVDA";
-  const asset = ASSETS[currentSymbol] ?? fallbackAsset(currentSymbol);
-  const points = useMemo(() => buildSeries(currentSymbol), [currentSymbol]);
+  const asset = assetCards[currentSymbol] ?? fallbackAsset(currentSymbol);
+  const points = useMemo(() => seriesBySymbol[currentSymbol] ?? [], [currentSymbol, seriesBySymbol]);
 
   useEffect(() => {
     let cancelled = false;
+
+    async function loadDashboardData(slug: string) {
+      const dashboard = await fetchDashboardData(slug);
+      if (cancelled || dashboard === null) {
+        return;
+      }
+      setAssetCards(dashboard.assets);
+      setSeriesBySymbol(dashboard.series);
+      setWatchlists((items) =>
+        items.map((item) => (item.id === slug ? { ...item, symbols: dashboard.symbols } : item)),
+      );
+      setSelectedSymbol((symbol) => (dashboard.symbols.includes(symbol) ? symbol : dashboard.symbols[0] ?? symbol));
+    }
 
     async function refreshMarketData() {
       try {
@@ -56,6 +68,7 @@ export function WatchlistDashboard() {
           setProviderSummary(nextProviderSummary);
           if (nextProviderSummary?.firstRunCompleted === false) {
             setStartupRefresh({ ...INITIAL_STARTUP_REFRESH, status: "setup_required" });
+            await loadDashboardData("semiconductor-core");
             return;
           }
         }
@@ -76,6 +89,11 @@ export function WatchlistDashboard() {
         if (!cancelled) {
           setStartupRefresh({ ...INITIAL_STARTUP_REFRESH, status: "failed" });
         }
+      }
+      try {
+        await loadDashboardData("semiconductor-core");
+      } catch (error) {
+        logStartupWarning(error, "dashboard data refresh failed");
       }
     }
 
@@ -190,7 +208,7 @@ export function WatchlistDashboard() {
           </div>
           <div className="symbol-list">
             {(activeWatchlist?.symbols ?? []).map((symbol) => {
-              const item = ASSETS[symbol];
+              const item = assetCards[symbol];
               return (
                 <button key={symbol} type="button" className={symbol === currentSymbol ? "symbol-row active" : "symbol-row"} onClick={() => setSelectedSymbol(symbol)} data-testid={`symbol-${symbol}`}>
                   <strong>{item?.displayNameKo ?? symbol}</strong>
@@ -216,8 +234,8 @@ export function WatchlistDashboard() {
             <div><b>현재가</b><span>{asset.price.toLocaleString()}</span></div>
             <div><b>1D</b><span>{asset.delta1d}</span></div>
             <div><b>1M</b><span>{asset.delta1m}</span></div>
-            <div><b>RSI14</b><span>52.4</span></div>
-            <div><b>MA5 / 20 / 50 / 120</b><span>예시 값</span></div>
+            <div><b>RSI14</b><span>{formatNumber(asset.rsi14)}</span></div>
+            <div><b>MA5 / 20 / 50 / 120</b><span>{formatMa(asset)}</span></div>
           </div>
 
           <ChartShell symbol={asset.symbol} points={points} />

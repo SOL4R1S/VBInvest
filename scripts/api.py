@@ -15,6 +15,7 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
 from scripts.lib.dashboard import render_dashboard_html
+from scripts.lib.dashboard_payload import serialize_dashboard_items
 from scripts.lib.api_store import ApiStore
 from scripts.lib.auth import AuthError, AuthUser, verify_bearer_token
 from scripts.lib.ai_provider import AIProviderConfigError
@@ -250,15 +251,7 @@ def dashboard_data(slug: str, days: int = 260):
     items = db().fetch_dashboard_items(slug, days=days)
     if not items:
         raise HTTPException(status_code=404, detail="dashboard data not found")
-    payload = []
-    for item in items:
-        latest = item["history"].iloc[-1].to_dict()
-        payload.append({
-            "asset": item["asset"],
-            "latest": {k: (v.isoformat() if hasattr(v, "isoformat") else v) for k, v in latest.items()},
-            "opinion": item.get("opinion", "중립"),
-            "thesis": item.get("thesis"),
-        })
+    payload = serialize_dashboard_items(items)
     return {"watchlist": slug, "count": len(payload), "items": payload}
 
 

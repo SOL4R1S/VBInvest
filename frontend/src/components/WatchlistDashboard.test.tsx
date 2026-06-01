@@ -10,11 +10,61 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
+function dashboardResponse(): Response {
+  return jsonResponse({
+    watchlist: "semiconductor-core",
+    count: 2,
+    items: [
+      {
+        asset: { symbol: "NVDA", display_name_ko: "엔비디아", currency: "USD" },
+        latest: {
+          date: "2026-06-01",
+          close: 999.12,
+          return_1d: 0.0388,
+          return_1m: 0.125,
+          ma5: 990.1,
+          ma20: 970.2,
+          ma50: 950.3,
+          ma120: 930.4,
+          rsi14: 64.2,
+        },
+        opinion: "아웃퍼폼",
+        history: [
+          { date: "2026-05-29", open: 980, high: 995, low: 970, close: 990, volume: 1000, ma5: 985, ma20: 970, ma50: 950, ma120: 930, rsi14: 61.1 },
+          { date: "2026-06-01", open: 990, high: 1005, low: 985, close: 999.12, volume: 1200, ma5: 990.1, ma20: 970.2, ma50: 950.3, ma120: 930.4, rsi14: 64.2 },
+        ],
+      },
+      {
+        asset: { symbol: "005930.KS", display_name_ko: "삼성전자", currency: "KRW" },
+        latest: {
+          date: "2026-06-01",
+          close: 81200,
+          return_1d: -0.005,
+          return_1m: 0.031,
+          ma5: 80800,
+          ma20: 79900,
+          ma50: 78500,
+          ma120: 77100,
+          rsi14: 55.5,
+        },
+        opinion: "중립",
+        history: [
+          { date: "2026-05-29", open: 80000, high: 81500, low: 79800, close: 81000, volume: 2000, ma5: 80600, ma20: 79700, ma50: 78300, ma120: 77000, rsi14: 54.1 },
+          { date: "2026-06-01", open: 81000, high: 81800, low: 80600, close: 81200, volume: 2200, ma5: 80800, ma20: 79900, ma50: 78500, ma120: 77100, rsi14: 55.5 },
+        ],
+      },
+    ],
+  });
+}
+
 describe("WatchlistDashboard", () => {
   beforeEach(() => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit): Promise<Response> => {
+      vi.fn(async (input: RequestInfo | URL, _init?: RequestInit): Promise<Response> => {
+        if (String(input).includes("/api/backend/watchlists/semiconductor-core/dashboard")) {
+          return dashboardResponse();
+        }
         return jsonResponse({ status: "ok", price_rows: 1, indicator_rows: 1, news_items: 0, disclosures: 0 });
       }),
     );
@@ -24,7 +74,7 @@ describe("WatchlistDashboard", () => {
     vi.unstubAllGlobals();
   });
 
-  it("renders the investing dashboard shell with approved labels and chart controls", () => {
+  it("renders the investing dashboard shell with approved labels and chart controls", async () => {
     render(<WatchlistDashboard />);
 
     expect(screen.getByRole("heading", { name: "투자 대시보드" })).toBeInTheDocument();
@@ -37,9 +87,12 @@ describe("WatchlistDashboard", () => {
     for (const opinion of APPROVED_OPINIONS) {
       expect(screen.getAllByText(opinion).length).toBeGreaterThan(0);
     }
+    await waitFor(() => {
+      expect(screen.getByText("999.12")).toBeInTheDocument();
+    });
   });
 
-  it("creates a new group and adds NVDA through the visible controls", () => {
+  it("creates a new group and adds NVDA through the visible controls", async () => {
     render(<WatchlistDashboard />);
 
     fireEvent.change(screen.getByLabelText("새 그룹 이름"), { target: { value: "AI Memory Lab" } });
@@ -49,10 +102,16 @@ describe("WatchlistDashboard", () => {
 
     expect(screen.getByRole("button", { name: "AI Memory Lab" })).toBeInTheDocument();
     expect(screen.getByTestId("symbol-NVDA")).toHaveTextContent("NVDA");
+    await waitFor(() => {
+      expect(screen.getByText("999.12")).toBeInTheDocument();
+    });
   });
 
   it("refreshes market data when the local program page opens", async () => {
     const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit): Promise<Response> => {
+      if (String(_input).includes("/api/backend/watchlists/semiconductor-core/dashboard")) {
+        return dashboardResponse();
+      }
       return new Response(JSON.stringify({ status: "ok", price_rows: 1, indicator_rows: 1 }), {
         status: 200,
         headers: { "Content-Type": "application/json" },
@@ -71,6 +130,32 @@ describe("WatchlistDashboard", () => {
     });
   });
 
+  it("renders price, indicators, and chart data from the backend dashboard payload", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit): Promise<Response> => {
+      const url = String(input);
+      if (url.includes("/api/backend/settings")) {
+        return jsonResponse({ provider_status: { opendart: { configured: true }, ai: { mode: "local" } } });
+      }
+      if (url.includes("/api/backend/watchlists/semiconductor-core/dashboard")) {
+        return dashboardResponse();
+      }
+      return jsonResponse({ status: "ok", price_rows: 2, indicator_rows: 2, news_items: 0, disclosures: 0 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<WatchlistDashboard />);
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith("/api/backend/watchlists/semiconductor-core/dashboard?days=260");
+    });
+    expect(screen.getByText("999.12")).toBeInTheDocument();
+    expect(screen.getByText("+3.88%")).toBeInTheDocument();
+    expect(screen.getByText("+12.50%")).toBeInTheDocument();
+    expect(screen.getByText("64.2")).toBeInTheDocument();
+    expect(screen.getByText("990.1 / 970.2 / 950.3 / 930.4")).toBeInTheDocument();
+    expect(screen.queryByText("예시 값")).not.toBeInTheDocument();
+  });
+
   it("does not run startup market refresh before first-run setup is completed", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit): Promise<Response> => {
       const url = String(input);
@@ -79,6 +164,9 @@ describe("WatchlistDashboard", () => {
           first_run_completed: false,
           provider_status: { opendart: { configured: false }, ai: { mode: "disabled" } },
         });
+      }
+      if (url.includes("/api/backend/watchlists/semiconductor-core/dashboard")) {
+        return dashboardResponse();
       }
       return jsonResponse({ status: "ok", price_rows: 1, indicator_rows: 1, news_items: 0, disclosures: 0 });
     });
@@ -93,6 +181,11 @@ describe("WatchlistDashboard", () => {
       "/api/backend/startup/market-refresh?no_network=false&include_news=true",
     );
     expect(screen.queryByText("시장 데이터 갱신 실패")).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith("/api/backend/watchlists/semiconductor-core/dashboard?days=260");
+    });
+    expect(screen.getByText("999.12")).toBeInTheDocument();
+    expect(screen.queryByText("예시 값")).not.toBeInTheDocument();
   });
 
   it("shows provider-disabled partial refresh without treating it as a total failure", async () => {

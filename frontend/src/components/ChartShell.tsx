@@ -14,7 +14,7 @@ import {
   type LogicalRange,
   type LogicalRangeChangeEventHandler,
 } from "lightweight-charts";
-import type { ChartPoint } from "@/lib/mock-data";
+import type { ChartPoint } from "@/lib/dashboard-data";
 
 type Props = {
   symbol: string;
@@ -68,21 +68,21 @@ export function ChartShell({ symbol, points }: Props) {
     const chart = createChart(containerRef.current, {
       autoSize: true,
       layout: {
-        background: { type: ColorType.Solid, color: "#07101f" },
-        textColor: "#dbeafe",
+        background: { type: ColorType.Solid, color: "#fffdf8" },
+        textColor: "#454745",
       },
       grid: {
-        vertLines: { color: "#13233d" },
-        horzLines: { color: "#13233d" },
+        vertLines: { color: "#eee7dc" },
+        horzLines: { color: "#eee7dc" },
       },
       crosshair: {
         mode: CrosshairMode.Normal,
       },
       rightPriceScale: {
-        borderColor: "#243756",
+        borderColor: "#ddd5c7",
       },
       timeScale: {
-        borderColor: "#243756",
+        borderColor: "#ddd5c7",
         timeVisible: true,
         secondsVisible: false,
       },
@@ -107,11 +107,11 @@ export function ChartShell({ symbol, points }: Props) {
       wickUpColor: "#22c55e",
       wickDownColor: "#ef4444",
     });
-    const line = chart.addSeries(LineSeries, { color: "#f8fafc", lineWidth: PRICE_LINE_WIDTH });
-    const ma5 = chart.addSeries(LineSeries, { color: "#22c55e", lineWidth: PRICE_LINE_WIDTH });
-    const ma20 = chart.addSeries(LineSeries, { color: "#38bdf8", lineWidth: PRICE_LINE_WIDTH });
-    const ma50 = chart.addSeries(LineSeries, { color: "#f59e0b", lineWidth: PRICE_LINE_WIDTH });
-    const ma120 = chart.addSeries(LineSeries, { color: "#a78bfa", lineWidth: PRICE_LINE_WIDTH });
+    const line = chart.addSeries(LineSeries, { color: "#111714", lineWidth: PRICE_LINE_WIDTH });
+    const ma5 = chart.addSeries(LineSeries, { color: "#16823a", lineWidth: PRICE_LINE_WIDTH });
+    const ma20 = chart.addSeries(LineSeries, { color: "#2458d3", lineWidth: PRICE_LINE_WIDTH });
+    const ma50 = chart.addSeries(LineSeries, { color: "#b86700", lineWidth: PRICE_LINE_WIDTH });
+    const ma120 = chart.addSeries(LineSeries, { color: "#7c5cc4", lineWidth: PRICE_LINE_WIDTH });
     const rsi = chart.addSeries(LineSeries, {
       color: "#fb7185",
       lineWidth: RSI_LINE_WIDTH,
