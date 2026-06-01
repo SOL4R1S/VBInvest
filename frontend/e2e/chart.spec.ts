@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -9,6 +9,23 @@ async function writeEvidence(name: string, content: string | Buffer) {
   await writeFile(path.join(evidenceDir, name), content);
 }
 
+async function routeStartupOk(page: Page) {
+  await page.route("**/api/backend/settings", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ provider_status: { opendart: { configured: true }, ai: { mode: "local" } } }),
+    });
+  });
+  await page.route("**/api/backend/startup/market-refresh?**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ status: "ok", price_rows: 1, indicator_rows: 1, news_items: 0, disclosures: 0 }),
+    });
+  });
+}
+
 test("dashboard chart interactions preserve stable stroke width", async ({ page }) => {
   const errors: string[] = [];
   page.on("console", (message) => {
@@ -17,6 +34,7 @@ test("dashboard chart interactions preserve stable stroke width", async ({ page 
     }
   });
 
+  await routeStartupOk(page);
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "투자 대시보드" })).toBeVisible();
   await page.getByRole("button", { name: "Google로 로그인" }).click();
@@ -75,6 +93,7 @@ test("dashboard chart interactions preserve stable stroke width", async ({ page 
 
 test("mobile layout keeps toolbar readable", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
+  await routeStartupOk(page);
   await page.goto("/");
 
   const toolbar = page.locator(".chart-toolbar");

@@ -130,4 +130,144 @@ describe("WatchlistDashboard", () => {
     });
     expect(screen.queryByText(/raw-ai-token-fixture|raw-dart-token-fixture|<redacted>/)).not.toBeInTheDocument();
   });
+
+  it("calls the on-demand research generation endpoint for the selected symbol", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit): Promise<Response> => {
+      const url = String(input);
+      if (url.includes("/api/backend/settings")) {
+        return jsonResponse({ provider_status: { opendart: { configured: true }, ai: { mode: "local" } } });
+      }
+      if (url.includes("/api/backend/research/NVDA/generate")) {
+        return jsonResponse({
+          target_slug: "NVDA",
+          opinion: "아웃퍼폼",
+          thesis: "DB 가격 지표와 공개 소스를 바탕으로 모멘텀을 점검했습니다.",
+          sources: [{ kind: "db_price_indicator" }],
+        }, 201);
+      }
+      return jsonResponse({ status: "ok", price_rows: 1, indicator_rows: 1, news_items: 0, disclosures: 0 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<WatchlistDashboard />);
+
+    fireEvent.click(screen.getByRole("button", { name: "리포트 발행" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith("/api/backend/research/NVDA/generate", { method: "POST" });
+    });
+  });
+
+  it("shows a safe setup message when report generation returns AI provider misconfiguration", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, _init?: RequestInit): Promise<Response> => {
+        const url = String(input);
+        if (url.includes("/api/backend/settings")) {
+          return jsonResponse({ provider_status: { opendart: { configured: true }, ai: { mode: "misconfigured" } } });
+        }
+        if (url.includes("/api/backend/research/NVDA/generate")) {
+          return jsonResponse({ detail: "AI provider API key is required for non-local providers" }, 503);
+        }
+        return jsonResponse({ status: "ok", price_rows: 1, indicator_rows: 1, news_items: 0, disclosures: 0 });
+      }),
+    );
+
+    render(<WatchlistDashboard />);
+
+    fireEvent.click(screen.getByRole("button", { name: "리포트 발행" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("AI API 설정이 필요합니다. 설정에서 provider 키 또는 로컬 모델을 확인해주세요.")).toBeInTheDocument();
+    });
+    expect(screen.queryByText("AI provider API key is required for non-local providers")).not.toBeInTheDocument();
+  });
+
+  it("renders generated opinion, thesis, and source count after report generation succeeds", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, _init?: RequestInit): Promise<Response> => {
+        const url = String(input);
+        if (url.includes("/api/backend/settings")) {
+          return jsonResponse({ provider_status: { opendart: { configured: true }, ai: { mode: "local" } } });
+        }
+        if (url.includes("/api/backend/research/NVDA/generate")) {
+          return jsonResponse({
+            target_slug: "NVDA",
+            opinion: "매수",
+            thesis: "<script>alert('x')</script>DB 소스 기반으로 수요 개선 가능성을 점검했습니다.",
+            sources: [{ kind: "news" }, { kind: "disclosure" }],
+          }, 201);
+        }
+        return jsonResponse({ status: "ok", price_rows: 1, indicator_rows: 1, news_items: 0, disclosures: 0 });
+      }),
+    );
+
+    render(<WatchlistDashboard />);
+
+    fireEvent.click(screen.getByRole("button", { name: "리포트 발행" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("투자의견 매수")).toBeInTheDocument();
+    });
+    expect(screen.getByText("<script>alert('x')</script>DB 소스 기반으로 수요 개선 가능성을 점검했습니다.")).toBeInTheDocument();
+    expect(screen.getByText("근거 2개")).toBeInTheDocument();
+    expect(document.querySelector("script")).toBeNull();
+  });
+
+  it("keeps the report button disabled while generation is in flight", async () => {
+    let resolveGenerate: (response: Response) => void = () => undefined;
+    const generatePromise = new Promise<Response>((resolve) => {
+      resolveGenerate = resolve;
+    });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit): Promise<Response> => {
+      const url = String(input);
+      if (url.includes("/api/backend/settings")) {
+        return jsonResponse({ provider_status: { opendart: { configured: true }, ai: { mode: "local" } } });
+      }
+      if (url.includes("/api/backend/research/NVDA/generate")) {
+        return generatePromise;
+      }
+      return jsonResponse({ status: "ok", price_rows: 1, indicator_rows: 1, news_items: 0, disclosures: 0 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<WatchlistDashboard />);
+
+    fireEvent.click(screen.getByRole("button", { name: "리포트 발행" }));
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "실시간 분석 중" })).toBeDisabled();
+    });
+    fireEvent.click(screen.getByRole("button", { name: "실시간 분석 중" }));
+    resolveGenerate(jsonResponse({ target_slug: "NVDA", opinion: "중립", thesis: "완료", sources: [] }, 201));
+
+    await waitFor(() => {
+      expect(screen.getByText("리포트 발행 완료")).toBeInTheDocument();
+    });
+    expect(fetchMock.mock.calls.filter(([input]) => String(input).includes("/api/backend/research/NVDA/generate"))).toHaveLength(1);
+  });
+
+  it("generates a report for the currently selected symbol after switching rows", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit): Promise<Response> => {
+      const url = String(input);
+      if (url.includes("/api/backend/settings")) {
+        return jsonResponse({ provider_status: { opendart: { configured: true }, ai: { mode: "local" } } });
+      }
+      if (url.includes("/api/backend/research/005930.KS/generate")) {
+        return jsonResponse({ target_slug: "005930.KS", opinion: "중립", thesis: "삼성전자 리포트", sources: [] }, 201);
+      }
+      return jsonResponse({ status: "ok", price_rows: 1, indicator_rows: 1, news_items: 0, disclosures: 0 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<WatchlistDashboard />);
+
+    fireEvent.click(screen.getByTestId("symbol-005930.KS"));
+    fireEvent.click(screen.getByRole("button", { name: "리포트 발행" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith("/api/backend/research/005930.KS/generate", { method: "POST" });
+    });
+    expect(screen.queryByText("DB 가격 지표와 공개 소스를 바탕으로 모멘텀을 점검했습니다.")).not.toBeInTheDocument();
+  });
 });

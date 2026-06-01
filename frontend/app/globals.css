@@ -47,6 +47,11 @@ button.active,
   box-shadow: inset 0 0 0 1px var(--accent);
 }
 
+button:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
 input {
   min-height: 40px;
   min-width: 0;
@@ -280,6 +285,40 @@ p {
 .research-card {
   margin-top: 12px;
   background: #fff8ed;
+}
+
+.generated-report {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.generated-report p {
+  margin-bottom: 0;
+}
+
+.generated-report span,
+.research-status {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.research-status {
+  margin-bottom: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: var(--surface);
+}
+
+.research-status.success {
+  border-color: color-mix(in srgb, var(--positive) 36%, var(--line));
+  color: var(--positive);
+}
+
+.research-status.error {
+  border-color: color-mix(in srgb, var(--negative) 36%, var(--line));
+  color: var(--negative);
 }
 
 @media (max-width: 900px) {

@@ -1,46 +1,24 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { APPROVED_OPINIONS } from "@/lib/research";
+import {
+  INITIAL_STARTUP_REFRESH,
+  fetchProviderSummary,
+  parseStartupRefresh,
+  providerSummaryLabel,
+  startupStatusLabel,
+  type ProviderSummary,
+  type StartupRefreshView,
+} from "@/lib/startup-status";
 import { ASSETS, WATCHLISTS, buildSeries } from "@/lib/mock-data";
 import { ChartShell } from "@/components/ChartShell";
+import { ResearchCard } from "@/components/ResearchCard";
 import { signInWithProvider } from "@/lib/supabase-auth";
 
 type Watchlist = {
   readonly id: string;
   readonly name: string;
   readonly symbols: readonly string[];
-};
-
-type StartupRefreshStatus = "checking" | "ready" | "partial" | "skipped" | "failed";
-
-type ProviderDisabled = {
-  readonly symbol: string;
-  readonly provider: string;
-  readonly reason: string;
-};
-
-type StartupRefreshView = {
-  readonly status: StartupRefreshStatus;
-  readonly priceRows: number;
-  readonly indicatorRows: number;
-  readonly newsItems: number;
-  readonly disclosures: number;
-  readonly providerDisabled: readonly ProviderDisabled[];
-};
-
-type ProviderSummary = {
-  readonly opendartConfigured: boolean;
-  readonly aiMode: string | null;
-};
-
-const INITIAL_REFRESH: StartupRefreshView = {
-  status: "checking",
-  priceRows: 0,
-  indicatorRows: 0,
-  newsItems: 0,
-  disclosures: 0,
-  providerDisabled: [],
 };
 
 function fallbackAsset(symbol: string) {
@@ -60,7 +38,7 @@ export function WatchlistDashboard() {
   const [selectedSymbol, setSelectedSymbol] = useState(WATCHLISTS[0]?.symbols[0] ?? "NVDA");
   const [newWatchlist, setNewWatchlist] = useState("");
   const [newSymbol, setNewSymbol] = useState("");
-  const [startupRefresh, setStartupRefresh] = useState<StartupRefreshView>(INITIAL_REFRESH);
+  const [startupRefresh, setStartupRefresh] = useState<StartupRefreshView>(INITIAL_STARTUP_REFRESH);
   const [providerSummary, setProviderSummary] = useState<ProviderSummary | null>(null);
 
   const activeWatchlist = watchlists.find((item) => item.id === selectedWatchlist) ?? watchlists[0];
@@ -92,7 +70,7 @@ export function WatchlistDashboard() {
       } catch (error) {
         logStartupWarning(error, "startup market refresh failed");
         if (!cancelled) {
-          setStartupRefresh({ ...INITIAL_REFRESH, status: "failed" });
+          setStartupRefresh({ ...INITIAL_STARTUP_REFRESH, status: "failed" });
         }
       }
     }
@@ -240,110 +218,11 @@ export function WatchlistDashboard() {
 
           <ChartShell symbol={asset.symbol} points={points} />
 
-          <article className="research-card">
-            <h3>리서치 의견</h3>
-            <p>아직 발행된 리서치가 없습니다. 현재는 DB 가격/지표를 기반으로 차트를 확인할 수 있습니다.</p>
-            <button type="button">리포트 발행</button>
-            <div className="badge-row">
-              {APPROVED_OPINIONS.map((opinion) => (
-                <span key={opinion} className={`badge ${opinion}`}>{opinion}</span>
-              ))}
-            </div>
-          </article>
+          <ResearchCard symbol={asset.symbol} />
         </section>
       </section>
     </main>
   );
-}
-
-async function fetchProviderSummary(): Promise<ProviderSummary | null> {
-  const response = await fetch("/api/backend/settings");
-  if (!response.ok) {
-    return null;
-  }
-  const payload: unknown = await response.json();
-  if (!isRecord(payload) || !isRecord(payload.provider_status)) {
-    return null;
-  }
-  const opendart = isRecord(payload.provider_status.opendart) ? payload.provider_status.opendart : {};
-  const ai = isRecord(payload.provider_status.ai) ? payload.provider_status.ai : {};
-  return {
-    opendartConfigured: opendart.configured === true,
-    aiMode: typeof ai.mode === "string" ? ai.mode : null,
-  };
-}
-
-function parseStartupRefresh(payload: unknown): StartupRefreshView {
-  if (!isRecord(payload)) {
-    return { ...INITIAL_REFRESH, status: "failed" };
-  }
-  const providerDisabled = parseProviderDisabled(payload.provider_disabled);
-  return {
-    status: normalizeStartupStatus(typeof payload.status === "string" ? payload.status : "", providerDisabled.length),
-    priceRows: numberValue(payload.price_rows),
-    indicatorRows: numberValue(payload.indicator_rows),
-    newsItems: numberValue(payload.news_items),
-    disclosures: numberValue(payload.disclosures),
-    providerDisabled,
-  };
-}
-
-function normalizeStartupStatus(status: string, disabledCount: number): StartupRefreshStatus {
-  if (status === "skipped") {
-    return "skipped";
-  }
-  if (status === "partial" || disabledCount > 0) {
-    return "partial";
-  }
-  if (status === "ok") {
-    return "ready";
-  }
-  return "failed";
-}
-
-function parseProviderDisabled(value: unknown): readonly ProviderDisabled[] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-  return value.filter(isProviderDisabled);
-}
-
-function isProviderDisabled(value: unknown): value is ProviderDisabled {
-  return (
-    isRecord(value)
-    && typeof value.symbol === "string"
-    && typeof value.provider === "string"
-    && typeof value.reason === "string"
-  );
-}
-
-function numberValue(value: unknown): number {
-  return typeof value === "number" && Number.isFinite(value) ? value : 0;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function startupStatusLabel(status: StartupRefreshStatus): string {
-  switch (status) {
-    case "checking":
-      return "확인 중";
-    case "ready":
-      return "시장 데이터 준비 완료";
-    case "partial":
-      return "일부 소스 비활성화";
-    case "skipped":
-      return "최근 갱신 사용";
-    case "failed":
-      return "시장 데이터 갱신 실패";
-  }
-}
-
-function providerSummaryLabel(summary: ProviderSummary): string {
-  const dart = summary.opendartConfigured ? "OpenDART 설정됨" : "OpenDART 미설정";
-  const ai = summary.aiMode ? `AI ${summary.aiMode}` : "AI disabled";
-  return `${dart} · ${ai}`;
 }
 
 function logStartupWarning(error: unknown, fallback: string): void {
