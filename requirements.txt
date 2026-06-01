@@ -1,0 +1,9 @@
+pytest
+pandas
+numpy
+psycopg[binary]
+yfinance
+fastapi
+uvicorn
+jinja2
+httpx

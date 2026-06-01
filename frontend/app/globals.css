@@ -1,0 +1,276 @@
+:root {
+  color-scheme: light;
+  --bg: #f6f3ee;
+  --surface: #fffdf8;
+  --surface-2: #ece7df;
+  --ink: #17201b;
+  --muted: #647067;
+  --line: #d9d2c7;
+  --accent: #0f766e;
+  --accent-2: #b45309;
+  --positive: #15803d;
+  --negative: #b91c1c;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  min-height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+button:hover,
+button.active,
+.chip.active,
+.symbol-row.active {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+input {
+  min-height: 40px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 12px;
+  background: #ffffff;
+  color: var(--ink);
+}
+
+.page {
+  width: min(1480px, 100%);
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.startup-refresh-modal,
+.startup-refresh-banner {
+  position: fixed;
+  top: 18px;
+  left: 50%;
+  z-index: 20;
+  transform: translateX(-50%);
+  width: min(360px, calc(100vw - 32px));
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 14px;
+  background: var(--surface);
+  box-shadow: 0 12px 32px rgb(23 32 27 / 18%);
+  text-align: center;
+  font-weight: 800;
+}
+
+.startup-refresh-banner {
+  border-color: var(--negative);
+  color: var(--negative);
+  background: #fff5f5;
+}
+
+.hero,
+.control-panel,
+.detail-header,
+.card-heading,
+.chart-toolbar,
+.auth-buttons,
+.inline-form,
+.badge-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.hero {
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.eyebrow {
+  margin: 0 0 4px;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin-top: 0;
+}
+
+.subtle {
+  margin-bottom: 0;
+  color: var(--muted);
+}
+
+.control-panel,
+.watchlist-card,
+.detail-card,
+.research-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 14px;
+}
+
+.control-panel {
+  align-items: stretch;
+  margin-bottom: 16px;
+}
+
+.panel-column {
+  flex: 1 1 260px;
+}
+
+.chips,
+.symbol-list {
+  display: grid;
+  gap: 8px;
+}
+
+.chip,
+.symbol-row {
+  width: 100%;
+  justify-content: space-between;
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.content-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 330px) minmax(0, 1fr);
+  gap: 16px;
+}
+
+.detail-card {
+  min-width: 0;
+}
+
+.detail-header {
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(120px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.summary-grid div {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  background: var(--surface-2);
+}
+
+.summary-grid b,
+.summary-grid span {
+  display: block;
+}
+
+.badge {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.badge.매수,
+.badge.아웃퍼폼 {
+  color: var(--positive);
+  background: #e7f7ea;
+}
+
+.badge.중립 {
+  color: var(--accent);
+  background: #e4f4f1;
+}
+
+.badge.언더퍼폼,
+.badge.매도 {
+  color: var(--negative);
+  background: #fde8e8;
+}
+
+.chart-shell {
+  display: grid;
+  gap: 8px;
+}
+
+.chart-toolbar {
+  justify-content: flex-start;
+}
+
+.chart-toolbar button {
+  padding: 0 12px;
+}
+
+.chart-frame {
+  width: 100%;
+  height: 520px;
+  min-height: 360px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #111713;
+}
+
+.legend {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.research-card {
+  margin-top: 12px;
+  background: #fff8ed;
+}
+
+@media (max-width: 900px) {
+  .page {
+    padding: 12px;
+  }
+
+  .hero {
+    align-items: flex-start;
+  }
+
+  .content-grid,
+  .summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .chart-frame {
+    height: 420px;
+  }
+
+  .chart-toolbar button,
+  .auth-buttons button {
+    flex: 1 1 96px;
+  }
+}

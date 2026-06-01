@@ -1,0 +1,59 @@
+# Local secrets
+.env
+*.env
+!.env.example
+
+# Local app data and generated storage
+.vbinvest/
+app-data/
+*.sqlite
+*.sqlite3
+*.db
+postgres-data/
+
+# macOS
+.DS_Store
+
+# APM modules/cache
+.agents/
+.apm/
+.omo/
+AGENTS.md
+HERMES.md
+SOURCE_OF_TRUTH.md
+apm.yml
+apm.lock.yaml
+apm_modules/
+.apm/cache/
+
+# Python/cache artifacts
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Generated local logs
+*.log
+evidence/
+
+# Generated reports and vault links
+reports/
+generated_reports/
+vault/
+ObsidianVault/
+
+# Release staging
+dist/
+release/
+release-artifacts/
+
+# Legacy local/Hermes planning artifacts
+plans/
+docs/
+docs/VBinvest-roadmap-checklist.md
+docs/cron-roadmap.md
+docs/db-roadmap.md
+docs/plans/
+docs/skill-design.md
+ops/cron/
+scripts/render_semiconductor_html.py

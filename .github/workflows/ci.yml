@@ -1,0 +1,72 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install backend dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Secret scan
+        run: python scripts/secret_scan.py
+      - name: Backend tests
+        run: pytest -q
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Frontend lint
+        working-directory: frontend
+        run: npm run lint
+      - name: Frontend typecheck
+        working-directory: frontend
+        run: npm run typecheck
+      - name: Frontend unit tests
+        working-directory: frontend
+        run: npm test -- --run
+      - name: Frontend build
+        working-directory: frontend
+        run: npm run build
+      - name: Install Playwright Chromium
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - name: Playwright e2e
+        working-directory: frontend
+        run: npx playwright test e2e/chart.spec.ts --project=chromium
+  migration-smoke:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: vbinvest
+          POSTGRES_USER: vbinvest
+          POSTGRES_PASSWORD: vbinvest_test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U vbinvest -d vbinvest"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Migration smoke
+        env:
+          PGPASSWORD: vbinvest_test_password
+        run: |
+          for file in postgres/init/*.sql; do
+            psql -h 127.0.0.1 -U vbinvest -d vbinvest -v ON_ERROR_STOP=1 -f "$file"
+          done

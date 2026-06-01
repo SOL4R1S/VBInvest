@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: vbinvest-postgres
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      # Local-only default. DBeaver on this Mac can connect to localhost:5432.
+      # Do not expose this directly to the public Internet.
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - /Volumes/nv6000t/.hermes/postgres/VBinvest:/var/lib/postgresql/data
+      - ./init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
