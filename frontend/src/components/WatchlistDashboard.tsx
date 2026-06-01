@@ -54,6 +54,10 @@ export function WatchlistDashboard() {
         const nextProviderSummary = await fetchProviderSummary();
         if (!cancelled) {
           setProviderSummary(nextProviderSummary);
+          if (nextProviderSummary?.firstRunCompleted === false) {
+            setStartupRefresh({ ...INITIAL_STARTUP_REFRESH, status: "setup_required" });
+            return;
+          }
         }
       } catch (error) {
         logStartupWarning(error, "settings status refresh failed");

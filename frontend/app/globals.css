@@ -86,6 +86,9 @@ input {
 }
 
 .startup-refresh-banner {
+  position: static;
+  transform: none;
+  margin: 0 auto 16px;
   border-color: var(--negative);
   color: var(--negative);
   background: #fff5f5;

@@ -1,4 +1,4 @@
-export type StartupRefreshStatus = "checking" | "ready" | "partial" | "skipped" | "failed";
+export type StartupRefreshStatus = "checking" | "setup_required" | "ready" | "partial" | "skipped" | "failed";
 
 export type ProviderDisabled = {
   readonly symbol: string;
@@ -16,6 +16,7 @@ export type StartupRefreshView = {
 };
 
 export type ProviderSummary = {
+  readonly firstRunCompleted: boolean;
   readonly opendartConfigured: boolean;
   readonly aiMode: string | null;
 };
@@ -41,6 +42,7 @@ export async function fetchProviderSummary(): Promise<ProviderSummary | null> {
   const opendart = isRecord(payload.provider_status.opendart) ? payload.provider_status.opendart : {};
   const ai = isRecord(payload.provider_status.ai) ? payload.provider_status.ai : {};
   return {
+    firstRunCompleted: payload.first_run_completed !== false,
     opendartConfigured: opendart.configured === true,
     aiMode: typeof ai.mode === "string" ? ai.mode : null,
   };
@@ -65,6 +67,8 @@ export function startupStatusLabel(status: StartupRefreshStatus): string {
   switch (status) {
     case "checking":
       return "확인 중";
+    case "setup_required":
+      return "초기 설정 필요";
     case "ready":
       return "시장 데이터 준비 완료";
     case "partial":

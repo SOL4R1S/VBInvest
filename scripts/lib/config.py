@@ -409,7 +409,9 @@ def _ai_provider_name(environ: Mapping[str, str], base_url: str) -> str:
         return "deepseek"
     if _text_from_env(environ, "OPENAI_API_KEY") or _text_from_env(environ, "OPENAI_BASE_URL"):
         return "openai"
-    return "openai-compatible"
+    if base_url or _text_from_env(environ, "AI_PROVIDER_MODEL") or _text_from_env(environ, "AI_API_KEY"):
+        return "openai-compatible"
+    return ""
 
 
 def _is_local_ai_provider(provider_name: str | None, base_url: str) -> bool:

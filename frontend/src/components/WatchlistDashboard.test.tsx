@@ -71,6 +71,30 @@ describe("WatchlistDashboard", () => {
     });
   });
 
+  it("does not run startup market refresh before first-run setup is completed", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit): Promise<Response> => {
+      const url = String(input);
+      if (url.includes("/api/backend/settings")) {
+        return jsonResponse({
+          first_run_completed: false,
+          provider_status: { opendart: { configured: false }, ai: { mode: "disabled" } },
+        });
+      }
+      return jsonResponse({ status: "ok", price_rows: 1, indicator_rows: 1, news_items: 0, disclosures: 0 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<WatchlistDashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByText("초기 설정 필요")).toBeInTheDocument();
+    });
+    expect(fetchMock.mock.calls.map(([input]) => String(input))).not.toContain(
+      "/api/backend/startup/market-refresh?no_network=false&include_news=true",
+    );
+    expect(screen.queryByText("시장 데이터 갱신 실패")).not.toBeInTheDocument();
+  });
+
   it("shows provider-disabled partial refresh without treating it as a total failure", async () => {
     vi.stubGlobal(
       "fetch",

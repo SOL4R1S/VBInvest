@@ -82,3 +82,26 @@ test("dashboard shows startup source counts without raw provider secrets", async
 
   expect(consoleErrors).toEqual([]);
 });
+
+test("dashboard loads global styling on first render", async ({ page }) => {
+  await page.route("**/api/backend/settings", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ provider_status: { opendart: { configured: true }, ai: { mode: "local" } } }),
+    });
+  });
+  await page.route("**/api/backend/startup/market-refresh?**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ status: "ok", price_rows: 1, indicator_rows: 1, news_items: 0, disclosures: 0 }),
+    });
+  });
+
+  await page.goto("/");
+
+  await expect(page.locator("body")).toHaveCSS("background-color", "rgb(246, 243, 238)");
+  const paddingTop = await page.locator(".page").evaluate((node) => Number.parseFloat(getComputedStyle(node).paddingTop));
+  expect(paddingTop).toBeGreaterThanOrEqual(12);
+});

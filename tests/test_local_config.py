@@ -6,7 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from scripts.api import app
-from scripts.lib.config import ConfigError, DatabaseMode, ExportMode, load_local_config, write_local_config
+from scripts.lib.config import ConfigError, DatabaseMode, ExportMode, load_local_config, provider_status, write_local_config
 
 
 def test_missing_config_loads_safe_defaults(tmp_path: Path) -> None:
@@ -16,6 +16,16 @@ def test_missing_config_loads_safe_defaults(tmp_path: Path) -> None:
     assert config.database.mode is DatabaseMode.SQLITE
     assert config.database.sqlite_path.name == "vbinvest.sqlite3"
     assert config.obsidian.export_mode is ExportMode.DIRECT
+
+
+def test_missing_ai_provider_config_reports_disabled(tmp_path: Path) -> None:
+    config = load_local_config(config_path=tmp_path / "missing.toml", environ={})
+
+    status = provider_status(config, environ={})
+
+    assert status["ai"]["mode"] == "disabled"
+    assert status["ai"]["provider"] is None
+    assert status["ai"]["error"] is None
 
 
 def test_valid_config_loads_and_redacts_secrets(tmp_path: Path) -> None:
