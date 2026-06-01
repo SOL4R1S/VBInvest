@@ -39,6 +39,89 @@ def test_readme_has_required_local_first_sections():
         assert required in english_text
 
 
+def test_readme_documents_cross_platform_launch_paths():
+    korean = (ROOT / "README.md").read_text(encoding="utf-8")
+    english = (ROOT / "README.en.md").read_text(encoding="utf-8")
+
+    for required in [
+        "macOS",
+        "./VBinvest.command",
+        "chmod +x VBinvest.command",
+        "Windows",
+        "VBinvest.bat",
+        "빈 포트를 자동으로 선택",
+    ]:
+        assert required in korean
+
+    for required in [
+        "macOS",
+        "./VBinvest.command",
+        "chmod +x VBinvest.command",
+        "Windows",
+        "VBinvest.bat",
+        "chooses free ports",
+    ]:
+        assert required in english
+
+
+def test_readme_documents_startup_sources_and_report_source_gap():
+    korean = (ROOT / "README.md").read_text(encoding="utf-8")
+    english = (ROOT / "README.en.md").read_text(encoding="utf-8")
+
+    for required in [
+        "프로그램 시작 시",
+        "뉴스",
+        "SEC",
+        "OpenDART",
+        "리포트 발행",
+        "DB에 저장된 최신 가격",
+        "source_gap",
+        "실시간 웹 탐색을 수행하지 않습니다",
+    ]:
+        assert required in korean
+
+    for required in [
+        "When the program starts",
+        "news",
+        "SEC",
+        "OpenDART",
+        "Generate Report",
+        "latest DB-backed prices",
+        "source_gap",
+        "does not perform live web browsing",
+    ]:
+        assert required in english
+
+
+def test_readme_documents_secure_storage_and_ai_modes():
+    korean = (ROOT / "README.md").read_text(encoding="utf-8")
+    english = (ROOT / "README.en.md").read_text(encoding="utf-8")
+
+    for required in [
+        'save_secret "AI_API_KEY"',
+        'save_secret "OPENDART_API_KEY"',
+        "Windows Credential Manager",
+        "Ollama",
+        "OpenAI-compatible",
+        "로컬 모델은 키 없이",
+        "클라우드 AI provider는 API 키가 필요",
+        "Codex/Copilot CLI",
+    ]:
+        assert required in korean
+
+    for required in [
+        'save_secret "AI_API_KEY"',
+        'save_secret "OPENDART_API_KEY"',
+        "Windows Credential Manager",
+        "Ollama",
+        "OpenAI-compatible",
+        "local models can run without a key",
+        "cloud AI providers require an API key",
+        "Codex/Copilot CLI",
+    ]:
+        assert required in english
+
+
 def test_cross_platform_local_launchers_are_tracked():
     mac_launcher = ROOT / "VBinvest.command"
     windows_launcher = ROOT / "VBinvest.bat"
@@ -116,3 +199,13 @@ def test_root_env_example_is_local_first():
     assert "OPENDART_API_KEY=<optional-opendart-api-key>" in text
     assert "AI_API_KEY=<openai-compatible-api-key>" in text
     assert "SUPABASE_SERVICE_ROLE_KEY" not in text
+
+
+def test_root_env_example_documents_local_and_cloud_ai_placeholders():
+    text = (ROOT / ".env.example").read_text(encoding="utf-8")
+
+    assert "AI_PROVIDER_NAME=ollama" in text
+    assert "AI_PROVIDER_BASE_URL=http://127.0.0.1:11434/v1" in text
+    assert "AI_PROVIDER_NAME=<cloud-or-openai-compatible-provider>" in text
+    assert "AI_API_KEY=<cloud-provider-api-key>" in text
+    assert "source_gap" in text

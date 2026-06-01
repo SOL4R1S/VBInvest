@@ -13,10 +13,11 @@ Local program mode is the primary path.
 ```bash
 git clone https://github.com/SOL4R1S/VBInvest.git
 cd VBInvest
+chmod +x VBinvest.command
 ./VBinvest.command
 ```
 
-On Windows:
+On macOS, `VBinvest.command` starts both the backend and the web UI. On Windows:
 
 ```powershell
 VBinvest.bat
@@ -29,9 +30,17 @@ The launcher starts the local backend on `127.0.0.1`, chooses free ports, opens 
 - Database: `SQLite built-in DB (recommended)`, `PostgreSQL Docker automatic start`, or `PostgreSQL direct connection`
 - Obsidian: choose a vault path for generated Markdown reports
 - OpenDART: optional `OPENDART_API_KEY` for Korean disclosures
-- AI: AI API integration, local LLM endpoint, Codex CLI, Copilot CLI, or disabled
+- AI: AI API integration, local LLM endpoints such as Ollama, OpenAI-compatible cloud providers, Codex CLI, Copilot CLI, or disabled
 
 On macOS, launcher-provided `AI_API_KEY` and `OPENDART_API_KEY` values are saved to Keychain service `VBinvest` through `save_secret "AI_API_KEY"` and `save_secret "OPENDART_API_KEY"` instead of being persisted in local config files. On Windows, the same accounts are stored in Windows Credential Manager.
+
+OpenAI-compatible local models can run without a key. For example, Ollama or an OpenAI-compatible endpoint on `127.0.0.1`/`localhost` is allowed without `AI_API_KEY`. OpenAI-compatible cloud AI providers require an API key; without one, report generation is blocked safely and only a configuration error is shown. Codex/Copilot CLI modes are OAuth-capable advanced options, but they may be affected by provider policies or account limits and are not the default path.
+
+## Source Refresh And Reports
+
+When the program starts, it refreshes prices, indicators, news, SEC filings, and OpenDART disclosures for the saved tickers where possible. If no OpenDART key is configured, only Korean disclosure collection is disabled; prices, indicators, news, and SEC refresh continue.
+
+The `Generate Report` button does not perform live web browsing. It uses the latest DB-backed prices, RSI, moving averages, volume, news, and SEC/OpenDART disclosures. If required sources are missing, the generated report keeps a `source_gap` so the user can see which evidence is unavailable.
 
 ## Cost And Risk Policy
 
