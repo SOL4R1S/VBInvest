@@ -17,11 +17,23 @@ from pydantic import BaseModel, Field
 from scripts.lib.dashboard import render_dashboard_html
 from scripts.lib.api_store import ApiStore
 from scripts.lib.auth import AuthError, AuthUser, verify_bearer_token
+from scripts.lib.ai_provider import AIProviderConfigError
+from scripts.lib.config import (
+    ConfigError,
+    load_local_config,
+    load_opendart_api_key,
+    parse_report_run_summary,
+    provider_status,
+)
 from scripts.lib.db import DatabaseConfig, VBinvestDB
 from scripts.lib.entitlements import WebhookSignatureError, verify_webhook_signature
 from scripts.lib.startup_market_refresh import run_startup_market_refresh
-from scripts.lib.config import ConfigError, load_local_config, load_opendart_api_key
 from scripts.lib.version import load_version_metadata
+
+try:
+    from psycopg import OperationalError as PostgresOperationalError
+except ImportError:
+    PostgresOperationalError = RuntimeError
 
 VERSION_METADATA = load_version_metadata()
 
@@ -100,7 +112,41 @@ def health():
 @app.get("/api/settings")
 def settings():
     try:
-        return load_local_config().redacted()
+        config = load_local_config()
+        latest_summary = {
+            "status": None,
+            "watchlist": None,
+            "completed_at": None,
+            "news_items": 0,
+            "disclosures": 0,
+            "provider_disabled": [],
+        }
+        try:
+            latest_run = db().fetch_latest_report_run("startup-market-refresh", "semiconductor-core")
+        except PostgresOperationalError:
+            latest_run = None
+        if latest_run is not None:
+            latest_summary.update(
+                {
+                    "status": latest_run.get("status"),
+                    "watchlist": latest_run.get("scope_slug"),
+                    "completed_at": (
+                        latest_run["completed_at"].isoformat()
+                        if hasattr(latest_run.get("completed_at"), "isoformat")
+                        else latest_run.get("completed_at")
+                    ),
+                }
+            )
+            parsed = parse_report_run_summary(latest_run.get("output_summary"))
+            if isinstance(parsed, dict):
+                latest_summary["news_items"] = parsed.get("news_items", 0)
+                latest_summary["disclosures"] = parsed.get("disclosures", 0)
+                latest_summary["provider_disabled"] = parsed.get("provider_disabled", [])
+        return {
+            **config.redacted(),
+            "provider_status": provider_status(config, os.environ),
+            "latest_startup_refresh": latest_summary,
+        }
     except ConfigError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -283,6 +329,8 @@ def generate_research(symbol: str, user: AuthUser = Depends(current_user)):
         raise HTTPException(status_code=501, detail="on-demand research is not available")
     try:
         row = store.generate_research_for_asset(user.auth_user_id, symbol)
+    except AIProviderConfigError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return _jsonable_research(row, locked=False)

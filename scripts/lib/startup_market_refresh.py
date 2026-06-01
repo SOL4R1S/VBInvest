@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Protocol
 
 from scripts.startup_market_refresh import IngestOptions, fallback_assets, ingest_assets
+from scripts.lib.config import serialize_report_run_summary
 
 try:
     from psycopg import OperationalError as PostgresOperationalError
@@ -78,6 +79,7 @@ def run_startup_market_refresh(
             disclosures=0,
             failures=[],
             stale=True,
+            provider_disabled=[],
         )
         return StartupRefreshResult(
             status="skipped",
@@ -125,6 +127,7 @@ def run_startup_market_refresh(
         disclosures=result.disclosures,
         failures=result.failures,
         stale=False,
+        provider_disabled=result.provider_disabled or [],
     )
     return StartupRefreshResult(
         status=status,
@@ -208,6 +211,7 @@ def _record_report_run(
     disclosures: int,
     failures: list[str],
     stale: bool,
+    provider_disabled: list[dict[str, str]],
 ) -> str | None:
     if store is None:
         return None
@@ -216,8 +220,16 @@ def _record_report_run(
         status=status,
         scope_slug=watchlist,
         failed_assets=failures,
-        output_summary=(
-            f"dry_run={dry_run} stale={stale} assets={assets} price_rows={price_rows} "
-            f"indicator_rows={indicator_rows} news_items={news_items} disclosures={disclosures}"
+        output_summary=serialize_report_run_summary(
+            (
+                f"dry_run={dry_run} stale={stale} assets={assets} price_rows={price_rows} "
+                f"indicator_rows={indicator_rows} news_items={news_items} disclosures={disclosures}"
+            ),
+            {
+                "watchlist": watchlist,
+                "news_items": news_items,
+                "disclosures": disclosures,
+                "provider_disabled": provider_disabled,
+            },
         ),
     )

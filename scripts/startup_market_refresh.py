@@ -13,8 +13,9 @@ from zoneinfo import ZoneInfo
 if __package__ is None or __package__ == "":
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from scripts.lib.db import DatabaseConfig, VBinvestDB, build_indicator_rows, build_price_rows
 from scripts.lib.config import ConfigError, load_opendart_api_key
+from scripts.lib.config import serialize_report_run_summary
+from scripts.lib.db import DatabaseConfig, VBinvestDB, build_indicator_rows, build_price_rows
 from scripts.lib.disclosures import collect_disclosures_for_asset
 from scripts.lib.indicators import add_indicators
 from scripts.lib.market_calendar import summarize_trade_dates
@@ -247,7 +248,15 @@ def main() -> int:
             status=result.status,
             scope_slug=args.watchlist,
             failed_assets=result.failures,
-            output_summary=summary,
+            output_summary=serialize_report_run_summary(
+                summary,
+                {
+                    "watchlist": args.watchlist,
+                    "news_items": result.news_items,
+                    "disclosures": result.disclosures,
+                    "provider_disabled": result.provider_disabled or [],
+                },
+            ),
         )
 
     print("VBinvest startup market refresh")

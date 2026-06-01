@@ -477,6 +477,32 @@ class VBinvestDB:
             cur.execute(sql, params)
         return run_id
 
+    def fetch_latest_report_run(self, run_type: str, scope_slug: str | None) -> dict[str, Any] | None:
+        sql = """
+        SELECT run_id, run_type, scope_type, scope_slug, completed_at, status, failed_assets, output_summary, output_path, error_message
+        FROM report_runs
+        WHERE run_type = %s AND scope_slug IS NOT DISTINCT FROM %s
+        ORDER BY completed_at DESC, run_id DESC
+        LIMIT 1
+        """
+        with self.connect() as conn, conn.cursor() as cur:
+            cur.execute(sql, (run_type, scope_slug))
+            row = cur.fetchone()
+        if row is None:
+            return None
+        return {
+            "run_id": row[0],
+            "run_type": row[1],
+            "scope_type": row[2],
+            "scope_slug": row[3],
+            "completed_at": row[4],
+            "status": row[5],
+            "failed_assets": row[6] or [],
+            "output_summary": row[7],
+            "output_path": row[8],
+            "error_message": row[9],
+        }
+
     def fetch_dashboard_items(self, slug: str, *, days: int = 260) -> list[dict[str, Any]]:
         assets = self.fetch_watchlist_assets(slug)
         if not assets:

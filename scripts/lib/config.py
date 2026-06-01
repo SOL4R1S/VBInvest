@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import platform
 import tomllib
@@ -213,6 +214,37 @@ def load_opendart_api_key(
     )
 
 
+def provider_status(
+    config: LocalConfig,
+    environ: Mapping[str, str],
+    *,
+    system_name: str | None = None,
+    secret_store: SecretStore | None = None,
+) -> dict[str, RedactedValue]:
+    return {
+        "opendart": _opendart_status(config, environ, system_name=system_name, secret_store=secret_store),
+        "ai": _ai_status(config, environ, system_name=system_name, secret_store=secret_store),
+    }
+
+
+def parse_report_run_summary(output_summary: str | None) -> dict[str, object]:
+    if not output_summary:
+        return {}
+    marker = " | meta="
+    if marker not in output_summary:
+        return {}
+    _, raw_json = output_summary.rsplit(marker, 1)
+    try:
+        parsed = json.loads(raw_json)
+    except json.JSONDecodeError:
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def serialize_report_run_summary(summary: str, metadata: dict[str, object]) -> str:
+    return f"{summary} | meta={json.dumps(metadata, ensure_ascii=False, sort_keys=True)}"
+
+
 def _read_toml(path: Path) -> TomlTable:
     if not path.exists():
         return {}
@@ -271,6 +303,128 @@ def _parse_providers(
         )
         or _text(raw, "ai_api_key", ""),
     )
+
+
+def _opendart_status(
+    config: LocalConfig,
+    environ: Mapping[str, str],
+    *,
+    system_name: str | None,
+    secret_store: SecretStore | None,
+) -> dict[str, RedactedValue]:
+    source = "none"
+    configured = False
+    system = system_name or platform.system()
+    store = secret_store or platform_secret_store(system)
+    if system in {"Darwin", "Windows"} and store.get("OPENDART_API_KEY"):
+        source = "secure-storage"
+        configured = True
+    elif _text_from_env(environ, "OPENDART_API_KEY"):
+        source = "env"
+        configured = True
+    elif _text_from_env(environ, "DART_API_KEY"):
+        source = "env"
+        configured = True
+    elif config.providers.opendart_api_key:
+        source = "config"
+        configured = True
+    return {"configured": configured, "source": source}
+
+
+def _ai_status(
+    config: LocalConfig,
+    environ: Mapping[str, str],
+    *,
+    system_name: str | None,
+    secret_store: SecretStore | None,
+) -> dict[str, RedactedValue]:
+    raw = _ai_provider_source(config, environ, system_name=system_name, secret_store=secret_store)
+    base_url = _text(raw, "base_url", "")
+    model = _text(raw, "model", "")
+    provider = _text(raw, "provider", "") or None
+    api_key = _text(raw, "api_key", "")
+    if not base_url and not model and not provider and not api_key:
+        return {
+            "mode": "disabled",
+            "provider": None,
+            "key_required": False,
+            "key_configured": False,
+            "base_url": None,
+            "model": None,
+            "error": None,
+        }
+    key_configured = bool(api_key)
+    key_required = not _is_local_ai_provider(provider, base_url)
+    error = None
+    mode = "local" if _is_local_ai_provider(provider, base_url) else "cloud"
+    if not model:
+        mode = "misconfigured"
+        error = "AI_PROVIDER_MODEL is required when an AI provider API key is set"
+    elif key_required and not key_configured:
+        mode = "misconfigured"
+        error = "AI provider API key is required for non-local providers"
+    return {
+        "mode": mode,
+        "provider": provider,
+        "key_required": key_required,
+        "key_configured": key_configured,
+        "base_url": base_url or None,
+        "model": model or None,
+        "error": error,
+    }
+
+
+def _ai_provider_source(
+    config: LocalConfig,
+    environ: Mapping[str, str],
+    *,
+    system_name: str | None,
+    secret_store: SecretStore | None,
+) -> TomlTable:
+    return {
+        "provider": _ai_provider_name(environ, config.providers.ai_base_url),
+        "base_url": _text_from_env(environ, "AI_PROVIDER_BASE_URL")
+        or _text_from_env(environ, "DEEPSEEK_BASE_URL")
+        or _text_from_env(environ, "OPENAI_BASE_URL")
+        or config.providers.ai_base_url,
+        "model": _text_from_env(environ, "AI_PROVIDER_MODEL")
+        or _text_from_env(environ, "DEEPSEEK_MODEL")
+        or _text_from_env(environ, "OPENAI_MODEL")
+        or "",
+        "api_key": resolve_secret(
+            environ,
+            "AI_API_KEY",
+            aliases=("AI_PROVIDER_API_KEY", "OPENAI_API_KEY", "DEEPSEEK_API_KEY"),
+            system_name=system_name,
+            store=secret_store,
+        )
+        or config.providers.ai_api_key,
+    }
+
+
+def _ai_provider_name(environ: Mapping[str, str], base_url: str) -> str:
+    if _text_from_env(environ, "AI_PROVIDER_NAME"):
+        return _text_from_env(environ, "AI_PROVIDER_NAME")
+    if _text_from_env(environ, "DEEPSEEK_API_KEY") or _text_from_env(environ, "DEEPSEEK_BASE_URL"):
+        return "deepseek"
+    if _text_from_env(environ, "OPENAI_API_KEY") or _text_from_env(environ, "OPENAI_BASE_URL"):
+        return "openai"
+    return "openai-compatible"
+
+
+def _is_local_ai_provider(provider_name: str | None, base_url: str) -> bool:
+    if (provider_name or "").strip().lower() == "ollama":
+        return True
+    return _is_loopback_base_url(base_url)
+
+
+def _is_loopback_base_url(base_url: str) -> bool:
+    parsed = urlsplit(base_url or "")
+    return parsed.hostname in {"localhost", "127.0.0.1", "::1"}
+
+
+def _text_from_env(environ: Mapping[str, str], key: str) -> str:
+    return environ.get(key, "").strip()
 
 
 def _table(raw: TomlTable, name: str) -> TomlTable:
