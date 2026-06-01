@@ -759,6 +759,8 @@ class VBinvestDB:
             rows = cur.fetchall()
             if not rows:
                 return None
+            news = self.fetch_recent_news_for_asset(asset["asset_id"])
+            disclosures = self.fetch_recent_disclosures_for_asset(asset["asset_id"])
         frame = pd.DataFrame(
             rows,
             columns=[
@@ -773,7 +775,50 @@ class VBinvestDB:
             "ma5", "ma20", "ma50", "ma120", "rsi14", "vol20", "drawdown_52w", "high_52w",
         ]:
             frame[column] = pd.to_numeric(frame[column], errors="coerce")
-        return {"asset": asset, "history": frame, "news": [], "disclosures": []}
+        return {"asset": asset, "history": frame, "news": news, "disclosures": disclosures}
+
+    def fetch_recent_news_for_asset(self, asset_id: int, *, limit: int = 10) -> list[dict[str, Any]]:
+        query = """
+        SELECT ni.provider, ni.source, COALESCE(ni.canonical_url, ni.url), ni.title, ni.published_at
+        FROM asset_news_map anm
+        JOIN news_items ni ON ni.news_id = anm.news_id
+        WHERE anm.asset_id = %s
+        ORDER BY ni.published_at DESC NULLS LAST, ni.news_id DESC
+        LIMIT %s
+        """
+        with self.connect() as conn, conn.cursor() as cur:
+            cur.execute(query, (asset_id, limit))
+            return [
+                {
+                    "provider": row[0],
+                    "source": row[1],
+                    "url": row[2],
+                    "title": row[3],
+                    "published_at": row[4],
+                }
+                for row in cur.fetchall()
+            ]
+
+    def fetch_recent_disclosures_for_asset(self, asset_id: int, *, limit: int = 10) -> list[dict[str, Any]]:
+        query = """
+        SELECT provider, title, url, published_at, provider_disclosure_id
+        FROM disclosures
+        WHERE asset_id = %s
+        ORDER BY published_at DESC NULLS LAST, disclosure_id DESC
+        LIMIT %s
+        """
+        with self.connect() as conn, conn.cursor() as cur:
+            cur.execute(query, (asset_id, limit))
+            return [
+                {
+                    "provider": row[0],
+                    "title": row[1],
+                    "url": row[2],
+                    "published_at": row[3],
+                    "provider_disclosure_id": row[4],
+                }
+                for row in cur.fetchall()
+            ]
 
     def user_has_research_entitlement(self, auth_user_id: str, symbol: str) -> bool:
         query = """
