@@ -12,7 +12,36 @@ type Watchlist = {
   readonly symbols: readonly string[];
 };
 
-type StartupRefreshState = "checking" | "ready" | "failed";
+type StartupRefreshStatus = "checking" | "ready" | "partial" | "skipped" | "failed";
+
+type ProviderDisabled = {
+  readonly symbol: string;
+  readonly provider: string;
+  readonly reason: string;
+};
+
+type StartupRefreshView = {
+  readonly status: StartupRefreshStatus;
+  readonly priceRows: number;
+  readonly indicatorRows: number;
+  readonly newsItems: number;
+  readonly disclosures: number;
+  readonly providerDisabled: readonly ProviderDisabled[];
+};
+
+type ProviderSummary = {
+  readonly opendartConfigured: boolean;
+  readonly aiMode: string | null;
+};
+
+const INITIAL_REFRESH: StartupRefreshView = {
+  status: "checking",
+  priceRows: 0,
+  indicatorRows: 0,
+  newsItems: 0,
+  disclosures: 0,
+  providerDisabled: [],
+};
 
 function fallbackAsset(symbol: string) {
   return {
@@ -31,7 +60,8 @@ export function WatchlistDashboard() {
   const [selectedSymbol, setSelectedSymbol] = useState(WATCHLISTS[0]?.symbols[0] ?? "NVDA");
   const [newWatchlist, setNewWatchlist] = useState("");
   const [newSymbol, setNewSymbol] = useState("");
-  const [startupRefreshState, setStartupRefreshState] = useState<StartupRefreshState>("checking");
+  const [startupRefresh, setStartupRefresh] = useState<StartupRefreshView>(INITIAL_REFRESH);
+  const [providerSummary, setProviderSummary] = useState<ProviderSummary | null>(null);
 
   const activeWatchlist = watchlists.find((item) => item.id === selectedWatchlist) ?? watchlists[0];
   const currentSymbol = activeWatchlist?.symbols.includes(selectedSymbol) ? selectedSymbol : activeWatchlist?.symbols[0] ?? "NVDA";
@@ -43,21 +73,26 @@ export function WatchlistDashboard() {
 
     async function refreshMarketData() {
       try {
-        const response = await fetch("/api/backend/startup/market-refresh?no_network=false", { method: "POST" });
+        const nextProviderSummary = await fetchProviderSummary();
+        if (!cancelled) {
+          setProviderSummary(nextProviderSummary);
+        }
+      } catch (error) {
+        logStartupWarning(error, "settings status refresh failed");
+      }
+      try {
+        const response = await fetch("/api/backend/startup/market-refresh?no_network=false&include_news=true", { method: "POST" });
         if (!response.ok) {
           throw new Error(`startup market refresh failed: ${response.status}`);
         }
+        const payload: unknown = await response.json();
         if (!cancelled) {
-          setStartupRefreshState("ready");
+          setStartupRefresh(parseStartupRefresh(payload));
         }
       } catch (error) {
-        if (error instanceof Error) {
-          console.warn(error.message);
-        } else {
-          console.warn("startup market refresh failed");
-        }
+        logStartupWarning(error, "startup market refresh failed");
         if (!cancelled) {
-          setStartupRefreshState("failed");
+          setStartupRefresh({ ...INITIAL_REFRESH, status: "failed" });
         }
       }
     }
@@ -100,12 +135,12 @@ export function WatchlistDashboard() {
 
   return (
     <main className="page">
-      {startupRefreshState === "checking" ? (
+      {startupRefresh.status === "checking" ? (
         <div className="startup-refresh-modal" role="status" aria-live="polite">
           주식 정보를 확인하는 중
         </div>
       ) : null}
-      {startupRefreshState === "failed" ? (
+      {startupRefresh.status === "failed" ? (
         <div className="startup-refresh-banner" role="status" aria-live="polite">
           시장 데이터 갱신 실패
         </div>
@@ -122,6 +157,16 @@ export function WatchlistDashboard() {
           <button type="button" onClick={() => void signInWithProvider("kakao")}>Kakao로 로그인</button>
         </div>
       </header>
+
+      {startupRefresh.status !== "checking" ? (
+        <section className={`startup-status-strip ${startupRefresh.status}`} aria-label="startup source status" data-testid="startup-status">
+          <strong>{startupStatusLabel(startupRefresh.status)}</strong>
+          <span>가격 {startupRefresh.priceRows} · 지표 {startupRefresh.indicatorRows}</span>
+          <span>뉴스 {startupRefresh.newsItems} · 공시 {startupRefresh.disclosures}</span>
+          {providerSummary ? <span>{providerSummaryLabel(providerSummary)}</span> : null}
+          {startupRefresh.providerDisabled.length > 0 ? <span>비활성 소스 {startupRefresh.providerDisabled.length}개</span> : null}
+        </section>
+      ) : null}
 
       <section className="control-panel" aria-label="watchlist controls">
         <div className="panel-column">
@@ -209,4 +254,102 @@ export function WatchlistDashboard() {
       </section>
     </main>
   );
+}
+
+async function fetchProviderSummary(): Promise<ProviderSummary | null> {
+  const response = await fetch("/api/backend/settings");
+  if (!response.ok) {
+    return null;
+  }
+  const payload: unknown = await response.json();
+  if (!isRecord(payload) || !isRecord(payload.provider_status)) {
+    return null;
+  }
+  const opendart = isRecord(payload.provider_status.opendart) ? payload.provider_status.opendart : {};
+  const ai = isRecord(payload.provider_status.ai) ? payload.provider_status.ai : {};
+  return {
+    opendartConfigured: opendart.configured === true,
+    aiMode: typeof ai.mode === "string" ? ai.mode : null,
+  };
+}
+
+function parseStartupRefresh(payload: unknown): StartupRefreshView {
+  if (!isRecord(payload)) {
+    return { ...INITIAL_REFRESH, status: "failed" };
+  }
+  const providerDisabled = parseProviderDisabled(payload.provider_disabled);
+  return {
+    status: normalizeStartupStatus(typeof payload.status === "string" ? payload.status : "", providerDisabled.length),
+    priceRows: numberValue(payload.price_rows),
+    indicatorRows: numberValue(payload.indicator_rows),
+    newsItems: numberValue(payload.news_items),
+    disclosures: numberValue(payload.disclosures),
+    providerDisabled,
+  };
+}
+
+function normalizeStartupStatus(status: string, disabledCount: number): StartupRefreshStatus {
+  if (status === "skipped") {
+    return "skipped";
+  }
+  if (status === "partial" || disabledCount > 0) {
+    return "partial";
+  }
+  if (status === "ok") {
+    return "ready";
+  }
+  return "failed";
+}
+
+function parseProviderDisabled(value: unknown): readonly ProviderDisabled[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.filter(isProviderDisabled);
+}
+
+function isProviderDisabled(value: unknown): value is ProviderDisabled {
+  return (
+    isRecord(value)
+    && typeof value.symbol === "string"
+    && typeof value.provider === "string"
+    && typeof value.reason === "string"
+  );
+}
+
+function numberValue(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function startupStatusLabel(status: StartupRefreshStatus): string {
+  switch (status) {
+    case "checking":
+      return "확인 중";
+    case "ready":
+      return "시장 데이터 준비 완료";
+    case "partial":
+      return "일부 소스 비활성화";
+    case "skipped":
+      return "최근 갱신 사용";
+    case "failed":
+      return "시장 데이터 갱신 실패";
+  }
+}
+
+function providerSummaryLabel(summary: ProviderSummary): string {
+  const dart = summary.opendartConfigured ? "OpenDART 설정됨" : "OpenDART 미설정";
+  const ai = summary.aiMode ? `AI ${summary.aiMode}` : "AI disabled";
+  return `${dart} · ${ai}`;
+}
+
+function logStartupWarning(error: unknown, fallback: string): void {
+  if (error instanceof Error) {
+    console.warn(error.message);
+    return;
+  }
+  console.warn(fallback);
 }

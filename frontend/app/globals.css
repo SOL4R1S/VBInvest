@@ -86,6 +86,37 @@ input {
   background: #fff5f5;
 }
 
+.startup-status-strip {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.startup-status-strip strong {
+  color: var(--ink);
+}
+
+.startup-status-strip.ready {
+  border-color: color-mix(in srgb, var(--positive) 40%, var(--line));
+}
+
+.startup-status-strip.partial,
+.startup-status-strip.skipped {
+  border-color: color-mix(in srgb, var(--accent-2) 42%, var(--line));
+}
+
+.startup-status-strip.failed {
+  border-color: color-mix(in srgb, var(--negative) 42%, var(--line));
+}
+
 .hero,
 .control-panel,
 .detail-header,
