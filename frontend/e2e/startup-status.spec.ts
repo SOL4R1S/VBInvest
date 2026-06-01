@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { routeDashboardData } from "./dashboard-fixture";
 
 const evidenceDir = path.resolve(process.cwd(), "../evidence");
 
@@ -17,6 +18,7 @@ test("dashboard shows startup source counts without raw provider secrets", async
     }
   });
 
+  await routeDashboardData(page);
   await page.route("**/api/backend/settings", async (route) => {
     await route.fulfill({
       status: 200,
@@ -84,6 +86,7 @@ test("dashboard shows startup source counts without raw provider secrets", async
 });
 
 test("dashboard loads global styling on first render", async ({ page }) => {
+  await routeDashboardData(page);
   await page.route("**/api/backend/settings", async (route) => {
     await route.fulfill({
       status: 200,
@@ -101,7 +104,8 @@ test("dashboard loads global styling on first render", async ({ page }) => {
 
   await page.goto("/");
 
-  await expect(page.locator("body")).toHaveCSS("background-color", "rgb(246, 243, 238)");
+  const backgroundImage = await page.locator("body").evaluate((node) => getComputedStyle(node).backgroundImage);
+  expect(backgroundImage).toContain("linear-gradient");
   const paddingTop = await page.locator(".page").evaluate((node) => Number.parseFloat(getComputedStyle(node).paddingTop));
   expect(paddingTop).toBeGreaterThanOrEqual(12);
 });

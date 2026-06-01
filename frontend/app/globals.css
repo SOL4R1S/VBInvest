@@ -43,13 +43,13 @@ input {
 }
 
 button {
-  min-height: 38px;
+  min-height: 36px;
   border: 1px solid var(--line-strong);
-  border-radius: 999px;
-  padding: 0 16px;
+  border-radius: 8px;
+  padding: 0 12px;
   background: var(--paper-strong);
   color: var(--ink);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   cursor: pointer;
   transition:
@@ -132,7 +132,7 @@ input:focus {
   flex-wrap: wrap;
   margin-bottom: 18px;
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: 10px;
   padding: 10px 14px;
   background: var(--paper-strong);
   color: var(--muted);
@@ -175,10 +175,10 @@ input:focus {
 
 .hero {
   justify-content: space-between;
-  margin-bottom: 22px;
+  margin-bottom: 14px;
   border: 1px solid var(--line);
-  border-radius: 24px;
-  padding: 24px;
+  border-radius: 12px;
+  padding: 14px 16px;
   background: var(--canvas-soft);
 }
 
@@ -199,9 +199,9 @@ p {
 }
 
 h1 {
-  margin-bottom: 8px;
-  font-size: clamp(2rem, 4vw, 3.3rem);
-  line-height: 0.95;
+  margin-bottom: 6px;
+  font-size: clamp(1.7rem, 3vw, 2.5rem);
+  line-height: 1;
   font-weight: 900;
   letter-spacing: 0;
 }
@@ -215,10 +215,11 @@ h3 {
   max-width: 680px;
   margin-bottom: 0;
   color: var(--body);
+  font-size: 14px;
 }
 
 .auth-buttons button {
-  min-height: 44px;
+  min-height: 36px;
   border-color: var(--brand);
   background: var(--paper-strong);
 }
@@ -232,15 +233,15 @@ h3 {
 .detail-card,
 .research-card {
   border: 1px solid var(--line);
-  border-radius: 18px;
+  border-radius: 12px;
   background: var(--paper);
-  box-shadow: var(--shadow);
+  box-shadow: 0 12px 34px rgb(52 42 27 / 8%);
 }
 
 .control-panel {
   align-items: stretch;
-  margin-bottom: 18px;
-  padding: 14px;
+  margin-bottom: 14px;
+  padding: 10px;
 }
 
 .panel-column {
@@ -252,6 +253,7 @@ h3 {
 .detail-card h2,
 .research-card h3 {
   margin-bottom: 8px;
+  font-size: 18px;
 }
 
 .chips,
@@ -269,7 +271,7 @@ h3 {
 }
 
 .chip {
-  border-radius: 12px;
+  border-radius: 8px;
 }
 
 .symbol-row {
@@ -277,7 +279,7 @@ h3 {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
   border-color: var(--line);
-  border-radius: 12px;
+  border-radius: 8px;
   background: var(--paper-muted);
 }
 
@@ -317,7 +319,7 @@ h3 {
   justify-content: space-between;
   margin-bottom: 14px;
   border-bottom: 1px solid var(--line);
-  padding-bottom: 14px;
+  padding-bottom: 12px;
 }
 
 .summary-grid {
@@ -329,8 +331,8 @@ h3 {
 
 .summary-grid div {
   border: 1px solid var(--line);
-  border-radius: 14px;
-  padding: 12px;
+  border-radius: 8px;
+  padding: 11px;
   background: var(--paper-muted);
 }
 
@@ -404,7 +406,7 @@ h3 {
   gap: 0;
   overflow: hidden;
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: 8px;
   background: var(--paper-muted);
 }
 
@@ -432,7 +434,7 @@ h3 {
   height: 640px;
   min-height: 420px;
   border: 1px solid var(--line);
-  border-radius: 18px;
+  border-radius: 10px;
   overflow: hidden;
   background: var(--paper-strong);
 }
@@ -489,7 +491,7 @@ h3 {
 
   .hero {
     align-items: flex-start;
-    padding: 18px;
+    padding: 12px;
   }
 
   .content-grid,

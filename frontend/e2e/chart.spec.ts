@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { routeDashboardData } from "./dashboard-fixture";
 
 const evidenceDir = path.resolve(process.cwd(), "../evidence");
 
@@ -10,6 +11,7 @@ async function writeEvidence(name: string, content: string | Buffer) {
 }
 
 async function routeStartupOk(page: Page) {
+  await routeDashboardData(page);
   await page.route("**/api/backend/settings", async (route) => {
     await route.fulfill({
       status: 200,

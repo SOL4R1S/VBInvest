@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { routeDashboardData } from "./dashboard-fixture";
 
 const evidenceDir = path.resolve(process.cwd(), "../evidence");
 
@@ -13,6 +14,7 @@ test("report button generates and renders research", async ({ page }) => {
   const generateRequests: readonly string[] = [];
   const seenGenerateRequests: string[] = [];
 
+  await routeDashboardData(page);
   await page.route("**/api/backend/settings", async (route) => {
     await route.fulfill({
       status: 200,

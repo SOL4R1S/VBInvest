@@ -35,7 +35,7 @@ VBinvest.bat
 
 ## 초기 설정
 
-- 데이터베이스: `SQLite 내장 DB (권장)`, `PostgreSQL Docker 자동 실행`, `PostgreSQL 직접 연결`
+- 데이터베이스: `SQLite 내장 DB (권장)`, 실행 중인 `PostgreSQL Docker 자동 감지/연결`, `PostgreSQL 직접 연결`
 - Obsidian: 생성된 Markdown 리포트를 저장할 Vault 경로 선택
 - OpenDART: 국내 공시 조회가 필요하면 선택적으로 `OPENDART_API_KEY` 설정
 - AI: `AI API 연동`, Ollama 같은 local LLM endpoint, OpenAI-compatible cloud provider, Codex CLI, Copilot CLI, 또는 비활성화

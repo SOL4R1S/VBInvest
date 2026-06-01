@@ -26,6 +26,8 @@ def serialize_dashboard_items(items: list[dict[str, Any]]) -> list[dict[str, Any
 def _serialize_history(frame: pd.DataFrame) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for row in frame.to_dict(orient="records"):
+        if row.get("source") == "synthetic" or row.get("provider") == "synthetic":
+            continue
         rows.append({key: _json_value(value) for key, value in row.items()})
     return rows
 

@@ -35,7 +35,7 @@ The launcher starts the local backend on `127.0.0.1`, chooses free ports, opens 
 
 ## First-Run Choices
 
-- Database: `SQLite built-in DB (recommended)`, `PostgreSQL Docker automatic start`, or `PostgreSQL direct connection`
+- Database: `SQLite built-in DB (recommended)`, automatic detection/connection for a running `PostgreSQL Docker` container, or `PostgreSQL direct connection`
 - Obsidian: choose a vault path for generated Markdown reports
 - OpenDART: optional `OPENDART_API_KEY` for Korean disclosures
 - AI: AI API integration, local LLM endpoints such as Ollama, OpenAI-compatible cloud providers, Codex CLI, Copilot CLI, or disabled

@@ -75,6 +75,22 @@ class FakeDashboardDB:
                             "rsi14": 62.5,
                         },
                         {
+                            "date": datetime(2026, 5, 30, tzinfo=timezone.utc).date(),
+                            "open": 104.0,
+                            "high": 105.0,
+                            "low": 101.0,
+                            "close": 102.0,
+                            "volume": 900,
+                            "source": "synthetic",
+                            "return_1d": -0.0097,
+                            "return_1m": 0.07,
+                            "ma5": 101.5,
+                            "ma20": 98.5,
+                            "ma50": 95.5,
+                            "ma120": None,
+                            "rsi14": 60.0,
+                        },
+                        {
                             "date": datetime(2026, 6, 1, tzinfo=timezone.utc).date(),
                             "open": 103.0,
                             "high": 108.0,
@@ -191,6 +207,7 @@ def test_watchlist_dashboard_api_includes_serialized_history(monkeypatch):
     assert payload["items"][0]["asset"]["symbol"] == "NVDA"
     assert payload["items"][0]["latest"]["close"] == 107.0
     assert payload["items"][0]["latest"]["rsi14"] == 64.2
+    assert all(row["source"] != "synthetic" for row in payload["items"][0]["history"])
     assert payload["items"][0]["history"] == [
         {
             "date": "2026-05-29",
