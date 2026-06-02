@@ -36,6 +36,8 @@ export function WatchlistDashboard() {
   const [seriesBySymbol, setSeriesBySymbol] = useState<Record<string, ChartPoint[]>>({});
   const [newWatchlist, setNewWatchlist] = useState("");
   const [newSymbol, setNewSymbol] = useState("");
+  const [symbolValidationMessage, setSymbolValidationMessage] = useState("");
+  const [symbolValidationPending, setSymbolValidationPending] = useState(false);
   const [startupRefresh, setStartupRefresh] = useState<StartupRefreshView>(INITIAL_STARTUP_REFRESH);
   const [providerSummary, setProviderSummary] = useState<ProviderSummary | null>(null);
 
@@ -116,10 +118,25 @@ export function WatchlistDashboard() {
     setNewWatchlist("");
   }
 
-  function addSymbol() {
+  async function addSymbol() {
     const symbol = newSymbol.trim().toUpperCase();
     if (!symbol) {
       return;
+    }
+    setSymbolValidationPending(true);
+    setSymbolValidationMessage("");
+    try {
+      const response = await fetch(`/api/backend/tickers/validate?symbol=${encodeURIComponent(symbol)}`);
+      if (!response.ok) {
+        setSymbolValidationMessage("실제 조회 가능한 티커만 추가할 수 있습니다.");
+        return;
+      }
+    } catch (error) {
+      logStartupWarning(error, "ticker validation failed");
+      setSymbolValidationMessage("티커 확인에 실패했습니다. 네트워크와 데이터 제공자를 확인해주세요.");
+      return;
+    } finally {
+      setSymbolValidationPending(false);
     }
     setWatchlists((items) =>
       items.map((item) =>
@@ -130,6 +147,7 @@ export function WatchlistDashboard() {
     );
     setSelectedSymbol(symbol);
     setNewSymbol("");
+    setSymbolValidationMessage("");
   }
 
   return (
@@ -190,8 +208,11 @@ export function WatchlistDashboard() {
           <h2>종목 추가</h2>
           <div className="inline-form">
             <input aria-label="새 종목 심볼" value={newSymbol} onChange={(event) => setNewSymbol(event.target.value)} placeholder="NVDA" />
-            <button type="button" onClick={addSymbol}>추가</button>
+            <button type="button" onClick={() => void addSymbol()} disabled={symbolValidationPending}>
+              {symbolValidationPending ? "확인 중" : "추가"}
+            </button>
           </div>
+          {symbolValidationMessage ? <p className="research-status error">{symbolValidationMessage}</p> : null}
         </div>
       </section>
 

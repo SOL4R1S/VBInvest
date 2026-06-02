@@ -148,7 +148,10 @@ def fetch_stooq_history(symbol: str) -> pd.DataFrame:
     except (urllib.error.URLError, TimeoutError, UnicodeDecodeError) as exc:
         raise PriceFetchError(f"{symbol}: stooq fetch failed: {exc}") from exc
 
-    frame = pd.read_csv(StringIO(csv_text))
+    try:
+        frame = pd.read_csv(StringIO(csv_text))
+    except pd.errors.ParserError as exc:
+        raise PriceFetchError(f"{symbol}: stooq returned malformed rows") from exc
     required = {"Date", "Open", "High", "Low", "Close", "Volume"}
     if frame.empty or not required.issubset(frame.columns):
         raise PriceFetchError(f"{symbol}: stooq returned no valid rows")
@@ -204,6 +207,24 @@ def fetch_price_history(
             continue
         return filtered
     raise PriceFetchError(f"{symbol}: all price providers failed: {'; '.join(failures)}")
+
+
+def validate_ticker_symbol(
+    symbol: str,
+    *,
+    history_fetcher=fetch_price_history,
+) -> dict[str, str | bool]:
+    normalized = symbol.strip().upper()
+    if not normalized:
+        return {"symbol": normalized, "valid": False, "reason": "empty_symbol"}
+    try:
+        frame = history_fetcher(normalized)
+    except PriceFetchError:
+        return {"symbol": normalized, "valid": False, "reason": "ticker_not_found"}
+    if frame.empty:
+        return {"symbol": normalized, "valid": False, "reason": "ticker_not_found"}
+    provider = str(frame["provider"].dropna().iloc[0]) if "provider" in frame and not frame["provider"].dropna().empty else "unknown"
+    return {"symbol": normalized, "valid": True, "provider": provider}
 
 
 def filter_price_history_window(

@@ -92,6 +92,18 @@ describe("WatchlistDashboard", () => {
   });
 
   it("creates a new group and adds NVDA through the visible controls", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit): Promise<Response> => {
+      const url = String(input);
+      if (url.includes("/api/backend/watchlists/semiconductor-core/dashboard")) {
+        return dashboardResponse();
+      }
+      if (url.includes("/api/backend/tickers/validate?symbol=NVDA")) {
+        return jsonResponse({ symbol: "NVDA", valid: true, provider: "yfinance" });
+      }
+      return jsonResponse({ status: "ok", price_rows: 1, indicator_rows: 1, news_items: 0, disclosures: 0 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
     render(<WatchlistDashboard />);
 
     fireEvent.change(screen.getByLabelText("새 그룹 이름"), { target: { value: "AI Memory Lab" } });
@@ -100,10 +112,42 @@ describe("WatchlistDashboard", () => {
     fireEvent.click(screen.getByRole("button", { name: "추가" }));
 
     expect(screen.getByRole("button", { name: "AI Memory Lab" })).toBeInTheDocument();
-    expect(screen.getByTestId("symbol-NVDA")).toHaveTextContent("NVDA");
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith("/api/backend/tickers/validate?symbol=NVDA");
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("symbol-NVDA")).toHaveTextContent("NVDA");
+    });
     await waitFor(() => {
       expect(screen.getByText("999.12")).toBeInTheDocument();
     });
+  });
+
+  it("does not add a symbol until the backend validates that the ticker exists", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit): Promise<Response> => {
+      const url = String(input);
+      if (url.includes("/api/backend/watchlists/semiconductor-core/dashboard")) {
+        return dashboardResponse();
+      }
+      if (url.includes("/api/backend/tickers/validate?symbol=NOTREAL")) {
+        return jsonResponse({ detail: "ticker not found" }, 404);
+      }
+      return jsonResponse({ status: "ok", price_rows: 1, indicator_rows: 1, news_items: 0, disclosures: 0 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<WatchlistDashboard />);
+
+    fireEvent.change(screen.getByLabelText("새 그룹 이름"), { target: { value: "검증 그룹" } });
+    fireEvent.click(screen.getByRole("button", { name: "새 그룹" }));
+    fireEvent.change(screen.getByLabelText("새 종목 심볼"), { target: { value: "NOTREAL" } });
+    fireEvent.click(screen.getByRole("button", { name: "추가" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith("/api/backend/tickers/validate?symbol=NOTREAL");
+    });
+    expect(screen.getByText("실제 조회 가능한 티커만 추가할 수 있습니다.")).toBeInTheDocument();
+    expect(screen.queryByTestId("symbol-NOTREAL")).not.toBeInTheDocument();
   });
 
   it("refreshes market data when the local program page opens", async () => {

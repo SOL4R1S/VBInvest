@@ -27,6 +27,7 @@ from scripts.lib.config import (
 )
 from scripts.lib.db_factory import build_database_from_local_config
 from scripts.lib.db_repository import DBRepository
+from scripts.lib.prices import validate_ticker_symbol
 from scripts.lib.startup_market_refresh import run_startup_market_refresh
 from scripts.lib.version import load_version_metadata
 
@@ -201,6 +202,14 @@ def system_shutdown(user: AuthUser = Depends(current_user)):
 @app.get("/api/watchlists")
 def list_watchlists(user: AuthUser = Depends(current_user)):
     return {"watchlists": auth_db().list_user_watchlists(user.auth_user_id)}
+
+
+@app.get("/api/tickers/validate")
+def validate_ticker(symbol: str):
+    result = validate_ticker_symbol(symbol)
+    if not result["valid"]:
+        raise HTTPException(status_code=404, detail="ticker not found")
+    return result
 
 
 @app.post("/api/watchlists", status_code=status.HTTP_201_CREATED)

@@ -2,7 +2,15 @@ from datetime import date
 
 import pandas as pd
 
-from scripts.lib.prices import PriceFetchError, fetch_price_history, normalize_yfinance_history, parse_yahoo_chart, synthetic_history
+from scripts.lib.prices import (
+    PriceFetchError,
+    fetch_price_history,
+    fetch_stooq_history,
+    normalize_yfinance_history,
+    parse_yahoo_chart,
+    synthetic_history,
+    validate_ticker_symbol,
+)
 
 
 def yahoo_payload():
@@ -207,3 +215,47 @@ def test_fetch_price_history_raises_clear_error_when_all_providers_fail():
     assert "yahoo failed" in message
     assert "yfinance failed" in message
     assert "stooq failed" in message
+
+
+def test_validate_ticker_symbol_accepts_provider_with_real_rows():
+    def fetcher(symbol: str):
+        assert symbol == "NVDA"
+        return pd.DataFrame([_price_row(date(2026, 6, 1), provider="yahoo-chart")])
+
+    result = validate_ticker_symbol(" nvda ", history_fetcher=fetcher)
+
+    assert result == {"symbol": "NVDA", "valid": True, "provider": "yahoo-chart"}
+
+
+def test_validate_ticker_symbol_rejects_missing_provider_rows():
+    def fetcher(symbol: str):
+        assert symbol == "NOTREAL"
+        raise PriceFetchError("NOTREAL: all price providers failed")
+
+    result = validate_ticker_symbol("notreal", history_fetcher=fetcher)
+
+    assert result == {"symbol": "NOTREAL", "valid": False, "reason": "ticker_not_found"}
+
+
+def test_fetch_stooq_history_wraps_malformed_provider_response(monkeypatch):
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            return False
+
+        def read(self):
+            return b"malformed provider response"
+
+    monkeypatch.setattr("urllib.request.urlopen", lambda request, timeout: Response())
+    monkeypatch.setattr(pd, "read_csv", lambda value: (_ for _ in ()).throw(pd.errors.ParserError("bad csv")))
+
+    try:
+        fetch_stooq_history("NOTREALXYZ123")
+    except PriceFetchError as exc:
+        message = str(exc)
+    else:
+        raise AssertionError("expected PriceFetchError")
+
+    assert "NOTREALXYZ123: stooq returned malformed rows" in message

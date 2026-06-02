@@ -232,6 +232,34 @@ def test_watchlist_asset_add_remove_enforces_ownership(monkeypatch):
     assert "000660.KS" not in remove_response.json()["symbols"]
 
 
+def test_ticker_validation_endpoint_reports_invalid_symbol(monkeypatch):
+    client = client_with_db(monkeypatch, FakeAuthDB())
+
+    monkeypatch.setattr(
+        api,
+        "validate_ticker_symbol",
+        lambda symbol: {"symbol": symbol.strip().upper(), "valid": False, "reason": "ticker_not_found"},
+    )
+    response = client.get("/api/tickers/validate", params={"symbol": "notreal"})
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "ticker not found"
+
+
+def test_ticker_validation_endpoint_returns_provider_for_valid_symbol(monkeypatch):
+    client = client_with_db(monkeypatch, FakeAuthDB())
+
+    monkeypatch.setattr(
+        api,
+        "validate_ticker_symbol",
+        lambda symbol: {"symbol": symbol.strip().upper(), "valid": True, "provider": "yfinance"},
+    )
+    response = client.get("/api/tickers/validate", params={"symbol": "nvda"})
+
+    assert response.status_code == 200
+    assert response.json() == {"symbol": "NVDA", "valid": True, "provider": "yfinance"}
+
+
 def test_portfolio_holding_crud_is_user_owned(monkeypatch):
     fake_db = FakeAuthDB()
     client = client_with_db(monkeypatch, fake_db)
