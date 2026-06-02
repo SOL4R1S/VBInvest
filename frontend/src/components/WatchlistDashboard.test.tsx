@@ -327,6 +327,34 @@ describe("WatchlistDashboard", () => {
     );
   });
 
+  it("shows AI API and local LLM settings when AI API integration is selected", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      const url = String(input);
+      if (url.includes("/api/settings") && init?.method !== "POST") {
+        return jsonResponse({
+          first_run_completed: false,
+          provider_status: { opendart: { configured: false }, ai: { mode: "disabled" } },
+        });
+      }
+      return jsonResponse({ status: "ok", price_rows: 1, indicator_rows: 1, news_items: 0, disclosures: 0 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<WatchlistDashboard />);
+
+    fireEvent.change(await screen.findByLabelText("AI Mode"), { target: { value: "openai_compatible" } });
+
+    expect(screen.getByLabelText("AI API Type")).toBeInTheDocument();
+    expect(screen.getByLabelText("Cloud Model Provider")).toBeInTheDocument();
+    expect(screen.getByLabelText("AI Base URL")).toBeInTheDocument();
+    expect(screen.getByLabelText("AI Model")).toBeInTheDocument();
+    expect(screen.getByLabelText("Context Size")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("AI API Type"), { target: { value: "local" } });
+
+    expect(screen.getByText(/Ollama/)).toBeInTheDocument();
+  });
+
   it("shows provider-disabled partial refresh without treating it as a total failure", async () => {
     vi.stubGlobal(
       "fetch",

@@ -19,6 +19,8 @@ from scripts.lib.dashboard_payload import serialize_dashboard_items
 from scripts.lib.api_store import ApiStore
 from scripts.lib.auth import AuthError, AuthUser, verify_bearer_token
 from scripts.lib.ai_provider import AIProviderConfigError
+from scripts.lib.ai_catalog import provider_catalog
+from scripts.lib.ai_cli import detect_ai_cli
 from scripts.lib.config import (
     ConfigError,
     DatabaseMode,
@@ -123,7 +125,10 @@ class FirstRunObsidianPayload(BaseModel):
 class FirstRunProviderPayload(BaseModel):
     opendart_api_key: str = Field(default="", max_length=200)
     ai_mode: str = Field(default="none", max_length=40)
+    ai_provider_name: str = Field(default="", max_length=80)
     ai_base_url: str = Field(default="", max_length=500)
+    ai_model: str = Field(default="", max_length=160)
+    ai_context_size: int = Field(default=8192, ge=1024, le=262144)
     ai_api_key: str = Field(default="", max_length=500)
 
 
@@ -169,7 +174,10 @@ def build_first_run_config(payload: FirstRunSetupPayload) -> LocalConfig:
     database = build_first_run_database(payload.database, data_dir)
     providers = ProviderSettings(
         opendart_api_key=payload.providers.opendart_api_key.strip(),
+        ai_provider_name="" if payload.providers.ai_mode == "none" else payload.providers.ai_provider_name.strip(),
         ai_base_url="" if payload.providers.ai_mode == "none" else payload.providers.ai_base_url.strip(),
+        ai_model="" if payload.providers.ai_mode == "none" else payload.providers.ai_model.strip(),
+        ai_context_size=payload.providers.ai_context_size,
         ai_api_key="" if payload.providers.ai_mode == "none" else payload.providers.ai_api_key.strip(),
     )
     return LocalConfig(
@@ -329,6 +337,31 @@ def opendart_provider_status(check: bool = False):
         "configured": result.status == "enabled",
         "provider_code": result.provider_code,
         "message": result.message,
+    }
+
+
+@app.get("/api/providers/ai/status")
+def ai_provider_status():
+    try:
+        config = load_local_config()
+    except ConfigError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    ai_status = provider_status(config, os.environ)["ai"]
+    return {
+        **ai_status,
+        "catalog": [entry.as_dict() for entry in provider_catalog()],
+        "cli": {
+            "codex": detect_ai_cli(
+                "codex",
+                executable_path=os.environ.get("CODEX_CLI_PATH"),
+                login_command="codex login --device-auth",
+            ).as_dict(),
+            "copilot": detect_ai_cli(
+                "copilot",
+                executable_path=os.environ.get("COPILOT_CLI_PATH"),
+                login_command="copilot login",
+            ).as_dict(),
+        },
     }
 
 

@@ -66,13 +66,19 @@ class ObsidianSettings:
 @dataclass(frozen=True, slots=True)
 class ProviderSettings:
     opendart_api_key: str
+    ai_provider_name: str
     ai_base_url: str
+    ai_model: str
+    ai_context_size: int
     ai_api_key: str
 
     def redacted(self) -> dict[str, RedactedValue]:
         return {
             "opendart_api_key": redact_secret(self.opendart_api_key),
+            "ai_provider_name": self.ai_provider_name,
             "ai_base_url": self.ai_base_url,
+            "ai_model": self.ai_model,
+            "ai_context_size": self.ai_context_size,
             "ai_api_key": redact_secret(self.ai_api_key),
         }
 
@@ -286,6 +292,9 @@ def _parse_providers(
         parsed = urlsplit(ai_base_url)
         if parsed.scheme not in {"http", "https"} or not parsed.netloc:
             raise ConfigError("providers.ai_base_url", "must be an http(s) URL")
+    ai_context_size = _int(raw, "ai_context_size", _int_from_env(environ, "AI_PROVIDER_CONTEXT_SIZE", 8192))
+    if ai_context_size < 1024 or ai_context_size > 262144:
+        raise ConfigError("providers.ai_context_size", "must be between 1024 and 262144")
     return ProviderSettings(
         opendart_api_key=resolve_opendart_api_key(
             environ,
@@ -293,7 +302,10 @@ def _parse_providers(
             store=secret_store,
             config_value=_text(raw, "opendart_api_key", ""),
         ),
+        ai_provider_name=_text(raw, "ai_provider_name", environ.get("AI_PROVIDER_NAME", "")),
         ai_base_url=ai_base_url,
+        ai_model=_text(raw, "ai_model", environ.get("AI_PROVIDER_MODEL", "")),
+        ai_context_size=ai_context_size,
         ai_api_key=resolve_secret(
             environ,
             "AI_API_KEY",
@@ -382,7 +394,7 @@ def _ai_provider_source(
     secret_store: SecretStore | None,
 ) -> TomlTable:
     return {
-        "provider": _ai_provider_name(environ, config.providers.ai_base_url),
+        "provider": _ai_provider_name(environ, config.providers.ai_provider_name, config.providers.ai_base_url),
         "base_url": _text_from_env(environ, "AI_PROVIDER_BASE_URL")
         or _text_from_env(environ, "DEEPSEEK_BASE_URL")
         or _text_from_env(environ, "OPENAI_BASE_URL")
@@ -390,7 +402,7 @@ def _ai_provider_source(
         "model": _text_from_env(environ, "AI_PROVIDER_MODEL")
         or _text_from_env(environ, "DEEPSEEK_MODEL")
         or _text_from_env(environ, "OPENAI_MODEL")
-        or "",
+        or config.providers.ai_model,
         "api_key": resolve_secret(
             environ,
             "AI_API_KEY",
@@ -402,9 +414,11 @@ def _ai_provider_source(
     }
 
 
-def _ai_provider_name(environ: Mapping[str, str], base_url: str) -> str:
+def _ai_provider_name(environ: Mapping[str, str], configured_name: str, base_url: str) -> str:
     if _text_from_env(environ, "AI_PROVIDER_NAME"):
         return _text_from_env(environ, "AI_PROVIDER_NAME")
+    if configured_name:
+        return configured_name
     if _text_from_env(environ, "DEEPSEEK_API_KEY") or _text_from_env(environ, "DEEPSEEK_BASE_URL"):
         return "deepseek"
     if _text_from_env(environ, "OPENAI_API_KEY") or _text_from_env(environ, "OPENAI_BASE_URL"):
@@ -450,6 +464,23 @@ def _bool(raw: TomlTable, name: str, default: bool) -> bool:
     raise ConfigError(name, "must be a boolean")
 
 
+def _int(raw: TomlTable, name: str, default: int) -> int:
+    value = raw.get(name, default)
+    if isinstance(value, int) and not isinstance(value, bool):
+        return value
+    raise ConfigError(name, "must be an integer")
+
+
+def _int_from_env(environ: Mapping[str, str], key: str, default: int) -> int:
+    raw = environ.get(key, "").strip()
+    if not raw:
+        return default
+    try:
+        return int(raw)
+    except ValueError as exc:
+        raise ConfigError(f"providers.{key.lower()}", "must be an integer") from exc
+
+
 def _enum[T: StrEnum](enum_type: type[T], value: str, field: str) -> T:
     try:
         return enum_type(value)
@@ -470,7 +501,10 @@ def _to_toml(config: LocalConfig) -> str:
         f'export_mode = "{config.obsidian.export_mode.value}"',
         "[providers]",
         f'opendart_api_key = "{config.providers.opendart_api_key}"',
+        f'ai_provider_name = "{config.providers.ai_provider_name}"',
         f'ai_base_url = "{config.providers.ai_base_url}"',
+        f'ai_model = "{config.providers.ai_model}"',
+        f"ai_context_size = {config.providers.ai_context_size}",
         f'ai_api_key = "{config.providers.ai_api_key}"',
     ]
     return "\n".join(lines) + "\n"

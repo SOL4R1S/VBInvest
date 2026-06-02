@@ -44,6 +44,13 @@ On macOS, launcher-provided `AI_API_KEY` and `OPENDART_API_KEY` values are saved
 
 OpenAI-compatible local models can run without a key. For example, Ollama or an OpenAI-compatible endpoint on `127.0.0.1`/`localhost` is allowed without `AI_API_KEY`. OpenAI-compatible cloud AI providers require an API key; without one, report generation is blocked safely and only a configuration error is shown. Codex/Copilot CLI modes are OAuth-capable advanced options, but they may be affected by provider policies or account limits and are not the default path.
 
+### AI API Integration Options
+
+- Cloud model provider: OpenAI, OpenRouter, DeepSeek, Qwen/DashScope, Kimi/Moonshot, GLM/Z.AI, or a custom OpenAI-compatible provider
+- Local LLM: an OpenAI-compatible `http://127.0.0.1:<port>/v1` endpoint from Ollama, LM Studio, llama.cpp, or similar tools
+- Settings: provider, base URL, model, context size, and API key
+- Codex CLI / Copilot CLI: VBinvest checks only installation and login status, and never stores OAuth tokens. The UI shows an account limitation/suspension risk label for these modes.
+
 ## Source Refresh And Reports
 
 When the program starts, it refreshes prices, indicators, news, SEC filings, and OpenDART disclosures for the saved tickers where possible. If no OpenDART key is configured, only Korean disclosure collection is disabled; prices, indicators, news, and SEC refresh continue.

@@ -20,6 +20,11 @@ export function SetupWizard({ onCompleted }: SetupWizardProps) {
   const [exportMode, setExportMode] = useState("direct");
   const [opendartKey, setOpendartKey] = useState("");
   const [aiMode, setAiMode] = useState("none");
+  const [aiApiType, setAiApiType] = useState("cloud");
+  const [aiProviderName, setAiProviderName] = useState("openai");
+  const [aiBaseUrl, setAiBaseUrl] = useState("https://api.openai.com/v1");
+  const [aiModel, setAiModel] = useState("");
+  const [aiContextSize, setAiContextSize] = useState(8192);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<SetupError | null>(null);
 
@@ -47,7 +52,10 @@ export function SetupWizard({ onCompleted }: SetupWizardProps) {
           providers: {
             opendart_api_key: opendartKey,
             ai_mode: aiMode,
-            ai_base_url: "",
+            ai_provider_name: aiMode === "openai_compatible" ? aiProviderName : "",
+            ai_base_url: aiMode === "openai_compatible" ? aiBaseUrl : "",
+            ai_model: aiMode === "openai_compatible" ? aiModel : "",
+            ai_context_size: aiContextSize,
             ai_api_key: "",
           },
         }),
@@ -134,6 +142,50 @@ export function SetupWizard({ onCompleted }: SetupWizardProps) {
             <option value="copilot_cli">Copilot CLI (계정 제한/정지 가능성 있음)</option>
           </select>
         </label>
+
+        {aiMode === "openai_compatible" ? (
+          <>
+            <label>
+              <span>AI API Type</span>
+              <select aria-label="AI API Type" value={aiApiType} onChange={(event) => setAiApiType(event.target.value)}>
+                <option value="cloud">Cloud model provider</option>
+                <option value="local">Local LLM</option>
+              </select>
+            </label>
+
+            {aiApiType === "cloud" ? (
+              <label>
+                <span>Cloud Model Provider</span>
+                <select aria-label="Cloud Model Provider" value={aiProviderName} onChange={(event) => setAiProviderName(event.target.value)}>
+                  <option value="openai">OpenAI</option>
+                  <option value="openrouter">OpenRouter</option>
+                  <option value="deepseek">DeepSeek</option>
+                  <option value="qwen_dashscope">Qwen / DashScope</option>
+                  <option value="kimi_moonshot">Kimi / Moonshot</option>
+                  <option value="glm_zai">GLM / Z.AI</option>
+                  <option value="custom">Custom provider</option>
+                </select>
+              </label>
+            ) : (
+              <p className="setup-note">Ollama, LM Studio, llama.cpp 같은 로컬 OpenAI-compatible endpoint를 사용할 수 있습니다.</p>
+            )}
+
+            <label className="setup-wide">
+              <span>AI Base URL</span>
+              <input aria-label="AI Base URL" value={aiBaseUrl} onChange={(event) => setAiBaseUrl(event.target.value)} placeholder="https://api.openai.com/v1" />
+            </label>
+
+            <label>
+              <span>AI Model</span>
+              <input aria-label="AI Model" value={aiModel} onChange={(event) => setAiModel(event.target.value)} placeholder="gpt-4.1-mini" />
+            </label>
+
+            <label>
+              <span>Context Size</span>
+              <input aria-label="Context Size" type="number" min={1024} max={262144} value={aiContextSize} onChange={(event) => setAiContextSize(Number(event.target.value))} />
+            </label>
+          </>
+        ) : null}
       </div>
 
       {error ? <p className="research-status error">{error.message}</p> : null}
