@@ -1,5 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
 import { APPROVED_OPINIONS } from "@/lib/research";
 import { WatchlistDashboard } from "@/components/WatchlistDashboard";
 
@@ -206,6 +208,188 @@ describe("WatchlistDashboard", () => {
     await waitFor(() => {
       expect(screen.queryByText("주식 정보를 확인하는 중")).not.toBeInTheDocument();
     });
+  });
+
+  it("shows startup progress counts from backend response on completion", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit): Promise<Response> => {
+      const url = String(input);
+      if (url.includes("/api/watchlists/semiconductor-core/dashboard")) {
+        return dashboardResponse();
+      }
+      if (url.includes("/api/startup/market-refresh")) {
+        return jsonResponse({
+          status: "ok",
+          queued: 2,
+          running: 0,
+          succeeded: 2,
+          failed: 1,
+          provider_disabled: [{ symbol: "005930.KS", provider: "dart", reason: "missing-api-key" }],
+          news_items: 4,
+          disclosures: 1,
+        });
+      }
+      return jsonResponse({ provider_status: { opendart: { configured: true }, ai: { mode: "local" } } });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<WatchlistDashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("startup-status")).toHaveTextContent("대기 2");
+    });
+    expect(screen.getByTestId("startup-status")).toHaveTextContent("진행 0");
+    expect(screen.getByTestId("startup-status")).toHaveTextContent("성공 2");
+    expect(screen.getByTestId("startup-status")).toHaveTextContent("실패 1");
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("writes startup count component evidence for manual QA", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit): Promise<Response> => {
+      const url = String(input);
+      if (url.includes("/api/watchlists/semiconductor-core/dashboard")) {
+        return dashboardResponse();
+      }
+      if (url.includes("/api/startup/market-refresh")) {
+        return jsonResponse({
+          status: "ok",
+          queued: 2,
+          running: 0,
+          succeeded: 2,
+          failed: 1,
+          provider_disabled: [{ symbol: "005930.KS", provider: "dart", reason: "missing-api-key" }],
+          news_items: 4,
+          disclosures: 1,
+        });
+      }
+      return jsonResponse({ provider_status: { opendart: { configured: true }, ai: { mode: "local" } } });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<WatchlistDashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("startup-status")).toHaveTextContent("성공 2");
+    });
+    const statusText = screen.getByTestId("startup-status").textContent ?? "";
+    await mkdir(path.resolve(process.cwd(), "../.omo/ulw-loop/evidence"), { recursive: true });
+    await writeFile(path.resolve(process.cwd(), "../.omo/ulw-loop/evidence/task11-frontend-component.txt"), statusText);
+  });
+
+  it("handles malformed startup payload as a startup failure", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit): Promise<Response> => {
+      const url = String(input);
+      if (url.includes("/api/watchlists/semiconductor-core/dashboard")) {
+        return dashboardResponse();
+      }
+      if (url.includes("/api/startup/market-refresh")) {
+        return new Response("not-json", { status: 200 });
+      }
+      return jsonResponse({ provider_status: { opendart: { configured: true }, ai: { mode: "local" } } });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<WatchlistDashboard />);
+
+    await waitFor(() => {
+      const statusBanners = screen.getAllByRole("status");
+      expect(statusBanners).toHaveLength(1);
+      expect(statusBanners[0]).toHaveTextContent("시장 데이터 갱신 실패");
+    });
+  });
+
+  it("shows stale skipped status without treating it as a hard failure", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit): Promise<Response> => {
+      const url = String(input);
+      if (url.includes("/api/watchlists/semiconductor-core/dashboard")) {
+        return dashboardResponse();
+      }
+      if (url.includes("/api/startup/market-refresh")) {
+        return jsonResponse({
+          status: "skipped",
+          price_rows: 1,
+          indicator_rows: 1,
+          news_items: 0,
+          disclosures: 0,
+        });
+      }
+      return jsonResponse({ provider_status: { opendart: { configured: true }, ai: { mode: "local" } } });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<WatchlistDashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("startup-status")).toHaveTextContent("최근 갱신 사용");
+    });
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("keeps the startup modal while a running status is reported", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit): Promise<Response> => {
+      const url = String(input);
+      if (url.includes("/api/settings")) {
+        return jsonResponse({ provider_status: { opendart: { configured: true }, ai: { mode: "local" } } });
+      }
+      if (url.includes("/api/watchlists/semiconductor-core/dashboard")) {
+        return dashboardResponse();
+      }
+      if (url.includes("/api/startup/market-refresh")) {
+        return jsonResponse({
+          status: "running",
+          queued: 1,
+          running: 3,
+          succeeded: 0,
+          failed: 0,
+          provider_disabled: [],
+          news_items: 0,
+          disclosures: 0,
+        });
+      }
+      return jsonResponse({ status: "ok", price_rows: 1, indicator_rows: 1, news_items: 0, disclosures: 0 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<WatchlistDashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("status")).toHaveTextContent("주식 정보를 확인하는 중");
+    });
+    expect(screen.queryByTestId("startup-status")).not.toBeInTheDocument();
+  });
+
+  it("derives startup counts from legacy fields when queued/running/succeeded/failed are absent", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit): Promise<Response> => {
+      const url = String(input);
+      if (url.includes("/api/settings")) {
+        return jsonResponse({ provider_status: { opendart: { configured: true }, ai: { mode: "local" } } });
+      }
+      if (url.includes("/api/watchlists/semiconductor-core/dashboard")) {
+        return dashboardResponse();
+      }
+      if (url.includes("/api/startup/market-refresh")) {
+        return jsonResponse({
+          status: "partial",
+          price_rows: 2,
+          indicator_rows: 2,
+          news_items: 4,
+          disclosures: 1,
+          provider_disabled: [{ symbol: "005930.KS", provider: "dart", reason: "missing-api-key" }],
+          failures: ["x"],
+        });
+      }
+      return jsonResponse({ status: "ok", price_rows: 1, indicator_rows: 1, news_items: 0, disclosures: 0 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<WatchlistDashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("startup-status")).toHaveTextContent("가격 2 · 지표 2");
+    });
+    expect(screen.getByTestId("startup-status")).toHaveTextContent("대기 0");
+    expect(screen.getByTestId("startup-status")).toHaveTextContent("진행 0");
+    expect(screen.getByTestId("startup-status")).toHaveTextContent("실패 2");
+    expect(screen.getByTestId("startup-status")).toHaveTextContent("성공 0");
   });
 
   it("uses same-origin API routes when the static frontend is served by FastAPI", async () => {

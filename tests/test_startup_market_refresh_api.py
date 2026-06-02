@@ -54,6 +54,7 @@ class UnavailableStartupRefreshDB(FakeStartupRefreshDB):
 
 def client_with_db(monkeypatch, fake_db: FakeStartupRefreshDB):
     monkeypatch.setattr(api, "db", lambda: fake_db)
+    monkeypatch.setattr(api, "auth_db", lambda: fake_db)
     return TestClient(api.app)
 
 
@@ -80,6 +81,10 @@ def test_startup_market_refresh_dry_run_records_status(monkeypatch):
     assert body["watchlist"] == "semiconductor-core"
     assert body["dry_run"] is True
     assert body["price_rows"] > 0
+    assert body["queued"] == 0
+    assert body["running"] == 0
+    assert body["succeeded"] == 1
+    assert body["failed"] == 0
     assert fake_db.report_runs[0]["run_type"] == "startup-market-refresh"
     assert fake_db.report_runs[0]["status"] == "ok"
 
@@ -133,6 +138,20 @@ def test_startup_refresh_defaults_to_source_collection(monkeypatch):
     ]
 
 
+def test_startup_refresh_treats_same_trading_day_success_as_fresh(monkeypatch):
+    recent = datetime.now(timezone.utc) - timedelta(hours=2)
+    fake_db = FakeStartupRefreshDB(last_success_at=recent)
+    client = client_with_db(monkeypatch, fake_db)
+
+    response = client.post(
+        "/api/startup/market-refresh?watchlist=semiconductor-core&dry_run=true&no_network=true&limit=1",
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "skipped"
+    assert response.json()["stale"] is True
+
+
 def test_startup_refresh_skips_when_recent_success_exists_unless_forced(monkeypatch):
     recent = datetime.now(timezone.utc) - timedelta(minutes=5)
     fake_db = FakeStartupRefreshDB(last_success_at=recent)
@@ -153,6 +172,106 @@ def test_startup_refresh_skips_when_recent_success_exists_unless_forced(monkeypa
     assert forced.json()["status"] == "ok"
     assert forced.json()["stale"] is False
     assert forced.json()["price_rows"] > 0
+
+
+def test_startup_refresh_skips_when_all_assets_are_fresh(monkeypatch):
+    today = datetime.now(timezone.utc).date()
+
+    class FreshAssetsDB(FakeStartupRefreshDB):
+        def fetch_latest_price_dates(self, asset_ids):
+            return {asset_id: today for asset_id in asset_ids}
+
+    client = client_with_db(monkeypatch, FreshAssetsDB())
+
+    response = client.post(
+        "/api/startup/market-refresh?watchlist=semiconductor-core&dry_run=true&no_network=true&limit=1",
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "skipped"
+    assert body["price_rows"] == 0
+    assert body["indicator_rows"] == 0
+    assert body["locked"] is False
+    assert body["stale"] is False
+
+
+def test_startup_refresh_force_ignores_fresh_asset_skip(monkeypatch):
+    today = datetime.now(timezone.utc).date()
+    captured: dict[str, list[dict[str, object]]] = {}
+
+    class FreshAssetsDB(FakeStartupRefreshDB):
+        def fetch_latest_price_dates(self, asset_ids):
+            return {asset_id: today for asset_id in asset_ids}
+
+    def fake_ingest_assets(assets, db, options):
+        captured["assets"] = assets
+        return ingest_module.IngestResult(
+            status="ok",
+            failures=[],
+            price_rows=1,
+            indicator_rows=1,
+            news_items=0,
+            disclosures=0,
+            provider_disabled=[],
+        )
+
+    monkeypatch.setattr(refresh_module, "ingest_assets", fake_ingest_assets)
+    client = client_with_db(monkeypatch, FreshAssetsDB())
+
+    response = client.post(
+        "/api/startup/market-refresh?watchlist=semiconductor-core&dry_run=true&no_network=true&limit=1&force=true",
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "ok"
+    assert body["price_rows"] == 1
+    assert [asset["symbol"] for asset in captured["assets"]] == ["NVDA"]
+
+
+def test_recent_success_uses_kst_calendar_date():
+    assert refresh_module._is_recent_success(
+        datetime(2026, 6, 1, 16, 0, tzinfo=timezone.utc),
+        [{"asset_id": 1, "symbol": "005930.KS", "exchange": "KRX"}],
+        now=datetime(2026, 6, 2, 8, 0, tzinfo=timezone.utc),
+    )
+
+
+def test_startup_refresh_merges_portfolio_holdings_when_available(monkeypatch):
+    captured: dict[str, list[dict[str, object]]] = {}
+
+    def fake_ingest_assets(assets, db, options):
+        captured["assets"] = assets
+        return ingest_module.IngestResult(
+            status="ok",
+            failures=[],
+            price_rows=2,
+            indicator_rows=2,
+            news_items=0,
+            disclosures=0,
+            provider_disabled=[],
+        )
+
+    class HoldingsDB(FakeStartupRefreshDB):
+        def list_portfolio_holdings(self):
+            return [
+                {"asset_id": 1, "symbol": "NVDA", "exchange": "NASDAQ", "display_name_ko": "엔비디아"},
+                {"asset_id": 2, "symbol": "AMD", "exchange": "NASDAQ", "display_name_ko": "AMD"},
+                {"asset_id": 1, "symbol": "NVDA", "exchange": "NASDAQ", "display_name_ko": "엔비디아"},
+            ]
+
+    monkeypatch.setattr(refresh_module, "ingest_assets", fake_ingest_assets)
+    client = client_with_db(monkeypatch, HoldingsDB())
+
+    response = client.post(
+        "/api/startup/market-refresh?watchlist=semiconductor-core&dry_run=true&no_network=true",
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
+    assert [asset["symbol"] for asset in captured["assets"]] == ["NVDA", "AMD"]
+    assert len(captured["assets"]) == 2
 
 
 def test_api_refresh_passes_resolved_opendart_key(monkeypatch):
@@ -220,6 +339,38 @@ def test_api_refresh_reads_opendart_key_without_validating_unrelated_provider_co
 
     assert response.status_code == 200
     assert captured == {"dart_api_key": "config-dart-key"}
+
+
+def test_startup_refresh_partial_provider_failure_remains_http_200(monkeypatch):
+    fake_db = FakeStartupRefreshDB()
+
+    def fake_ingest_assets(assets, db, options):
+        return ingest_module.IngestResult(
+            status="partial",
+            failures=["NVDA:PriceFetchError"],
+            price_rows=0,
+            indicator_rows=0,
+            news_items=0,
+            disclosures=0,
+            provider_disabled=[{"symbol": "NVDA", "provider": "yahoo", "reason": "timeout"}],
+        )
+
+    monkeypatch.setattr(refresh_module, "ingest_assets", fake_ingest_assets)
+    client = client_with_db(monkeypatch, fake_db)
+
+    response = client.post(
+        "/api/startup/market-refresh?watchlist=semiconductor-core&dry_run=true&no_network=true&limit=1",
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "partial"
+    assert body["failures"] == ["NVDA:PriceFetchError"]
+    assert body["provider_disabled"] == [{"symbol": "NVDA", "provider": "yahoo", "reason": "timeout"}]
+    assert body["queued"] == 0
+    assert body["running"] == 0
+    assert body["succeeded"] == 0
+    assert body["failed"] == 2
 
 
 def test_startup_market_refresh_concurrent_run_returns_skipped(monkeypatch):

@@ -1,4 +1,4 @@
-export type StartupRefreshStatus = "checking" | "setup_required" | "ready" | "partial" | "skipped" | "failed";
+export type StartupRefreshStatus = "checking" | "running" | "setup_required" | "ready" | "partial" | "skipped" | "failed";
 
 export type ProviderDisabled = {
   readonly symbol: string;
@@ -8,6 +8,10 @@ export type ProviderDisabled = {
 
 export type StartupRefreshView = {
   readonly status: StartupRefreshStatus;
+  readonly queued: number;
+  readonly running: number;
+  readonly succeeded: number;
+  readonly failed: number;
   readonly priceRows: number;
   readonly indicatorRows: number;
   readonly newsItems: number;
@@ -36,6 +40,10 @@ export type CollectionAssetStatus = {
 
 export const INITIAL_STARTUP_REFRESH: StartupRefreshView = {
   status: "checking",
+  queued: 0,
+  running: 0,
+  succeeded: 0,
+  failed: 0,
   priceRows: 0,
   indicatorRows: 0,
   newsItems: 0,
@@ -77,11 +85,29 @@ export function parseStartupRefresh(payload: unknown): StartupRefreshView {
   if (!isRecord(payload)) {
     return { ...INITIAL_STARTUP_REFRESH, status: "failed" };
   }
+  const failures = parseFailures(payload.failures);
   const providerDisabled = parseProviderDisabled(payload.provider_disabled);
+  const priceRows = numberValue(payload.price_rows);
+  const indicatorRows = numberValue(payload.indicator_rows);
+  const rawCounts = deriveCounts({
+    rawQueued: numberValue(payload.queued),
+    rawRunning: numberValue(payload.running),
+    rawSucceeded: numberValue(payload.succeeded),
+    rawFailed: numberValue(payload.failed),
+    priceRows,
+    indicatorRows,
+    providerDisabledCount: providerDisabled.length,
+    failureCount: failures.length,
+    status: typeof payload.status === "string" ? payload.status : "",
+  });
   return {
     status: normalizeStartupStatus(typeof payload.status === "string" ? payload.status : "", providerDisabled.length),
-    priceRows: numberValue(payload.price_rows),
-    indicatorRows: numberValue(payload.indicator_rows),
+    queued: rawCounts.queued,
+    running: rawCounts.running,
+    succeeded: rawCounts.succeeded,
+    failed: rawCounts.failed,
+    priceRows,
+    indicatorRows,
     newsItems: numberValue(payload.news_items),
     disclosures: numberValue(payload.disclosures),
     providerDisabled,
@@ -92,6 +118,8 @@ export function startupStatusLabel(status: StartupRefreshStatus): string {
   switch (status) {
     case "checking":
       return "확인 중";
+    case "running":
+      return "데이터 갱신 진행 중";
     case "setup_required":
       return "초기 설정 필요";
     case "ready":
@@ -148,6 +176,12 @@ function parseCollectionStatus(value: unknown): CollectionAssetStatus["status"] 
 }
 
 function normalizeStartupStatus(status: string, disabledCount: number): StartupRefreshStatus {
+  if (status === "queued") {
+    return "checking";
+  }
+  if (status === "running") {
+    return "running";
+  }
   if (status === "skipped") {
     return "skipped";
   }
@@ -165,6 +199,58 @@ function parseProviderDisabled(value: unknown): readonly ProviderDisabled[] {
     return [];
   }
   return value.filter(isProviderDisabled);
+}
+
+function parseFailures(value: unknown): readonly string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.filter((item): item is string => typeof item === "string");
+}
+
+function deriveCounts(args: {
+  rawQueued: number;
+  rawRunning: number;
+  rawSucceeded: number;
+  rawFailed: number;
+  priceRows: number;
+  indicatorRows: number;
+  providerDisabledCount: number;
+  failureCount: number;
+  status: string;
+}): { queued: number; running: number; succeeded: number; failed: number } {
+  const hasExplicitCounts = hasProgressCounts(args.rawQueued, args.rawRunning, args.rawSucceeded, args.rawFailed);
+  if (hasExplicitCounts) {
+    return {
+      queued: args.rawQueued,
+      running: args.rawRunning,
+      succeeded: args.rawSucceeded,
+      failed: args.rawFailed,
+    };
+  }
+
+  const failed = Number.isFinite(args.failureCount) && args.failureCount > 0
+    ? args.failureCount + args.providerDisabledCount
+    : args.providerDisabledCount;
+  const baselineRows = Math.max(args.priceRows, args.indicatorRows);
+  if (args.status === "failed") {
+    return {
+      queued: 0,
+      running: 0,
+      succeeded: 0,
+      failed: Math.max(failed, 1),
+    };
+  }
+  return {
+    queued: 0,
+    running: 0,
+    succeeded: Math.max(0, baselineRows - failed),
+    failed,
+  };
+}
+
+function hasProgressCounts(queued: number, running: number, succeeded: number, failed: number): boolean {
+  return queued > 0 || running > 0 || succeeded > 0 || failed > 0;
 }
 
 function isProviderDisabled(value: unknown): value is ProviderDisabled {

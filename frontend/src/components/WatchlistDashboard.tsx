@@ -52,6 +52,7 @@ export function WatchlistDashboard() {
   const currentSymbol = activeWatchlist?.symbols.includes(selectedSymbol) ? selectedSymbol : activeWatchlist?.symbols[0] ?? "NVDA";
   const asset = assetCards[currentSymbol] ?? fallbackAsset(currentSymbol);
   const points = useMemo(() => seriesBySymbol[currentSymbol] ?? [], [currentSymbol, seriesBySymbol]);
+  const startupInProgress = startupRefresh.status === "checking" || startupRefresh.status === "running";
 
   useEffect(() => {
     let cancelled = false;
@@ -181,7 +182,7 @@ export function WatchlistDashboard() {
       {setupRequired ? <SetupWizard onCompleted={completeSetup} /> : null}
       {setupRequired ? null : (
         <>
-      {startupRefresh.status === "checking" ? (
+      {startupInProgress ? (
         <div className="startup-refresh-modal" role="status" aria-live="polite">
           주식 정보를 확인하는 중
         </div>
@@ -200,9 +201,10 @@ export function WatchlistDashboard() {
         </div>
       </header>
 
-      {startupRefresh.status !== "checking" ? (
+      {!startupInProgress ? (
         <section className={`startup-status-strip ${startupRefresh.status}`} aria-label="startup source status" data-testid="startup-status">
           <strong>{startupStatusLabel(startupRefresh.status)}</strong>
+          <span>대기 {startupRefresh.queued} · 진행 {startupRefresh.running} · 성공 {startupRefresh.succeeded} · 실패 {startupRefresh.failed}</span>
           <span>가격 {startupRefresh.priceRows} · 지표 {startupRefresh.indicatorRows}</span>
           <span>뉴스 {startupRefresh.newsItems} · 공시 {startupRefresh.disclosures}</span>
           {providerSummary ? <span>{providerSummaryLabel(providerSummary)}</span> : null}

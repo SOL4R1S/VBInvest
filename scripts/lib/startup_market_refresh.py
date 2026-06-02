@@ -1,19 +1,22 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 from typing import Any, Protocol
 
-from scripts.startup_market_refresh import IngestOptions, fallback_assets, ingest_assets
+from scripts.startup_market_refresh import (
+    IngestOptions,
+    fallback_assets,
+    ingest_assets,
+)
 from scripts.lib.config import serialize_report_run_summary
+from scripts.lib.price_refresh_window import fetch_latest_price_dates
+from scripts.lib.market_calendar import KST, completed_trade_date
 
 try:
     from psycopg import OperationalError as PostgresOperationalError
 except ImportError:
     PostgresOperationalError = RuntimeError
-
-STALE_REFRESH_WINDOW = timedelta(minutes=30)
-
 
 class StartupRefreshStore(Protocol):
     def fetch_watchlist_assets(self, slug: str) -> list[dict]:
@@ -29,6 +32,10 @@ class StartupRefreshResult:
     watchlist: str
     dry_run: bool
     locked: bool
+    queued: int
+    running: int
+    succeeded: int
+    failed: int
     price_rows: int
     indicator_rows: int
     news_items: int
@@ -54,19 +61,74 @@ def run_startup_market_refresh(
 ) -> StartupRefreshResult:
     effective_store = store
     try:
-        assets = store.fetch_watchlist_assets(watchlist) if store is not None else fallback_assets(watchlist)
+        watchlist_assets = (
+            store.fetch_watchlist_assets(watchlist) if store is not None else fallback_assets(watchlist)
+        )
     except PostgresOperationalError:
         if not dry_run:
             raise
         effective_store = None
-        assets = fallback_assets(watchlist)
+        watchlist_assets = fallback_assets(watchlist)
+    assets = _combine_assets(
+        watchlist_assets if watchlist_assets else fallback_assets(watchlist),
+        _portfolio_holdings_assets(effective_store),
+    )
     if not assets:
         assets = fallback_assets(watchlist)
     if limit > 0:
         assets = assets[:limit]
+    asset_count = len(assets)
+    queued = running = 0
+
+    def compute_counts(
+        status: str,
+        failures: list[str],
+        provider_disabled: list[dict[str, str]],
+    ) -> tuple[int, int, int, int]:
+        if status in {"locked", "skipped"}:
+            return (0, 0, 0, 0)
+        if status == "partial":
+            failed = len(failures) + len(provider_disabled)
+            succeeded = max(asset_count - failed, 0)
+            return (0, 0, succeeded, failed)
+        return (0, 0, asset_count, 0)
 
     last_success_at = _latest_success_at(effective_store, watchlist)
-    if not force and _is_recent_success(last_success_at):
+    if not force and _are_all_assets_fresh(effective_store, assets):
+        report_run_id = _record_report_run(
+            effective_store,
+            status="skipped",
+            watchlist=watchlist,
+            assets=len(assets),
+            dry_run=dry_run,
+            price_rows=0,
+            indicator_rows=0,
+            news_items=0,
+            disclosures=0,
+            failures=[],
+            stale=False,
+            provider_disabled=[],
+        )
+        return StartupRefreshResult(
+            status="skipped",
+            watchlist=watchlist,
+            dry_run=dry_run,
+            locked=False,
+            queued=queued,
+            running=running,
+            succeeded=0,
+            failed=0,
+            stale=False,
+            price_rows=0,
+            indicator_rows=0,
+            news_items=0,
+            disclosures=0,
+            provider_disabled=[],
+            failures=[],
+            report_run_id=report_run_id,
+            last_success_at=last_success_at,
+        )
+    if not force and _is_recent_success(last_success_at, assets):
         report_run_id = _record_report_run(
             effective_store,
             status="skipped",
@@ -86,6 +148,10 @@ def run_startup_market_refresh(
             watchlist=watchlist,
             dry_run=dry_run,
             locked=False,
+            queued=queued,
+            running=running,
+            succeeded=0,
+            failed=0,
             stale=True,
             price_rows=0,
             indicator_rows=0,
@@ -115,6 +181,11 @@ def run_startup_market_refresh(
     )
     locked = result.status == "locked"
     status = "skipped" if locked else result.status
+    queued, running, succeeded, failed = compute_counts(
+        status=status,
+        failures=result.failures,
+        provider_disabled=result.provider_disabled or [],
+    )
     report_run_id = _record_report_run(
         effective_store,
         status=status,
@@ -134,6 +205,10 @@ def run_startup_market_refresh(
         watchlist=watchlist,
         dry_run=dry_run,
         locked=locked,
+        queued=queued,
+        running=running,
+        succeeded=succeeded,
+        failed=failed,
         price_rows=result.price_rows,
         indicator_rows=result.indicator_rows,
         news_items=result.news_items,
@@ -192,10 +267,109 @@ def _coerce_datetime(value: Any) -> datetime | None:
     return None
 
 
-def _is_recent_success(last_success_at: datetime | None) -> bool:
+def _are_all_assets_fresh(store: StartupRefreshStore | None, assets: list[dict]) -> bool:
+    if store is None:
+        return False
+    assets_with_id = [_parse_asset_with_asset_id(asset) for asset in assets]
+    if any(asset is None for asset in assets_with_id):
+        return False
+    assets_with_id = [asset for asset in assets_with_id if asset is not None]
+    if not assets_with_id:
+        return False
+    latest_dates = fetch_latest_price_dates(store, [int(asset["asset_id"]) for asset in assets_with_id])
+    if not latest_dates:
+        return False
+    now = datetime.now(timezone.utc)
+    return all(
+        latest_dates.get(int(asset["asset_id"])) is not None
+        and latest_dates[int(asset["asset_id"])] >= _trade_date_for_asset(asset, now)
+        for asset in assets_with_id
+    )
+
+
+def _is_recent_success(last_success_at: datetime | None, assets: list[dict], now: datetime | None = None) -> bool:
     if last_success_at is None:
         return False
-    return datetime.now(timezone.utc) - last_success_at <= STALE_REFRESH_WINDOW
+    if not assets:
+        return False
+    last_run_at = _coerce_datetime(last_success_at)
+    if last_run_at is None:
+        return False
+    if now is None:
+        now = datetime.now(timezone.utc)
+    latest_trade_date = _latest_trade_date(assets, now)
+    if latest_trade_date is None:
+        return False
+    return last_run_at.astimezone(KST).date() >= latest_trade_date
+
+
+def _latest_trade_date(assets: list[dict], now: datetime) -> date | None:
+    family_dates = {_trade_date_for_asset(asset, now) for asset in assets}
+    return None if not family_dates else max(family_dates)
+
+
+def _trade_date_for_asset(asset: dict, now: datetime):
+    if now.tzinfo is None:
+        now_kst = now.replace(tzinfo=KST)
+    else:
+        now_kst = now.astimezone(KST)
+    return completed_trade_date(asset.get("exchange"), now_kst)
+
+
+def _combine_assets(watchlist_assets: list[dict], portfolio_assets: list[dict]) -> list[dict]:
+    merged: list[dict] = []
+    seen = set()
+    for asset in watchlist_assets + portfolio_assets:
+        key = _asset_identity(asset)
+        if key is None:
+            continue
+        if key in seen:
+            continue
+        seen.add(key)
+        merged.append(asset)
+    return merged
+
+
+def _portfolio_holdings_assets(store: StartupRefreshStore | None) -> list[dict]:
+    if store is None:
+        return []
+    for method_name in ("list_portfolio_holdings", "list_all_portfolio_holdings", "list_user_portfolio_holdings"):
+        method = getattr(store, method_name, None)
+        if callable(method):
+            try:
+                return list(method())
+            except TypeError:
+                continue
+            except (AttributeError, ValueError):
+                continue
+    return []
+
+
+def _asset_identity(asset: dict) -> tuple[str, int | str] | None:
+    try:
+        asset_id = int(asset["asset_id"])
+        return ("asset_id", asset_id)
+    except (TypeError, KeyError, ValueError):
+        symbol = asset.get("symbol")
+        if not isinstance(symbol, str):
+            return None
+        return ("symbol", symbol.upper())
+
+
+def _parse_asset_with_asset_id(asset: dict) -> dict | None:
+    if not isinstance(asset, dict):
+        return None
+    try:
+        asset_id = int(asset["asset_id"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    return {
+        "asset_id": asset_id,
+        "symbol": asset.get("symbol"),
+        "display_name_ko": asset.get("display_name_ko"),
+        "exchange": asset.get("exchange"),
+        "currency": asset.get("currency"),
+    }
 
 
 def _record_report_run(
