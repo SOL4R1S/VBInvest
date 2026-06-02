@@ -3,6 +3,7 @@
 [한국어](README.md) | [English](README.en.md)
 
 VBinvest is a local-first open-source research dashboard. It stores price/volume/RSI14/MA 5/20/50/120/history, news, SEC filings, and OpenDART disclosures for tracked symbols in local storage and generates per-symbol reports.
+VBinvest is not a hosted SaaS. You run it locally on your own machine, and data/API/AI costs are handled through your own keys and environment.
 
 ## Table of Contents
 
@@ -17,6 +18,7 @@ VBinvest is a local-first open-source research dashboard. It stores price/volume
 - [Backup and uninstall](#backup-and-uninstall)
 - [Troubleshooting](#troubleshooting)
 - [Contributing](#contributing)
+- [Git Flow and releases](#git-flow-and-releases)
 - [License](#license)
 - [Disclaimer](#disclaimer)
 
@@ -197,6 +199,27 @@ Install Git hooks before contributions:
 - Fork and create feature branches from `develop`.
 - Use Conventional Commits.
 - Submissions are expected to include tests/docs updates for behavior-impacting changes.
+
+## Git Flow and releases
+
+VBinvest public work follows Git Flow.
+Publishing / Release follows this policy.
+
+- `develop` is the integration branch. Normal work is pushed to `origin/develop`.
+- `main` is the stable release branch. Never force-push `main` or `develop`.
+- Use `feature/<short-name>` for feature work, `release/vX.Y.Z` for stabilization, and `hotfix/<short-name>` for urgent fixes.
+- Before pushing, local git hooks, secret scan, backend/frontend tests, and launcher/package smoke checks must pass.
+
+Create releases with SemVer release tags:
+
+```bash
+git checkout develop
+git pull origin develop
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+After a release tag is pushed, GitHub Actions builds a macOS/Windows launcher-ready release artifact and writes the Git-SHA-backed `build_version` to `build_version.txt`. Until packaged binaries exist, each release artifact contains the source-run package and launcher files.
 
 ## License
 

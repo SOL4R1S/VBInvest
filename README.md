@@ -2,7 +2,8 @@
 
 [한국어](README.md) | [English](README.en.md)
 
-로컬 우선 오픈소스 투자 리서치 대시보드입니다. VBinvest는 사용자가 등록한 종목의 가격·거래량·RSI14·이동평균(5/20/50/120)·뉴스·SEC 공시·OpenDART 공시를 모아 로컬 DB에 보관하고 종목별 리포트를 생성합니다.
+로컬 우선(local-first) 오픈소스 투자 리서치 대시보드입니다. VBinvest는 사용자가 등록한 종목의 가격·거래량·RSI14·이동평균(5/20/50/120)·뉴스·SEC 공시·OpenDART 공시를 모아 로컬 DB에 보관하고 종목별 리포트를 생성합니다.
+VBinvest는 호스팅 SaaS가 아닙니다. 사용자는 자신의 PC에서 프로그램을 로컬에서 실행하고, 데이터/API/AI 비용은 각자의 키와 환경으로 부담합니다.
 
 ## 목차
 
@@ -17,6 +18,7 @@
 - [백업과 삭제](#백업과-삭제)
 - [문제 해결](#문제-해결)
 - [개발과 기여](#개발과-기여)
+- [Git Flow와 릴리스](#git-flow와-릴리스)
 - [라이선스](#라이선스)
 - [면책 고지](#면책-고지)
 
@@ -196,6 +198,27 @@ cd frontend && npm run lint && npm run typecheck && npm test -- --run && npm run
 
 - 브랜치 기본 운영: `develop` 기준으로 기능 브랜치 생성
 - 커밋 규칙: Conventional Commits
+
+## Git Flow와 릴리스
+
+VBinvest의 공개 작업은 Git Flow 기준으로 진행합니다.
+Publishing / Release 절차는 아래 기준을 따릅니다.
+
+- `develop`은 통합 브랜치이며 일반 작업은 `origin/develop`에 push합니다.
+- `main`은 안정 릴리스용 브랜치입니다. `main`과 `develop`은 force-push하지 않습니다.
+- 기능 작업은 `feature/<short-name>`, 안정화는 `release/vX.Y.Z`, 긴급 수정은 `hotfix/<short-name>`을 사용합니다.
+- push 전에는 로컬 git hook, secret scan, backend/frontend test, launcher/package smoke를 통과해야 합니다.
+
+릴리스는 SemVer 형식의 릴리스 태그로 만듭니다.
+
+```bash
+git checkout develop
+git pull origin develop
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+릴리스 태그 push 후 GitHub Actions가 macOS/Windows launcher-ready release artifact를 만들고 `build_version.txt`에 Git SHA 기반 `build_version`을 기록합니다. 패키지형 바이너리가 나오기 전까지 release artifact는 소스 실행 패키지와 런처 파일을 포함합니다.
 
 ## 라이선스
 

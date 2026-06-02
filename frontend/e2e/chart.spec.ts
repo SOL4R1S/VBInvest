@@ -12,11 +12,14 @@ async function writeEvidence(name: string, content: string | Buffer) {
 
 async function routeStartupOk(page: Page) {
   await routeDashboardData(page);
+  await page.route("**/favicon.ico", async (route) => {
+    await route.fulfill({ status: 204 });
+  });
   await page.route("**/api/settings", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify({ provider_status: { opendart: { configured: true }, ai: { mode: "local" } } }),
+      body: JSON.stringify({ language: "ko", provider_status: { opendart: { configured: true }, ai: { mode: "local" } } }),
     });
   });
   await page.route("**/api/startup/market-refresh?**", async (route) => {
@@ -24,6 +27,20 @@ async function routeStartupOk(page: Page) {
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({ status: "ok", price_rows: 1, indicator_rows: 1, news_items: 0, disclosures: 0 }),
+    });
+  });
+  await page.route("**/api/watchlists/semiconductor-core/collection-status", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ watchlist: "semiconductor-core", assets: [] }),
+    });
+  });
+  await page.route("**/api/scheduler/settings", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ daily_refresh_enabled: false, weekly_precompute_enabled: false }),
     });
   });
 }

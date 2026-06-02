@@ -1,0 +1,73 @@
+name: release
+
+on:
+  push:
+    tags: [v*]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install backend dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Secret scan
+        run: python scripts/secret_scan.py
+      - name: Backend tests
+        run: pytest -q
+      - name: Frontend checks
+        working-directory: frontend
+        run: |
+          npm run lint
+          npm run typecheck
+          npm test -- --run
+          npm run build
+      - name: Smoke launchers and package inputs
+        run: |
+          make launcher-smoke
+          make package-smoke
+      - name: Build release artifact
+        env:
+          VBINVEST_BUILD_VERSION: ${{ github.ref_name }}+${{ github.sha }}
+        run: |
+          rm -rf release-artifacts
+          mkdir -p release-artifacts/VBinvest
+          python - <<'PY' > release-artifacts/VBinvest/build_version.txt
+          from scripts.lib.version import load_version_metadata
+
+          metadata = load_version_metadata()
+          print(f"version={metadata.version}")
+          print(f"build_version={metadata.build_version}")
+          PY
+          cp VBinvest.command VBinvest.bat VBinvest.ps1 VERSION README.md README.en.md release-artifacts/VBinvest/
+          cp -R scripts frontend postgres release-artifacts/VBinvest/
+          find release-artifacts/VBinvest -name '__pycache__' -type d -prune -exec rm -rf {} +
+          find release-artifacts/VBinvest -name '.next' -type d -prune -exec rm -rf {} +
+          cd release-artifacts
+          zip -qr "vbinvest-${{ github.ref_name }}.zip" VBinvest
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vbinvest-${{ github.ref_name }}
+          path: release-artifacts/vbinvest-${{ github.ref_name }}.zip
+          if-no-files-found: error
+      - uses: softprops/action-gh-release@v2
+        with:
+          prerelease: true
+          files: release-artifacts/vbinvest-${{ github.ref_name }}.zip
+          generate_release_notes: true

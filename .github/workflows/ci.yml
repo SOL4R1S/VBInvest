@@ -2,8 +2,9 @@ name: ci
 
 on:
   pull_request:
+    branches: [develop, main, release/**]
   push:
-    branches: [main]
+    branches: [develop, main, release/**]
 
 jobs:
   quality:
@@ -22,6 +23,24 @@ jobs:
         run: python -m pip install -r requirements.txt
       - name: Secret scan
         run: python scripts/secret_scan.py
+      - name: Git hook parity
+        run: |
+          git ls-files | python scripts/git_hooks/check_paths.py
+          printf '%s\n' 'feat: ci hook parity' > /tmp/vbinvest-good-commit-msg.txt
+          python scripts/git_hooks/check_commit_msg.py /tmp/vbinvest-good-commit-msg.txt
+          python - <<'PY'
+          from scripts.git_hooks.check_pre_push import EXPECTED_ORIGIN_URL, validate_branch_name, validate_origin_url
+
+          checks = [
+              validate_origin_url(EXPECTED_ORIGIN_URL),
+              validate_branch_name("develop"),
+              validate_branch_name("release/v0.1.0"),
+          ]
+          failures = [check.message for check in checks if not check.ok]
+          if failures:
+              raise SystemExit("\n".join(failures))
+          print("pre_push_policy=ok")
+          PY
       - name: Backend tests
         run: pytest -q
       - name: Install frontend dependencies
@@ -39,6 +58,10 @@ jobs:
       - name: Frontend build
         working-directory: frontend
         run: npm run build
+      - name: Launcher and package smoke
+        run: |
+          make launcher-smoke
+          make package-smoke
       - name: Install Playwright Chromium
         working-directory: frontend
         run: npx playwright install --with-deps chromium
