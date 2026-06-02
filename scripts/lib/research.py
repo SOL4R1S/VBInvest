@@ -37,6 +37,10 @@ def build_source_packet(
                 "symbol": symbol,
                 "date": _json_value(latest.get("date")),
                 "fields": ["close", "return_1m", "rsi14", "drawdown_52w", "ma20", "ma50"],
+                "source_text": json.dumps("DB 가격 지표/기술 지표 기반", ensure_ascii=False),
+                "title": json.dumps("DB 가격 지표/기술 지표 기반", ensure_ascii=False),
+                "source_material": True,
+                "untrusted": True,
             }
         )
         sources.extend(_source_rows("news", symbol, news))
@@ -170,16 +174,26 @@ def _ai_view(
 def _source_rows(kind: str, symbol: str, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     result = []
     for row in rows:
+        source_text = _quoted_source_text(row.get("title"))
         result.append(
             {
                 "kind": kind,
                 "symbol": symbol,
                 "title": row.get("title"),
+                "raw_title": row.get("title"),
                 "url": row.get("url"),
                 "published_at": _json_value(row.get("published_at")),
+                "source_text": source_text,
+                "source_material": True,
+                "untrusted": True,
             }
         )
     return result
+
+
+def _quoted_source_text(value: Any) -> str:
+    text = "" if value is None else str(value)
+    return json.dumps(text, ensure_ascii=False)
 
 
 def _metric_sentence(label: str, value: Any, *, percent: bool) -> str:

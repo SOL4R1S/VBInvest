@@ -232,6 +232,6 @@ def test_root_env_example_documents_local_and_cloud_ai_placeholders():
 
     assert "AI_PROVIDER_NAME=ollama" in text
     assert "AI_PROVIDER_BASE_URL=http://127.0.0.1:11434/v1" in text
-    assert "AI_PROVIDER_NAME=<cloud-or-openai-compatible-provider>" in text
-    assert "AI_API_KEY=<cloud-provider-api-key>" in text
+    assert "AI_PROVIDER_NAME=<openai|openrouter|deepseek|qwen_dashscope|kimi_moonshot|glm_zai|custom>" in text
+    assert "AI_API_KEY=<openai-compatible-api-key>" in text
     assert "source_gap" in text
