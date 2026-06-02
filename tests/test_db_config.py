@@ -10,6 +10,13 @@ def test_database_config_defaults_for_hermes_docker():
     assert config.user == "vbinvest"
 
 
+def test_database_config_default_dsn_is_masked() -> None:
+    config = DatabaseConfig.from_env({})
+
+    assert config.dsn() == "postgresql://vbinvest@host.docker.internal:5432/vbinvest"
+    assert config.dsn(mask_password=False) == "postgresql://vbinvest@host.docker.internal:5432/vbinvest"
+
+
 def test_database_config_builds_dsn_with_password_when_requested():
     config = DatabaseConfig.from_env(
         {

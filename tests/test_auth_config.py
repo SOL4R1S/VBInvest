@@ -14,7 +14,7 @@ def test_local_auth_mode_allows_default_test_secret():
     assert user.email == "local@example.com"
 
 
-def test_production_auth_mode_uses_supabase_jwt_secret():
+def test_production_auth_mode_uses_vbinvest_jwt_secret():
     secret = "prod-test-secret-not-real"
     token = _encode_hs256(
         {
@@ -30,12 +30,27 @@ def test_production_auth_mode_uses_supabase_jwt_secret():
         token,
         {
             "VBINVEST_AUTH_MODE": "production",
-            "SUPABASE_JWT_SECRET": secret,
+            "VBINVEST_JWT_SECRET": secret,
         },
     )
 
     assert user.auth_user_id == "prod-user"
     assert user.email == "prod@example.com"
+
+
+def test_production_auth_mode_ignores_supabase_jwt_secret():
+    secret = "prod-test-secret-not-real"
+    token = _encode_hs256(
+        {
+            "sub": "prod-user",
+            "iat": int(time.time()),
+            "exp": int(time.time()) + 3600,
+        },
+        secret,
+    )
+
+    with pytest.raises(AuthError, match="jwt verification is not configured"):
+        verify_bearer_token(token, {"VBINVEST_AUTH_MODE": "production", "SUPABASE_JWT_SECRET": secret})
 
 
 def test_production_auth_mode_rejects_local_test_secret():
@@ -46,7 +61,7 @@ def test_production_auth_mode_rejects_local_test_secret():
             token,
             {
                 "VBINVEST_AUTH_MODE": "production",
-                "SUPABASE_JWT_SECRET": LOCAL_TEST_JWT_SECRET,
+                "VBINVEST_JWT_SECRET": LOCAL_TEST_JWT_SECRET,
             },
         )
 

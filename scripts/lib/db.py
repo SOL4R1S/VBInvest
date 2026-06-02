@@ -7,6 +7,7 @@ import uuid
 import hashlib
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any, Mapping
 from urllib.parse import quote_plus
 
@@ -143,6 +144,17 @@ class VBinvestDB:
             raise RuntimeError("psycopg is required for live DB access") from exc
         self._psycopg = psycopg
 
+    @classmethod
+    def from_local_config(
+        cls,
+        *,
+        config_path: Path | None = None,
+        environ: Mapping[str, str] | None = None,
+    ):
+        from scripts.lib.db_factory import build_database_from_local_config
+
+        return build_database_from_local_config(config_path=config_path, environ=environ)
+
     def connect(self):
         return self._psycopg.connect(self.config.dsn(mask_password=False))
 
@@ -193,7 +205,7 @@ class VBinvestDB:
         name = email.split("@", 1)[0] if email else slug
         query = """
         INSERT INTO profiles (slug, name, auth_user_id, email, auth_provider)
-        VALUES (%s, %s, %s, %s, 'supabase')
+        VALUES (%s, %s, %s, %s, 'local')
         ON CONFLICT (auth_user_id) WHERE auth_user_id IS NOT NULL DO UPDATE SET
           email = COALESCE(profiles.email, EXCLUDED.email),
           updated_at = now()
@@ -502,6 +514,45 @@ class VBinvestDB:
             "output_path": row[8],
             "error_message": row[9],
         }
+
+    def fetch_latest_successful_report_run(self, run_type: str, scope_slug: str | None) -> dict[str, Any] | None:
+        sql = """
+        SELECT run_id, run_type, scope_type, scope_slug, completed_at, status, failed_assets, output_summary, output_path, error_message
+        FROM report_runs
+        WHERE run_type = %s AND scope_slug IS NOT DISTINCT FROM %s AND status = 'ok'
+        ORDER BY completed_at DESC, run_id DESC
+        LIMIT 1
+        """
+        with self.connect() as conn, conn.cursor() as cur:
+            cur.execute(sql, (run_type, scope_slug))
+            row = cur.fetchone()
+        if row is None:
+            return None
+        return {
+            "run_id": row[0],
+            "run_type": row[1],
+            "scope_type": row[2],
+            "scope_slug": row[3],
+            "completed_at": row[4],
+            "status": row[5],
+            "failed_assets": row[6] or [],
+            "output_summary": row[7],
+            "output_path": row[8],
+            "error_message": row[9],
+        }
+
+    def fetch_latest_price_dates(self, asset_ids: list[int]) -> dict[int, datetime.date]:
+        if not asset_ids:
+            return {}
+        placeholders = ",".join(["%s"] * len(asset_ids))
+        sql = (
+            "SELECT asset_id, max(date) AS latest_date "
+            f"FROM daily_prices WHERE asset_id IN ({placeholders}) GROUP BY asset_id"
+        )
+        with self.connect() as conn, conn.cursor() as cur:
+            cur.execute(sql, asset_ids)
+            rows = cur.fetchall()
+        return {int(asset_id): latest_date for asset_id, latest_date in rows if latest_date is not None}
 
     def fetch_dashboard_items(self, slug: str, *, days: int = 260) -> list[dict[str, Any]]:
         assets = self.fetch_watchlist_assets(slug)

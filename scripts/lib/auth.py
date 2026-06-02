@@ -40,8 +40,11 @@ def create_test_token(auth_user_id: str, *, email: str | None = None) -> str:
 
 def verify_bearer_token(token: str, env: dict[str, str] | None = None) -> AuthUser:
     auth_env = os.environ if env is None else env
+    local_session_token = auth_env.get("VBINVEST_LOCAL_SESSION_TOKEN")
+    if local_session_token and hmac.compare_digest(token, local_session_token):
+        return AuthUser(auth_user_id=auth_env.get("VBINVEST_LOCAL_SESSION_USER", "local-owner"))
     mode = auth_env.get("VBINVEST_AUTH_MODE", "local")
-    secret = auth_env.get("SUPABASE_JWT_SECRET") or auth_env.get("VBINVEST_JWT_SECRET")
+    secret = auth_env.get("VBINVEST_JWT_SECRET")
     if secret is None and mode == "local":
         secret = LOCAL_TEST_JWT_SECRET
     if secret == LOCAL_TEST_JWT_SECRET and mode != "local":

@@ -1,0 +1,66 @@
+from __future__ import annotations
+
+from datetime import date
+from typing import Any, Protocol
+
+
+class DBRepository(Protocol):
+    def fetch_watchlist_assets(self, slug: str) -> list[dict[str, Any]]:
+        ...
+
+    def fetch_profile_by_auth_user(self, auth_user_id: str) -> dict[str, Any] | None:
+        ...
+
+    def ensure_profile_for_auth_user(self, auth_user_id: str, email: str | None) -> dict[str, Any]:
+        ...
+
+    def list_user_watchlists(self, auth_user_id: str) -> list[dict[str, Any]]:
+        ...
+
+    def create_user_watchlist(self, auth_user_id: str, name: str, symbols: list[str]) -> dict[str, Any]:
+        ...
+
+    def get_user_watchlist(self, auth_user_id: str, watchlist_id: str) -> dict[str, Any] | None:
+        ...
+
+    def add_user_watchlist_asset(self, auth_user_id: str, watchlist_id: str, symbol: str) -> dict[str, Any] | None:
+        ...
+
+    def remove_user_watchlist_asset(self, auth_user_id: str, watchlist_id: str, symbol: str) -> dict[str, Any] | None:
+        ...
+
+    def upsert_prices(self, rows: list[dict[str, Any]]) -> int:
+        ...
+
+    def upsert_indicators(self, rows: list[dict[str, Any]]) -> int:
+        ...
+
+    def upsert_news_items(self, rows: list[dict[str, Any]]) -> int:
+        ...
+
+    def upsert_disclosures(self, rows: list[dict[str, Any]]) -> int:
+        ...
+
+    def try_acquire_job_lock(self, lock_name: str, holder: str, ttl_seconds: int) -> bool:
+        ...
+
+    def release_job_lock(self, lock_name: str, holder: str) -> None:
+        ...
+
+    def record_report_run(self, **kwargs: object) -> str:
+        ...
+
+    def fetch_latest_report_run(self, run_type: str, scope_slug: str | None) -> dict[str, Any] | None:
+        ...
+
+    def fetch_latest_successful_report_run(self, run_type: str, scope_slug: str | None) -> dict[str, Any] | None:
+        ...
+
+    def fetch_latest_price_dates(self, asset_ids: list[int]) -> dict[int, date]:
+        ...
+
+    def upsert_research_views(self, rows: list[dict[str, Any]]) -> int:
+        ...
+
+    def fetch_latest_research_for_asset(self, symbol: str) -> dict[str, Any] | None:
+        ...

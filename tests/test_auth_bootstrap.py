@@ -18,7 +18,7 @@ class BootstrapDB:
             "auth_user_id": auth_user_id,
             "slug": auth_user_id,
             "email": email,
-            "auth_provider": "supabase",
+            "auth_provider": "local",
         }
         self.profiles[auth_user_id] = profile
         self.created.append(profile)
@@ -39,6 +39,7 @@ def test_first_login_bootstraps_profile(monkeypatch):
 
     assert response.status_code == 200
     assert response.json()["profile"]["auth_user_id"] == "local-user"
+    assert response.json()["profile"]["auth_provider"] == "local"
     assert fake_db.created[0]["email"] == "local@example.com"
 
 

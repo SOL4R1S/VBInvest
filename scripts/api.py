@@ -7,10 +7,9 @@ from pathlib import Path
 if __package__ is None or __package__ == "":
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import json
 from typing import Any
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
+from fastapi import Depends, FastAPI, Header, HTTPException, status
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
@@ -26,8 +25,8 @@ from scripts.lib.config import (
     parse_report_run_summary,
     provider_status,
 )
-from scripts.lib.db import DatabaseConfig, VBinvestDB
-from scripts.lib.entitlements import WebhookSignatureError, verify_webhook_signature
+from scripts.lib.db_factory import build_database_from_local_config
+from scripts.lib.db_repository import DBRepository
 from scripts.lib.startup_market_refresh import run_startup_market_refresh
 from scripts.lib.version import load_version_metadata
 
@@ -39,10 +38,11 @@ except ImportError:
 VERSION_METADATA = load_version_metadata()
 
 app = FastAPI(title="VBinvest API", version=VERSION_METADATA.version)
+LOCAL_SHUTDOWN_CALLBACK = None
 
 
-def db() -> VBinvestDB:
-    return VBinvestDB(DatabaseConfig.from_env(os.environ))
+def db() -> DBRepository:
+    return build_database_from_local_config(environ=os.environ)
 
 
 class WatchlistCreate(BaseModel):
@@ -67,15 +67,8 @@ class PortfolioHoldingUpdate(BaseModel):
     note: str | None = Field(default=None, max_length=500)
 
 
-class AdUnlockRequest(BaseModel):
-    ad_event_id: str = Field(min_length=1, max_length=160)
-
-
-class MockPaymentWebhook(BaseModel):
-    event_id: str = Field(min_length=1, max_length=160)
-    auth_user_id: str = Field(min_length=1, max_length=160)
-    symbol: str = Field(min_length=1, max_length=32)
-    event_type: str = Field(default="ad_unlocked", max_length=80)
+def hosted_monetization_disabled() -> HTTPException:
+    return HTTPException(status_code=status.HTTP_410_GONE, detail="hosted monetization is disabled in local mode")
 
 
 def auth_db() -> Any:
@@ -197,6 +190,14 @@ def startup_market_refresh(
     }
 
 
+@app.post("/api/system/shutdown")
+def system_shutdown(user: AuthUser = Depends(current_user)):
+    if LOCAL_SHUTDOWN_CALLBACK is None:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="local launcher shutdown is not available")
+    LOCAL_SHUTDOWN_CALLBACK()
+    return {"status": "shutting_down"}
+
+
 @app.get("/api/watchlists")
 def list_watchlists(user: AuthUser = Depends(current_user)):
     return {"watchlists": auth_db().list_user_watchlists(user.auth_user_id)}
@@ -304,14 +305,6 @@ def latest_research(symbol: str, user: AuthUser = Depends(current_user)):
     row = auth_db().fetch_latest_research_for_asset(symbol)
     if row is None:
         raise HTTPException(status_code=404, detail="research not found")
-    has_access = auth_db().user_has_research_entitlement(user.auth_user_id, symbol)
-    if not has_access:
-        return {
-            "target_slug": symbol,
-            "opinion": row.get("opinion", "중립"),
-            "locked": True,
-            "preview": "리서치 상세 내용은 발행 후 열람할 수 있습니다.",
-        }
     return _jsonable_research(row, locked=False)
 
 
@@ -330,45 +323,13 @@ def generate_research(symbol: str, user: AuthUser = Depends(current_user)):
 
 
 @app.post("/api/research/{symbol}/ad-unlock")
-def ad_unlock_research(symbol: str, payload: AdUnlockRequest, user: AuthUser = Depends(current_user)):
-    result = auth_db().grant_ad_unlock(user.auth_user_id, symbol, payload.ad_event_id)
-    return {
-        "target_slug": symbol,
-        "entitlement_state": result["entitlement_state"],
-        "expires_at": result["expires_at"].isoformat() if hasattr(result["expires_at"], "isoformat") else result["expires_at"],
-    }
+def ad_unlock_research(symbol: str, user: AuthUser = Depends(current_user)):
+    raise hosted_monetization_disabled()
 
 
 @app.post("/api/webhooks/mock-payment")
-async def mock_payment_webhook(
-    request: Request,
-    x_webhook_signature: str | None = Header(default=None),
-):
-    body = await request.body()
-    try:
-        verify_webhook_signature(body, x_webhook_signature, os.environ.get("VBINVEST_MOCK_PAYMENT_WEBHOOK_SECRET"))
-    except WebhookSignatureError as exc:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
-    try:
-        payload = MockPaymentWebhook.model_validate(json.loads(body.decode("utf-8")))
-    except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as exc:
-        raise HTTPException(status_code=400, detail="invalid webhook body") from exc
-
-    store = auth_db()
-    event = store.record_payment_webhook(
-        payload.event_id,
-        "mock-payment",
-        payload.event_type,
-        payload.model_dump(),
-        True,
-    )
-    if event.get("duplicate"):
-        return {"status": "ignored", "event_id": payload.event_id}
-    if payload.event_type == "ad_unlocked":
-        store.grant_ad_unlock(payload.auth_user_id, payload.symbol, payload.event_id)
-    if payload.event_type == "subscription.activated":
-        store.grant_subscription_entitlement(payload.auth_user_id, "mock-payment", payload.event_id)
-    return {"status": "processed", "event_id": payload.event_id}
+async def mock_payment_webhook():
+    raise hosted_monetization_disabled()
 
 
 @app.get("/dashboard/{slug}", response_class=HTMLResponse)

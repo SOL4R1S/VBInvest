@@ -131,7 +131,7 @@ class FakeAuthDB:
         return row
 
     def user_has_research_entitlement(self, auth_user_id: str, symbol: str):
-        return auth_user_id == "user-a"
+        raise AssertionError("local research access must not call entitlement gate")
 
     def grant_ad_unlock(self, auth_user_id: str, symbol: str, ad_event_id: str):
         entitlement = {
@@ -266,22 +266,9 @@ def test_portfolio_holding_crud_is_user_owned(monkeypatch):
     assert deleted.status_code == 204
 
 
-def test_gated_research_redacts_without_entitlement(monkeypatch):
+def test_local_research_returns_full_report_without_entitlement_gate(monkeypatch):
     client = client_with_db(monkeypatch, FakeAuthDB())
     token = create_test_token("user-free")
-
-    response = client.get("/api/research/NVDA/latest", headers={"Authorization": f"Bearer {token}"})
-
-    assert response.status_code == 200
-    body = response.json()
-    assert body["locked"] is True
-    assert "thesis" not in body
-    assert "Full source-cited thesis" not in response.text
-
-
-def test_gated_research_full_with_entitlement(monkeypatch):
-    client = client_with_db(monkeypatch, FakeAuthDB())
-    token = create_test_token("user-a")
 
     response = client.get("/api/research/NVDA/latest", headers={"Authorization": f"Bearer {token}"})
 
@@ -306,28 +293,7 @@ def test_generate_research_runs_only_for_authenticated_user_request(monkeypatch)
     assert fake_db.generated == [{"auth_user_id": "user-a", "symbol": "NVDA"}]
 
 
-def test_expired_ad_unlock_still_redacts_research(monkeypatch):
-    fake_db = FakeAuthDB()
-    fake_db.entitlements["expired"] = {
-        "auth_user_id": "user-free",
-        "target_slug": "NVDA",
-        "entitlement_state": "ad_unlocked",
-        "expires_at": "2026-06-01T11:59:59+00:00",
-    }
-    fake_db.user_has_research_entitlement = lambda auth_user_id, symbol: False
-    client = client_with_db(monkeypatch, fake_db)
-    token = create_test_token("user-free")
-
-    response = client.get("/api/research/NVDA/latest", headers={"Authorization": f"Bearer {token}"})
-
-    assert response.status_code == 200
-    body = response.json()
-    assert body["locked"] is True
-    assert "thesis" not in body
-    assert "Full source-cited thesis" not in response.text
-
-
-def test_ad_unlock_endpoint_grants_access_state(monkeypatch):
+def test_ad_unlock_endpoint_is_disabled_in_local_mode(monkeypatch):
     client = client_with_db(monkeypatch, FakeAuthDB())
     token = create_test_token("user-a")
 
@@ -337,7 +303,36 @@ def test_ad_unlock_endpoint_grants_access_state(monkeypatch):
         json={"ad_event_id": "test-ad-1"},
     )
 
+    assert response.status_code == 410
+    assert response.json()["detail"] == "hosted monetization is disabled in local mode"
+
+
+def test_local_session_token_authenticates_without_jwt(monkeypatch):
+    fake_db = FakeAuthDB()
+    client = client_with_db(monkeypatch, fake_db)
+    monkeypatch.setenv("VBINVEST_LOCAL_SESSION_TOKEN", "qa-token")
+
+    response = client.get("/api/me", headers={"Authorization": "Bearer qa-token"})
+
     assert response.status_code == 200
-    body = response.json()
-    assert body["target_slug"] == "NVDA"
-    assert body["entitlement_state"] == "ad_unlocked"
+    assert response.json()["auth_user_id"] == "local-owner"
+    assert response.json()["provider"] == "local"
+
+
+def test_shutdown_requires_local_session_token(monkeypatch):
+    client = client_with_db(monkeypatch, FakeAuthDB())
+    monkeypatch.setenv("VBINVEST_LOCAL_SESSION_TOKEN", "qa-token")
+
+    response = client.post("/api/system/shutdown")
+
+    assert response.status_code == 401
+
+
+def test_shutdown_is_disabled_without_launcher_callback(monkeypatch):
+    client = client_with_db(monkeypatch, FakeAuthDB())
+    monkeypatch.setenv("VBINVEST_LOCAL_SESSION_TOKEN", "qa-token")
+
+    response = client.post("/api/system/shutdown", headers={"Authorization": "Bearer qa-token"})
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "local launcher shutdown is not available"
