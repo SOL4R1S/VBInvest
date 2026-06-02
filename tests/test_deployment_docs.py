@@ -260,7 +260,7 @@ def test_readme_documents_cover_screenshot_and_distribution_notes():
         "Python",
         "Node",
         "패키지 배포본은",
-        "런타임에 Node.js가 필요하지 않을 수 있음",
+        "런타임에 Node.js가 필요하지 않습니다",
     ]:
         assert required in korean
 

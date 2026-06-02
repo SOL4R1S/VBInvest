@@ -22,8 +22,8 @@ VBinvest is a local-first open-source research dashboard. It stores price/volume
 
 ## Quick Start
 
-VBinvest is local-first. Source execution requires Python and Node.js for development workflows, while packaged releases are expected to run without Node.js at runtime when distribution bundles are produced.
-Developer environment requires Python and Node.js.
+VBinvest is local-first. Developer environment setup for source builds requires Python 3.10+ and Node.js.
+Packaged releases include static frontend assets, so Node.js runtime is not required.
 
 The launcher chooses free ports automatically from `4173` upward, so if the default port is busy it will try another available port.
 Node.js runtime is not required for packaged releases.
@@ -41,21 +41,21 @@ chmod +x VBinvest.command
 
 ### Windows Users
 
+Use the batch launcher:
+
 ```powershell
 git clone https://github.com/SOL4R1S/VBInvest.git
 cd VBInvest
 VBinvest.bat
 ```
 
-For diagnostic launch in PowerShell:
+Or use the PowerShell launcher for clearer diagnostics:
 
 ```powershell
-git clone https://github.com/SOL4R1S/VBInvest.git
-cd VBInvest
 ./VBinvest.ps1
 ```
 
-`VBinvest.bat` and `VBinvest.ps1` both run `python -m scripts.launcher`.
+Both `VBinvest.bat` and `VBinvest.ps1` run `python -m scripts.launcher`.
 
 ## First-Run Choices
 
@@ -200,8 +200,8 @@ Install Git hooks before contributions:
 
 ## License
 
-Public contributions are expected to follow the project license file once added.
-Check `LICENSE` before redistribution.
+The repository `LICENSE` file defines redistribution terms.
+If a release copy does not include `LICENSE`, verify the license status before redistributing it.
 
 ## Disclaimer
 
