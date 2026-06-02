@@ -316,19 +316,19 @@ def _opendart_status(
     configured = False
     system = system_name or platform.system()
     store = secret_store or platform_secret_store(system)
-    if system in {"Darwin", "Windows"} and store.get("OPENDART_API_KEY"):
-        source = "secure-storage"
-        configured = True
-    elif _text_from_env(environ, "OPENDART_API_KEY"):
+    if _text_from_env(environ, "OPENDART_API_KEY"):
         source = "env"
         configured = True
     elif _text_from_env(environ, "DART_API_KEY"):
         source = "env"
         configured = True
+    elif system in {"Darwin", "Windows"} and store.get("OPENDART_API_KEY"):
+        source = "secure-storage"
+        configured = True
     elif config.providers.opendart_api_key:
         source = "config"
         configured = True
-    return {"configured": configured, "source": source}
+    return {"configured": configured, "source": source, "status": "enabled" if configured else "missing_key"}
 
 
 def _ai_status(

@@ -24,6 +24,38 @@ class DisclosureFetchResult:
     provider_disabled: list[str]
 
 
+@dataclass(frozen=True, slots=True)
+class OpenDartProviderStatus:
+    status: str
+    provider_code: str | None
+    message: str | None
+
+
+def classify_opendart_status(payload: dict[str, Any]) -> OpenDartProviderStatus:
+    provider_code = payload.get("status")
+    message = payload.get("message")
+    code = provider_code if isinstance(provider_code, str) else None
+    text = message if isinstance(message, str) else None
+    if code == "000":
+        return OpenDartProviderStatus(status="enabled", provider_code=code, message=text)
+    if code in {"020", "800"} or "제한" in (text or "").lower() or "limit" in (text or "").lower():
+        return OpenDartProviderStatus(status="rate_limited", provider_code=code, message=text)
+    return OpenDartProviderStatus(status="provider_error", provider_code=code, message=text)
+
+
+def check_opendart_api_key(api_key: str) -> OpenDartProviderStatus:
+    params = urllib.parse.urlencode({"crtfc_key": api_key, "page_count": "1"})
+    request = urllib.request.Request(f"{DART_LIST_URL}?{params}", headers={"User-Agent": "VBinvest/0.1"})
+    try:
+        with urllib.request.urlopen(request, timeout=20) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (urllib.error.URLError, TimeoutError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        return OpenDartProviderStatus(status="provider_error", provider_code=None, message=str(exc))
+    if isinstance(payload, dict):
+        return classify_opendart_status(payload)
+    return OpenDartProviderStatus(status="provider_error", provider_code=None, message="invalid provider response")
+
+
 def normalize_sec_submissions(asset: dict[str, Any], payload: dict[str, Any], *, limit: int = 20) -> list[dict[str, Any]]:
     recent = ((payload.get("filings") or {}).get("recent") or {})
     accessions = recent.get("accessionNumber") or []

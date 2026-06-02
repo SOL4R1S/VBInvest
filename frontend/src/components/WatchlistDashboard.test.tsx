@@ -288,6 +288,8 @@ describe("WatchlistDashboard", () => {
       expect(screen.getByRole("heading", { name: "초기 설정" })).toBeInTheDocument();
     });
     expect(screen.getByRole("button", { name: "설정 완료" })).toBeDisabled();
+    expect(screen.getByText(/OpenDART 공시를 받으려면/)).toBeInTheDocument();
+    expect(screen.getByText(/사용량과 제한은 사용자 키 책임/)).toBeInTheDocument();
     expect(fetchMock.mock.calls.map(([input]) => String(input))).not.toContain(
       "/api/startup/market-refresh?no_network=false&include_news=true",
     );

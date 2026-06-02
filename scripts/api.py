@@ -36,6 +36,7 @@ from scripts.lib.config import (
 )
 from scripts.lib.db_factory import build_database_from_local_config
 from scripts.lib.db_repository import DBRepository
+from scripts.lib.disclosures import check_opendart_api_key
 from scripts.lib.prices import validate_ticker_symbol
 from scripts.lib.startup_market_refresh import run_startup_market_refresh
 from scripts.lib.version import load_version_metadata
@@ -305,6 +306,29 @@ def save_first_run_settings(payload: FirstRunSetupPayload):
     return {
         **config.redacted(),
         "provider_status": provider_status(config, os.environ),
+    }
+
+
+@app.get("/api/providers/opendart/status")
+def opendart_provider_status(check: bool = False):
+    try:
+        config = load_local_config()
+    except ConfigError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    status_payload = provider_status(config, os.environ)["opendart"]
+    status_text = status_payload.get("status")
+    source = status_payload.get("source")
+    if status_text == "missing_key":
+        return {"status": "missing_key", "source": source, "configured": False}
+    if not check:
+        return {"status": "enabled", "source": source, "configured": True}
+    result = check_opendart_api_key(load_opendart_api_key())
+    return {
+        "status": result.status,
+        "source": source,
+        "configured": result.status == "enabled",
+        "provider_code": result.provider_code,
+        "message": result.message,
     }
 
 

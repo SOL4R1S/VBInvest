@@ -121,6 +121,10 @@ export function SetupWizard({ onCompleted }: SetupWizardProps) {
           <input aria-label="OpenDART API Key" value={opendartKey} onChange={(event) => setOpendartKey(event.target.value)} placeholder="선택 사항" />
         </label>
 
+        <p className="setup-note">
+          OpenDART 공시를 받으려면 OpenDART에서 API 키를 발급해 입력하세요. 사용량과 제한은 사용자 키 책임이며, 비워두면 한국 공시 수집만 비활성화됩니다.
+        </p>
+
         <label>
           <span>AI Mode</span>
           <select aria-label="AI Mode" value={aiMode} onChange={(event) => setAiMode(event.target.value)}>
