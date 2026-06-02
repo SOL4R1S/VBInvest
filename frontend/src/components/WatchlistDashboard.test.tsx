@@ -4,6 +4,8 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { APPROVED_OPINIONS } from "@/lib/research";
 import { WatchlistDashboard } from "@/components/WatchlistDashboard";
+import { SetupWizard } from "@/components/SetupWizard";
+import { labelFor, type Language } from "@/lib/i18n";
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -222,6 +224,47 @@ describe("WatchlistDashboard", () => {
     await waitFor(() => {
       expect(screen.getByText("999.12")).toBeInTheDocument();
     });
+  });
+
+  it("switches dashboard language and persists it with the local session token", async () => {
+    window.__VBINVEST_LOCAL_SESSION_TOKEN__ = "local-token";
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      const url = String(input);
+      if (url === "/api/settings/language" && init?.method === "PATCH") {
+        return jsonResponse({ language: "en" });
+      }
+      if (url === "/api/settings") {
+        return jsonResponse({
+          language: "ko",
+          provider_status: { opendart: { configured: true }, ai: { mode: "local" } },
+        });
+      }
+      if (url.includes("/api/watchlists/semiconductor-core/dashboard")) {
+        return dashboardResponse();
+      }
+      if (url.includes("/api/watchlists/semiconductor-core/collection-status")) {
+        return collectionStatusResponse();
+      }
+      if (url === "/api/watchlists") {
+        return watchlistsResponse();
+      }
+      return jsonResponse({ status: "ok", price_rows: 1, indicator_rows: 1, news_items: 0, disclosures: 0 });
+    });
+    vi.stubGlobal("fetch", withSchedulerFallback(fetchMock));
+
+    render(<WatchlistDashboard />);
+
+    expect(await screen.findByRole("heading", { name: "투자 대시보드" })).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("언어"), { target: { value: "en" } });
+
+    expect(await screen.findByRole("heading", { name: "Investment Dashboard" })).toBeInTheDocument();
+    const patchCall = fetchMock.mock.calls.find(([input, init]) => String(input) === "/api/settings/language" && init?.method === "PATCH");
+    expect(patchCall).toBeDefined();
+    const patchInit = patchCall?.[1];
+    expect(headerValue(patchInit, "Authorization")).toBe("Bearer local-token");
+    expect(JSON.parse(String(patchInit?.body))).toEqual({ language: "en" });
+    expect(window.localStorage.getItem("vbinvest_language")).toBe("en");
   });
 
   it("loads persisted watchlists from backend and renders them from /api/watchlists", async () => {
@@ -1100,6 +1143,55 @@ describe("WatchlistDashboard", () => {
     expect(screen.queryByText("시장 데이터 갱신 실패")).not.toBeInTheDocument();
   });
 
+  it("switches first-run setup language locally and stores it in the setup payload", async () => {
+    const selectedLanguages: Language[] = [];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      const url = String(input);
+      if (url === "/api/settings/first-run" && init?.method === "POST") {
+        return jsonResponse({
+          first_run_completed: true,
+          provider_status: { opendart: { configured: false }, ai: { mode: "disabled" } },
+        });
+      }
+      return jsonResponse({ status: "ok", price_rows: 1, indicator_rows: 1, news_items: 0, disclosures: 0 });
+    });
+    vi.stubGlobal("fetch", withSchedulerFallback(fetchMock));
+
+    render(
+      <SetupWizard
+        onCompleted={() => undefined}
+        language="ko"
+        labels={labelFor("ko").setup}
+        onLanguageChange={(nextLanguage) => selectedLanguages.push(nextLanguage)}
+      />,
+    );
+
+    const languageSelect = await screen.findByRole("combobox", { name: "언어" });
+    fireEvent.change(languageSelect, { target: { value: "en" } });
+
+    await waitFor(() => {
+      expect(languageSelect).toHaveValue("en");
+    });
+    expect(selectedLanguages).toEqual(["en"]);
+    expect(fetchMock.mock.calls.some(([input]) => String(input) === "/api/settings/language")).toBe(false);
+    expect(window.localStorage.getItem("vbinvest_language")).toBe("en");
+
+    fireEvent.change(screen.getByLabelText("Obsidian Vault Path"), { target: { value: "/tmp/vault" } });
+    fireEvent.click(screen.getByRole("button", { name: "Finish setup" }));
+
+    await waitFor(() => {
+      expect(hasFetchCallWithMethod(fetchMock, "/api/settings/first-run", "POST")).toBe(true);
+    });
+    const setupCall = fetchMock.mock.calls.find(([input, init]) => String(input) === "/api/settings/first-run" && init?.method === "POST");
+    expect(setupCall).toBeDefined();
+    expect(JSON.parse(String(setupCall?.[1]?.body))).toEqual(
+      expect.objectContaining({
+        language: "en",
+        obsidian: expect.objectContaining({ vault_path: "/tmp/vault" }),
+      }),
+    );
+  });
+
   it("shows a first-run setup error when the selected Obsidian vault is invalid", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
       const url = String(input);
@@ -1557,6 +1649,9 @@ describe("WatchlistDashboard", () => {
 
     render(<WatchlistDashboard />);
 
+    await waitFor(() => {
+      expect(screen.getByText("999.12")).toBeInTheDocument();
+    });
     fireEvent.click(await screen.findByRole("button", { name: "리포트 발행" }));
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "실시간 분석 중" })).toBeDisabled();

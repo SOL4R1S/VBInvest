@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { isLanguage, type Language, type LocalizedLabels } from "@/lib/i18n";
+import { isLanguage, labelsFor, persistLanguage, type Language, type LocalizedLabels } from "@/lib/i18n";
 
 type SetupWizardProps = {
   readonly onCompleted: () => void;
@@ -17,7 +17,9 @@ type SetupError = {
 
 const DEFAULT_DATA_DIRECTORY = "~/Library/Application Support/VBinvest";
 
-export function SetupWizard({ onCompleted, language, labels, onLanguageChange }: SetupWizardProps) {
+export function SetupWizard({ onCompleted, language, labels: initialLabels, onLanguageChange }: SetupWizardProps) {
+  const [selectedLanguage, setSelectedLanguage] = useState(language);
+  const labels = selectedLanguage === language ? initialLabels : labelsFor(selectedLanguage).setup;
   const [dataDirectory, setDataDirectory] = useState(DEFAULT_DATA_DIRECTORY);
   const [databaseMode, setDatabaseMode] = useState("sqlite");
   const [postgresUrl, setPostgresUrl] = useState("");
@@ -33,6 +35,15 @@ export function SetupWizard({ onCompleted, language, labels, onLanguageChange }:
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<SetupError | null>(null);
 
+  function selectLanguage(value: string) {
+    if (!isLanguage(value)) {
+      return;
+    }
+    setSelectedLanguage(value);
+    persistLanguage(value);
+    onLanguageChange(value);
+  }
+
   async function submitSetup() {
     if (!vaultPath.trim() || submitting) {
       return;
@@ -44,7 +55,7 @@ export function SetupWizard({ onCompleted, language, labels, onLanguageChange }:
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          language,
+          language: selectedLanguage,
           data_directory: dataDirectory,
           database: {
             mode: databaseMode,
@@ -93,13 +104,10 @@ export function SetupWizard({ onCompleted, language, labels, onLanguageChange }:
       <label>
         <span>{labels.languageField}</span>
         <select
-          value={language}
-          onChange={(event) => {
-            const nextLanguage = event.target.value;
-            if (isLanguage(nextLanguage)) {
-              onLanguageChange(nextLanguage);
-            }
-          }}
+          value={selectedLanguage}
+          aria-label={labels.languageField}
+          onChange={(event) => selectLanguage(event.currentTarget.value)}
+          onInput={(event) => selectLanguage(event.currentTarget.value)}
         >
           <option value="ko">{labels.languageOptionKo}</option>
           <option value="en">{labels.languageOptionEn}</option>
