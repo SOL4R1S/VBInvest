@@ -25,6 +25,8 @@ type Mode = "line" | "candle";
 
 const PRICE_LINE_WIDTH = 2;
 const RSI_LINE_WIDTH = 1;
+const PRICE_PANE_INDEX = 0;
+const INDICATOR_PANE_INDEX = 1;
 
 function formatLogicalRange(range: LogicalRange | null) {
   return {
@@ -45,17 +47,18 @@ export function ChartShell({ symbol, points }: Props) {
   const volumeRef = useRef<ISeriesApi<"Histogram"> | null>(null);
   const [mode, setMode] = useState<Mode>("line");
   const [visibleRange, setVisibleRange] = useState(() => formatLogicalRange(null));
+  const [paneCount, setPaneCount] = useState(1);
 
   const priceData = useMemo(
     () =>
       points.map((point) => {
         const [year, month, day] = point.time.split("-").map((value) => Number(value));
         return {
-        time: { year, month, day } satisfies BusinessDay,
-        open: point.open,
-        high: point.high,
-        low: point.low,
-        close: point.close,
+          time: { year, month, day } satisfies BusinessDay,
+          open: point.open,
+          high: point.high,
+          low: point.low,
+          close: point.close,
         };
       }),
     [points],
@@ -106,23 +109,29 @@ export function ChartShell({ symbol, points }: Props) {
       borderVisible: true,
       wickUpColor: "#22c55e",
       wickDownColor: "#ef4444",
-    });
-    const line = chart.addSeries(LineSeries, { color: "#111714", lineWidth: PRICE_LINE_WIDTH });
-    const ma5 = chart.addSeries(LineSeries, { color: "#16823a", lineWidth: PRICE_LINE_WIDTH });
-    const ma20 = chart.addSeries(LineSeries, { color: "#2458d3", lineWidth: PRICE_LINE_WIDTH });
-    const ma50 = chart.addSeries(LineSeries, { color: "#b86700", lineWidth: PRICE_LINE_WIDTH });
-    const ma120 = chart.addSeries(LineSeries, { color: "#7c5cc4", lineWidth: PRICE_LINE_WIDTH });
+    }, PRICE_PANE_INDEX);
+    const line = chart.addSeries(LineSeries, { color: "#111714", lineWidth: PRICE_LINE_WIDTH }, PRICE_PANE_INDEX);
+    const ma5 = chart.addSeries(LineSeries, { color: "#16823a", lineWidth: PRICE_LINE_WIDTH }, PRICE_PANE_INDEX);
+    const ma20 = chart.addSeries(LineSeries, { color: "#2458d3", lineWidth: PRICE_LINE_WIDTH }, PRICE_PANE_INDEX);
+    const ma50 = chart.addSeries(LineSeries, { color: "#b86700", lineWidth: PRICE_LINE_WIDTH }, PRICE_PANE_INDEX);
+    const ma120 = chart.addSeries(LineSeries, { color: "#7c5cc4", lineWidth: PRICE_LINE_WIDTH }, PRICE_PANE_INDEX);
     const rsi = chart.addSeries(LineSeries, {
       color: "#fb7185",
       lineWidth: RSI_LINE_WIDTH,
-      priceScaleId: "rsi",
-    });
+      priceScaleId: "right",
+    }, INDICATOR_PANE_INDEX);
     const volume = chart.addSeries(HistogramSeries, {
       color: "rgba(56, 189, 248, 0.45)",
       priceFormat: { type: "volume" },
-      priceScaleId: "",
+      priceScaleId: "volume",
+    }, INDICATOR_PANE_INDEX);
+    chart.priceScale("right", INDICATOR_PANE_INDEX).applyOptions({
+      scaleMargins: { top: 0.08, bottom: 0.12 },
     });
-
+    chart.priceScale("volume", INDICATOR_PANE_INDEX).applyOptions({
+      scaleMargins: { top: 0.62, bottom: 0 },
+      visible: false,
+    });
     candle.setData(priceData);
     const seriesTime = (point: ChartPoint) => {
       const [year, month, day] = point.time.split("-").map((value) => Number(value));
@@ -135,6 +144,15 @@ export function ChartShell({ symbol, points }: Props) {
     ma120.setData(points.map((point) => ({ time: seriesTime(point), value: point.ma120 })));
     rsi.setData(points.map((point) => ({ time: seriesTime(point), value: point.rsi14 })));
     volume.setData(points.map((point) => ({ time: seriesTime(point), value: point.volume, color: point.close >= point.open ? "rgba(34,197,94,0.35)" : "rgba(239,68,68,0.35)" })));
+
+    const syncPaneLayout = () => {
+      const panes = chart.panes();
+      panes[PRICE_PANE_INDEX]?.setHeight(470);
+      panes[INDICATOR_PANE_INDEX]?.setHeight(170);
+      setPaneCount(panes.length);
+    };
+    syncPaneLayout();
+    const paneFrame = window.requestAnimationFrame(syncPaneLayout);
 
     candleRef.current = candle;
     lineRef.current = line;
@@ -158,6 +176,7 @@ export function ChartShell({ symbol, points }: Props) {
     resizeObserver.observe(containerRef.current);
 
     return () => {
+      window.cancelAnimationFrame(paneFrame);
       chart.timeScale().unsubscribeVisibleLogicalRangeChange(rangeHandler);
       resizeObserver.disconnect();
       chart.remove();
@@ -169,6 +188,7 @@ export function ChartShell({ symbol, points }: Props) {
       ma50Ref.current = null;
       ma120Ref.current = null;
       volumeRef.current = null;
+      setPaneCount(1);
     };
   }, [points, priceData]);
 
@@ -202,8 +222,9 @@ export function ChartShell({ symbol, points }: Props) {
         data-range-to={visibleRange.to}
         data-price-line-width={PRICE_LINE_WIDTH}
         data-rsi-line-width={RSI_LINE_WIDTH}
+        data-pane-count={paneCount}
       />
-      <div className="legend">종가 · 5일선 · 20일선 · 50일선 · 120일선 · RSI14 · 휠 줌 · 드래그 팬</div>
+      <div className="legend">상단 가격 · 하단 거래량/RSI14 · 5일선 · 20일선 · 50일선 · 120일선 · 휠 줌 · 드래그 팬</div>
     </section>
   );
 }

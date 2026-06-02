@@ -14,8 +14,17 @@ vi.mock("lightweight-charts", () => {
     subscribeVisibleLogicalRangeChange: vi.fn(),
     unsubscribeVisibleLogicalRangeChange: vi.fn(),
   };
+  const priceScale = {
+    applyOptions: vi.fn(),
+  };
+  const panes = [
+    { setHeight: vi.fn() },
+    { setHeight: vi.fn() },
+  ];
   const chart = {
     addSeries: vi.fn(() => series),
+    panes: vi.fn(() => panes),
+    priceScale: vi.fn(() => priceScale),
     remove: vi.fn(),
     timeScale: vi.fn(() => timeScale),
   };

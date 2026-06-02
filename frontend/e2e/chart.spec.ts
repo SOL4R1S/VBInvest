@@ -41,11 +41,17 @@ test("dashboard chart interactions preserve stable stroke width", async ({ page 
   await expect(page.getByRole("heading", { name: "투자 대시보드" })).toBeVisible();
   await page.getByRole("button", { name: "Google로 로그인" }).click();
   await page.getByRole("button", { name: "Kakao로 로그인" }).click();
+
+  const initialChart = page.getByTestId("chart-frame");
+  await expect(initialChart).toHaveAttribute("data-pane-count", "2");
+
   await page.getByTestId("symbol-NVDA").click();
 
   const chart = page.getByTestId("chart-frame");
   await expect(chart).toBeVisible();
   await expect(chart).not.toHaveAttribute("data-range-from", "pending");
+  await expect(chart).toHaveAttribute("data-pane-count", "2");
+  await expect(page.getByText("상단 가격 · 하단 거래량/RSI14")).toBeVisible();
 
   const beforeRange = {
     from: await chart.getAttribute("data-range-from"),
