@@ -308,6 +308,7 @@ def test_readme_documents_db_modes_and_data_responsibility():
 def test_readme_documents_obsidian_backup_uninstall_disclaimer_contributing():
     korean = (ROOT / "README.md").read_text(encoding="utf-8")
     english = (ROOT / "README.en.md").read_text(encoding="utf-8")
+    contributing = (ROOT / "CONTRIBUTING.md").read_text(encoding="utf-8")
 
     for required in [
         "Obsidian",
@@ -322,6 +323,13 @@ def test_readme_documents_obsidian_backup_uninstall_disclaimer_contributing():
         "사용자 비용",
     ]:
         assert required in korean
+    for required in [
+        "scripts/git_hooks/install_hooks.py",
+        "pre-commit 패키지는 필수",
+        "CONTRIBUTING.md",
+    ]:
+        assert required in korean
+    assert "pre-commit run --all-files" not in korean
 
     for required in [
         "Obsidian",
@@ -336,6 +344,23 @@ def test_readme_documents_obsidian_backup_uninstall_disclaimer_contributing():
         "user-paid data and AI costs",
     ]:
         assert required.lower() in english.lower()
+    for required in [
+        "scripts/git_hooks/install_hooks.py",
+        "pre-commit package is not required",
+        "CONTRIBUTING.md",
+    ]:
+        assert required.lower() in english.lower()
+    assert "pre-commit run --all-files" not in english
+
+    for required in [
+        "scripts/git_hooks/install_hooks.py",
+        "check_paths.py",
+        "check_commit_msg.py",
+        "check_pre_push.py",
+        "pre-commit package is not required",
+        "pre-commit 패키지는 필수",
+    ]:
+        assert required in contributing
 
 
 def test_readme_documents_disallow_central_free_and_fake_service_mentions():

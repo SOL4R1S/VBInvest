@@ -190,12 +190,14 @@ cd frontend && npm run lint && npm run typecheck && npm test -- --run && npm run
 
 기능 작업 전 Git hook을 설치합니다.
 (`Git hooks`)
-- 기여는 Conventional Commits를 지켜주세요.
 
 ```bash
 ./.venv/bin/python scripts/git_hooks/install_hooks.py
 ```
 
+- 이 프로젝트는 자체 `scripts/git_hooks/*`를 사용합니다. 별도 pre-commit 패키지는 필수 설치 항목이 아닙니다.
+- 기여는 Conventional Commits를 지켜주세요.
+- 자세한 기여 절차는 [CONTRIBUTING.md](CONTRIBUTING.md)를 참고하세요.
 - 브랜치 기본 운영: `develop` 기준으로 기능 브랜치 생성
 - 커밋 규칙: Conventional Commits
 

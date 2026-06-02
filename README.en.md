@@ -196,6 +196,8 @@ Install Git hooks before contributions:
 ./.venv/bin/python scripts/git_hooks/install_hooks.py
 ```
 
+- This project uses its own `scripts/git_hooks/*` checks. The Python pre-commit package is not required.
+- See [CONTRIBUTING.md](CONTRIBUTING.md) for the detailed contribution workflow.
 - Fork and create feature branches from `develop`.
 - Use Conventional Commits.
 - Submissions are expected to include tests/docs updates for behavior-impacting changes.
