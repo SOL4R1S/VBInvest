@@ -243,6 +243,9 @@ export function WatchlistDashboard() {
     setLanguage(nextLanguage);
     setLabels(labelsFor(nextLanguage));
     persistLanguage(nextLanguage);
+    if (setupRequired) {
+      return;
+    }
     try {
       const response = await fetch("/api/settings/language", {
         method: "PATCH",
