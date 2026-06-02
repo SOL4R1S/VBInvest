@@ -5,7 +5,7 @@ import {
   INITIAL_STARTUP_REFRESH,
   collectionStatusLabel,
   fetchCollectionStatus,
-  fetchProviderSummary,
+  fetchRuntimeSettings,
   parseStartupRefresh,
   providerSummaryLabel,
   startupStatusLabel,
@@ -31,6 +31,8 @@ import {
 import { ChartShell } from "@/components/ChartShell";
 import { ResearchCard } from "@/components/ResearchCard";
 import { SetupWizard } from "@/components/SetupWizard";
+import type { Language, LocalizedLabels } from "@/lib/i18n";
+import { isLanguage, labelsFor, persistLanguage, resolveLanguage } from "@/lib/i18n";
 import {
   FALLBACK_SCHEDULER_SETTINGS,
   fetchSchedulerSettings,
@@ -65,6 +67,8 @@ export function WatchlistDashboard() {
   const [systemShutdownMessage, setSystemShutdownMessage] = useState<string | null>(null);
   const [systemShuttingDown, setSystemShuttingDown] = useState(false);
   const [systemShutdownComplete, setSystemShutdownComplete] = useState(false);
+  const [language, setLanguage] = useState<Language>(() => resolveLanguage(undefined, null, undefined));
+  const [labels, setLabels] = useState<LocalizedLabels>(() => labelsFor(language));
 
   const activeWatchlist = watchlists.find((item) => item.id === selectedWatchlist) ?? watchlists[0] ?? null;
   const hasWatchlists = watchlists.length > 0;
@@ -76,7 +80,7 @@ export function WatchlistDashboard() {
   const asset = assetCards[currentSymbol] ?? fallbackAsset(currentSymbol);
   const points = useMemo(() => seriesBySymbol[currentSymbol] ?? [], [currentSymbol, seriesBySymbol]);
   const startupInProgress = startupRefresh.status === "checking" || startupRefresh.status === "running";
-  const schedulerText = schedulerSettings.weeklyPrecomputeEnabled ? "주간 사전 리포트 켜짐" : "주간 사전 리포트 꺼짐";
+  const schedulerText = schedulerSettings.weeklyPrecomputeEnabled ? labels.controls.weeklyReportOn : labels.controls.weeklyReportOff;
 
   useEffect(() => {
     let cancelled = false;
@@ -87,7 +91,7 @@ export function WatchlistDashboard() {
         return;
       }
       if (dashboard === null) {
-        setDashboardLoadError("대시보드 데이터를 불러오지 못했습니다.");
+        setDashboardLoadError(labels.errors.dashboardLoad);
         return;
       }
       setDashboardLoadError(null);
@@ -110,7 +114,7 @@ export function WatchlistDashboard() {
         if (!cancelled) {
           if (nextStatus === null) {
             setSchedulerSettings(FALLBACK_SCHEDULER_SETTINGS);
-            setSchedulerStateError("스케줄러 설정 저장 실패");
+            setSchedulerStateError(labels.errors.schedulerSave);
           } else {
             setSchedulerSettings(nextStatus);
           }
@@ -119,7 +123,7 @@ export function WatchlistDashboard() {
         logStartupWarning(error, "scheduler status refresh failed");
         if (!cancelled) {
           setSchedulerSettings(FALLBACK_SCHEDULER_SETTINGS);
-          setSchedulerStateError("스케줄러 설정 저장 실패");
+          setSchedulerStateError(labels.errors.schedulerSave);
         }
       } finally {
         if (!cancelled) {
@@ -128,20 +132,40 @@ export function WatchlistDashboard() {
       }
     }
 
+    function applyLanguage(nextLanguage: Language | null) {
+      const resolvedLanguage = resolveLanguage(nextLanguage, language, undefined);
+      if (resolvedLanguage === language) {
+        return;
+      }
+      setLanguage(resolvedLanguage);
+      setLabels(labelsFor(resolvedLanguage));
+      persistLanguage(resolvedLanguage);
+    }
+
+    async function loadRuntimeSettings() {
+      const settings = await fetchRuntimeSettings();
+      if (cancelled) {
+        return null;
+      }
+      applyLanguage(settings.language);
+      setProviderSummary(settings.providerSummary);
+      return settings;
+    }
+
     async function refreshMarketData() {
       setWatchlistsLoaded(false);
       try {
-        const nextProviderSummary = await fetchProviderSummary();
-        if (!cancelled) {
-          setProviderSummary(nextProviderSummary);
-          if (nextProviderSummary?.firstRunCompleted === false) {
-            setSetupRequired(true);
-            setStartupRefresh({ ...INITIAL_STARTUP_REFRESH, status: "setup_required" });
-            return;
-          }
-          setSetupRequired(false);
-          void loadSchedulerSettings();
+        const nextRuntimeSettings = await loadRuntimeSettings();
+        if (cancelled) {
+          return;
         }
+        if (nextRuntimeSettings?.providerSummary?.firstRunCompleted === false) {
+          setSetupRequired(true);
+          setStartupRefresh({ ...INITIAL_STARTUP_REFRESH, status: "setup_required" });
+          return;
+        }
+        setSetupRequired(false);
+        void loadSchedulerSettings();
       } catch (error) {
         logStartupWarning(error, "settings status refresh failed");
       }
@@ -167,7 +191,7 @@ export function WatchlistDashboard() {
         }
         if (nextWatchlists.length === 0) {
           setWatchlistsLoaded(true);
-          setWatchlistLoadError("저장된 관심 그룹이 없습니다.");
+          setWatchlistLoadError(null);
           setWatchlists([]);
           setSelectedWatchlist(null);
           setSelectedSymbol("NVDA");
@@ -194,7 +218,7 @@ export function WatchlistDashboard() {
         logStartupWarning(error, "watchlist load failed");
         if (!cancelled) {
           setWatchlistsLoaded(true);
-          setWatchlistLoadError("관심 그룹 목록을 불러오는 데 실패했습니다.");
+          setWatchlistLoadError(labels.errors.watchlistLoad);
         }
       }
     }
@@ -212,6 +236,34 @@ export function WatchlistDashboard() {
     setSetupRevision((value) => value + 1);
   }
 
+  async function changeLanguage(nextLanguage: Language) {
+    if (nextLanguage === language) {
+      return;
+    }
+    setLanguage(nextLanguage);
+    setLabels(labelsFor(nextLanguage));
+    persistLanguage(nextLanguage);
+    try {
+      const response = await fetch("/api/settings/language", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ language: nextLanguage }),
+      });
+      if (!response.ok) {
+        throw new Error(`language update failed: ${response.status}`);
+      }
+      const payload: unknown = await response.json();
+      if (!isLanguageResponse(payload)) {
+        throw new Error("invalid language response");
+      }
+      setLanguage(payload.language);
+      setLabels(labelsFor(payload.language));
+      persistLanguage(payload.language);
+    } catch (error) {
+      logStartupWarning(error, "language change failed");
+    }
+  }
+
   async function updateWeeklyPrecompute(enabled: boolean) {
     const previousStatus = schedulerSettings;
     const optimisticStatus = { ...schedulerSettings, weeklyPrecomputeEnabled: enabled };
@@ -227,7 +279,7 @@ export function WatchlistDashboard() {
     } catch (error) {
       logStartupWarning(error, "scheduler settings update failed");
       setSchedulerSettings(previousStatus);
-      setSchedulerStateError("스케줄러 설정 저장 실패");
+      setSchedulerStateError(labels.errors.schedulerSave);
     } finally {
       setSchedulerSaving(false);
     }
@@ -236,11 +288,11 @@ export function WatchlistDashboard() {
   async function createWatchlist() {
     const trimmed = newWatchlist.trim();
     if (!trimmed) {
-      setWatchlistValidationMessage("그룹 이름은 비워둘 수 없습니다.");
+      setWatchlistValidationMessage(labels.errors.emptyWatchlistName);
       return;
     }
     if (!watchlistsLoaded) {
-      setWatchlistValidationMessage("관심 그룹을 불러온 뒤 추가해 주세요.");
+      setWatchlistValidationMessage(labels.errors.addAfterLoad);
       return;
     }
 
@@ -248,7 +300,7 @@ export function WatchlistDashboard() {
     try {
       const next = await createWatchlistRequest(trimmed);
       if (next === null) {
-        setWatchlistValidationMessage("그룹 생성에 실패했습니다.");
+        setWatchlistValidationMessage(labels.errors.createWatchlist);
         return;
       }
       setWatchlists((items) => [...items, next]);
@@ -258,22 +310,22 @@ export function WatchlistDashboard() {
       setWatchlistValidationMessage("");
     } catch (error) {
       logStartupWarning(error, "watchlist create failed");
-      setWatchlistValidationMessage("그룹 생성에 실패했습니다.");
+      setWatchlistValidationMessage(labels.errors.createWatchlist);
     }
   }
 
   async function addSymbol() {
     const symbol = newSymbol.trim().toUpperCase();
     if (!symbol) {
-      setSymbolValidationMessage("종목 코드를 입력해 주세요.");
+      setSymbolValidationMessage(labels.errors.emptySymbol);
       return;
     }
     if (selectedWatchlist === null) {
-      setSymbolValidationMessage("먼저 관심 그룹을 선택해 주세요.");
+      setSymbolValidationMessage(labels.errors.selectWatchlist);
       return;
     }
     if (!watchlistsLoaded) {
-      setSymbolValidationMessage("관심 그룹을 불러온 뒤 추가해 주세요.");
+      setSymbolValidationMessage(labels.errors.addAfterLoad);
       return;
     }
     setSymbolValidationPending(true);
@@ -281,12 +333,12 @@ export function WatchlistDashboard() {
     try {
       const response = await fetch(`/api/tickers/validate?symbol=${encodeURIComponent(symbol)}`);
       if (!response.ok) {
-        setSymbolValidationMessage("실제 조회 가능한 티커만 추가할 수 있습니다.");
+        setSymbolValidationMessage(labels.errors.invalidSymbol);
         return;
       }
     } catch (error) {
       logStartupWarning(error, "ticker validation failed");
-      setSymbolValidationMessage("티커 확인에 실패했습니다. 네트워크와 데이터 제공자를 확인해주세요.");
+      setSymbolValidationMessage(labels.errors.symbolLookup);
       return;
     } finally {
       setSymbolValidationPending(false);
@@ -294,7 +346,7 @@ export function WatchlistDashboard() {
 
     const addResponse = await addAssetToWatchlist(selectedWatchlist, symbol);
     if (addResponse === null) {
-      setSymbolValidationMessage("종목 추가에 실패했습니다.");
+      setSymbolValidationMessage(labels.errors.addSymbol);
       return;
     } else {
       setWatchlists((items) => items.map((item) => (item.id === addResponse.id ? addResponse : item)));
@@ -307,14 +359,14 @@ export function WatchlistDashboard() {
 
   async function removeSymbol(symbol: string) {
     if (selectedWatchlist === null) {
-      setSymbolValidationMessage("먼저 관심 그룹을 선택해 주세요.");
+      setSymbolValidationMessage(labels.errors.selectWatchlist);
       return;
     }
     setSymbolValidationMessage("");
     try {
       const next = await deleteAssetFromWatchlist(selectedWatchlist, symbol);
       if (next === null) {
-        setSymbolValidationMessage("종목 제거에 실패했습니다.");
+        setSymbolValidationMessage(labels.errors.removeSymbol);
         return;
       }
       setWatchlists((items) => items.map((item) => (item.id === next.id ? next : item)));
@@ -323,7 +375,7 @@ export function WatchlistDashboard() {
       }
     } catch (error) {
       logStartupWarning(error, "watchlist asset delete failed");
-      setSymbolValidationMessage("종목 제거에 실패했습니다.");
+      setSymbolValidationMessage(labels.errors.removeSymbol);
     }
   }
 
@@ -331,12 +383,12 @@ export function WatchlistDashboard() {
     if (systemShuttingDown || systemShutdownComplete) {
       return;
     }
-    const confirm = window.confirm("로컬 프로그램을 종료하시겠습니까?");
+    const confirm = window.confirm(labels.app.confirmShutdownLabel);
     if (!confirm) {
       return;
     }
     setSystemShuttingDown(true);
-    setSystemShutdownMessage("종료 처리 중입니다.");
+    setSystemShutdownMessage(labels.controls.shutdownBusy);
     const result = await shutdownSystem();
     if (!result.ok) {
       setSystemShutdownMessage(result.message);
@@ -344,23 +396,30 @@ export function WatchlistDashboard() {
       return;
     }
     setSystemShuttingDown(false);
-    setSystemShutdownMessage("종료 요청이 접수되었습니다.");
+    setSystemShutdownMessage(labels.controls.shutdownDone);
     setSystemShutdownComplete(true);
   }
 
   return (
     <main className="page">
-      {setupRequired ? <SetupWizard onCompleted={completeSetup} /> : null}
+      {setupRequired ? (
+        <SetupWizard
+          onCompleted={completeSetup}
+          language={language}
+          labels={labels.setup}
+          onLanguageChange={changeLanguage}
+        />
+      ) : null}
       {setupRequired ? null : (
         <>
       {startupInProgress ? (
         <div className="startup-refresh-modal" role="status" aria-live="polite">
-          주식 정보를 확인하는 중
+          {labels.startup.checkingText}
         </div>
       ) : null}
       {startupRefresh.status === "failed" ? (
         <div className="startup-refresh-banner" role="status" aria-live="polite">
-          시장 데이터 갱신 실패
+          {labels.startup.failedBanner}
         </div>
       ) : null}
       {watchlistLoadError ? (
@@ -376,32 +435,49 @@ export function WatchlistDashboard() {
 
       <header className="hero">
         <div>
-          <p className="eyebrow">VBinvest</p>
-          <h1>투자 대시보드</h1>
-          <p className="subtle">로컬 프로그램에서 관심 그룹과 종목을 관리하고, 차트와 리서치 의견을 같은 화면에서 확인합니다.</p>
+          <p className="eyebrow">{labels.app.title}</p>
+          <h1>{labels.app.dashboardHeading}</h1>
+          <p className="subtle">{labels.app.dashboardSubtitle}</p>
         </div>
+        <label>
+          <span className="sr-only">{labels.app.languageLabel}</span>
+          <select
+            value={language}
+            aria-label={labels.app.languageLabel}
+            onChange={(event) => {
+              if (isLanguage(event.target.value)) {
+                void changeLanguage(event.target.value);
+              }
+            }}
+          >
+            <option value="ko">{labels.app.languageOptionKo}</option>
+            <option value="en">{labels.app.languageOptionEn}</option>
+          </select>
+        </label>
       </header>
 
       {!startupInProgress ? (
         <section className={`startup-status-strip ${startupRefresh.status}`} aria-label="startup source status" data-testid="startup-status">
-          <strong>{startupStatusLabel(startupRefresh.status)}</strong>
-          <span>대기 {startupRefresh.queued} · 진행 {startupRefresh.running} · 성공 {startupRefresh.succeeded} · 실패 {startupRefresh.failed}</span>
-          <span>가격 {startupRefresh.priceRows} · 지표 {startupRefresh.indicatorRows}</span>
-          <span>뉴스 {startupRefresh.newsItems} · 공시 {startupRefresh.disclosures}</span>
-          {providerSummary ? <span>{providerSummaryLabel(providerSummary)}</span> : null}
-          {startupRefresh.providerDisabled.length > 0 ? <span>비활성 소스 {startupRefresh.providerDisabled.length}개</span> : null}
+          <strong>{startupStatusLabel(startupRefresh.status, labels.startupStatusLabels)}</strong>
+          <span>{labels.startup.queued} {startupRefresh.queued} · {labels.startup.running} {startupRefresh.running} · {labels.startup.success} {startupRefresh.succeeded} · {labels.startup.failed} {startupRefresh.failed}</span>
+          <span>{labels.startup.price} {startupRefresh.priceRows} · {labels.startup.indicator} {startupRefresh.indicatorRows}</span>
+          <span>{labels.startup.news} {startupRefresh.newsItems} · {labels.startup.disclosure} {startupRefresh.disclosures}</span>
+          {providerSummary ? <span>{providerSummaryLabel(providerSummary, labels.providerSummaryLabels)}</span> : null}
+          {startupRefresh.providerDisabled.length > 0 ? (
+            <span>{labels.startup.providerDisabled} {startupRefresh.providerDisabled.length}</span>
+          ) : null}
         </section>
       ) : null}
 
       {collectionStatus.length > 0 ? (
-        <section className="collection-status-strip" aria-label="data collection status" data-testid="collection-status">
+        <section className="collection-status-strip" aria-label={labels.startup.collectionAria} data-testid="collection-status">
           {collectionStatus.map((item) => (
             <span key={item.symbol} className={`collection-status-pill ${item.status}`}>
               <strong>{item.symbol}</strong>
-              <span>{collectionStatusLabel(item.status)}</span>
-              <span>최신 {item.latestPriceDate ?? "-"}</span>
-              <span>{item.provider ?? "provider 없음"}</span>
-              <span>가격 {item.priceRows} / 지표 {item.indicatorRows}</span>
+              <span>{collectionStatusLabel(item.status, labels.collectionStatusLabels)}</span>
+              <span>{labels.startup.latest} {item.latestPriceDate ?? "-"}</span>
+              <span>{item.provider ?? labels.startup.noProvider}</span>
+              <span>{labels.startup.price} {item.priceRows} / {labels.startup.indicator} {item.indicatorRows}</span>
             </span>
           ))}
         </section>
@@ -410,7 +486,7 @@ export function WatchlistDashboard() {
       <section className="control-panel" aria-label="watchlist controls">
         {watchlistsLoaded && hasWatchlists ? (
           <div className="panel-column">
-            <h2>관심 그룹</h2>
+            <h2>{labels.controls.watchlistsHeading}</h2>
             <div className="chips">
               {watchlists.map((watchlist) => (
                 <button
@@ -430,31 +506,47 @@ export function WatchlistDashboard() {
         ) : null}
 
         <div className="panel-column">
-          <h2>그룹 추가</h2>
+          <h2>{labels.controls.addWatchlistHeading}</h2>
           <div className="inline-form">
-            <input aria-label="새 그룹 이름" value={newWatchlist} onChange={(event) => setNewWatchlist(event.target.value)} placeholder="AI Memory" />
-            <button type="button" onClick={() => void createWatchlist()} disabled={!watchlistsLoaded}>새 그룹</button>
+            <input
+              aria-label={labels.controls.newWatchlistLabel}
+              value={newWatchlist}
+              onChange={(event) => setNewWatchlist(event.target.value)}
+              placeholder={labels.controls.watchlistNamePlaceholder}
+            />
+            <button type="button" onClick={() => void createWatchlist()} disabled={!watchlistsLoaded}>
+              {labels.controls.addWatchlistAction}
+            </button>
           </div>
           {watchlistValidationMessage ? <p className="research-status error">{watchlistValidationMessage}</p> : null}
         </div>
 
         <div className="panel-column">
-          <h2>종목 추가</h2>
+          <h2>{labels.controls.symbolHeading}</h2>
           <div className="inline-form">
-            <input aria-label="새 종목 심볼" value={newSymbol} onChange={(event) => setNewSymbol(event.target.value)} placeholder="NVDA" />
-            <button type="button" onClick={() => void addSymbol()} disabled={symbolValidationPending || !watchlistsLoaded}>
-              {symbolValidationPending ? "확인 중" : "추가"}
+            <input
+              aria-label={labels.controls.newSymbolLabel}
+              value={newSymbol}
+              onChange={(event) => setNewSymbol(event.target.value)}
+              placeholder={labels.controls.symbolPlaceholder}
+            />
+            <button
+              type="button"
+              onClick={() => void addSymbol()}
+              disabled={symbolValidationPending || !watchlistsLoaded}
+            >
+              {symbolValidationPending ? labels.controls.symbolActionBusy : labels.controls.symbolAction}
             </button>
           </div>
           {symbolValidationMessage ? <p className="research-status error">{symbolValidationMessage}</p> : null}
         </div>
 
         <div className="panel-column">
-          <h2>주간 사전 리포트</h2>
+          <h2>{labels.controls.weeklyReportHeading}</h2>
           <div className="inline-form scheduler-toggle-row">
-            <span>주간 사전 리포트 계산</span>
+            <span>{labels.controls.weeklyReportCheckbox}</span>
             <input
-              aria-label="주간 사전 리포트"
+              aria-label={labels.controls.weeklyReportCheckbox}
               type="checkbox"
               checked={schedulerSettings.weeklyPrecomputeEnabled}
               onChange={(event) => {
@@ -463,20 +555,20 @@ export function WatchlistDashboard() {
               disabled={schedulerLoading || schedulerSaving}
             />
           </div>
-          <p className="research-status">기본은 꺼짐(오프)이며 필요할 때만 사용합니다.</p>
-          <p className="research-status">리포트 발행은 수동 버튼으로 동일하게 실행할 수 있습니다.</p>
+          <p className="research-status">{labels.controls.weeklyReportDefault}</p>
+          <p className="research-status">{labels.controls.weeklyReportManual}</p>
           <p className="research-status">{schedulerText}</p>
           {schedulerStateError ? <p className="research-status error">{schedulerStateError}</p> : null}
         </div>
 
         <div className="panel-column">
-          <h2>시스템 제어</h2>
+          <h2>{labels.controls.systemHeading}</h2>
           <button
             type="button"
             onClick={() => void shutdownLocalProgram()}
             disabled={systemShuttingDown || systemShutdownComplete}
           >
-            종료
+            {labels.controls.shutdownAction}
           </button>
           {systemShutdownMessage ? (
             <p className={`research-status ${systemShutdownComplete ? "success" : systemShuttingDown ? "" : "error"}`}>
@@ -488,13 +580,13 @@ export function WatchlistDashboard() {
 
       {watchlistsLoaded && !hasWatchlists ? (
         <section className="startup-refresh-banner" role="status" aria-live="polite">
-          표시할 관심 그룹이 없습니다.
+          {labels.startup.noWatchlists}
         </section>
       ) : null}
 
       {watchlistsLoaded && hasWatchlists && !activeWatchlistHasSymbols ? (
         <section className="startup-refresh-banner" role="status" aria-live="polite">
-          선택한 관심 그룹에 종목이 없습니다.
+          {labels.startup.noSymbols}
         </section>
       ) : null}
 
@@ -503,7 +595,7 @@ export function WatchlistDashboard() {
           <aside className="watchlist-card">
             <div className="card-heading">
               <h2>{activeWatchlist?.name}</h2>
-              <span>{activeWatchlist?.symbols.length ?? 0}개 종목</span>
+              <span>{labels.summary.assetCount(activeWatchlist?.symbols.length ?? 0)}</span>
             </div>
             <div className="symbol-list">
               {(activeWatchlist?.symbols ?? []).map((symbol) => {
@@ -523,9 +615,9 @@ export function WatchlistDashboard() {
                         event.stopPropagation();
                         void removeSymbol(symbol);
                       }}
-                      aria-label={`${symbol} 제거`}
+                      aria-label={labels.summary.removeSymbol(symbol)}
                     >
-                      제거
+                      {labels.controls.removeAction}
                     </button>
                   </div>
                 );
@@ -545,16 +637,16 @@ export function WatchlistDashboard() {
             </div>
 
             <div className="summary-grid">
-              <div><b>현재가</b><span>{asset.price.toLocaleString()}</span></div>
-              <div><b>1D</b><span>{asset.delta1d}</span></div>
-              <div><b>1M</b><span>{asset.delta1m}</span></div>
-              <div><b>RSI14</b><span>{formatNumber(asset.rsi14)}</span></div>
-              <div><b>MA5 / 20 / 50 / 120</b><span>{formatMa(asset)}</span></div>
+              <div><b>{labels.summary.price}</b><span>{asset.price.toLocaleString()}</span></div>
+              <div><b>{labels.summary.oneDay}</b><span>{asset.delta1d}</span></div>
+              <div><b>{labels.summary.oneMonth}</b><span>{asset.delta1m}</span></div>
+              <div><b>{labels.summary.rsi14}</b><span>{formatNumber(asset.rsi14)}</span></div>
+              <div><b>{labels.summary.ma}</b><span>{formatMa(asset)}</span></div>
             </div>
 
-            <ChartShell symbol={asset.symbol} points={points} />
+            <ChartShell symbol={asset.symbol} points={points} labels={labels.chart} />
 
-            <ResearchCard symbol={asset.symbol} />
+            <ResearchCard symbol={asset.symbol} labels={labels.report} />
           </section>
         </section>
       ) : null}
@@ -570,4 +662,23 @@ function logStartupWarning(error: unknown, fallback: string): void {
     return;
   }
   console.warn(fallback);
+}
+
+function isLanguageResponse(value: unknown): value is { readonly language: Language } {
+  return isRecord(value) && (value.language === "ko" || value.language === "en");
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function authHeaders(): Record<string, string> {
+  const token = typeof window === "undefined" ? "" : window.__VBINVEST_LOCAL_SESSION_TOKEN__ ?? "";
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+declare global {
+  interface Window {
+    __VBINVEST_LOCAL_SESSION_TOKEN__?: string;
+  }
 }

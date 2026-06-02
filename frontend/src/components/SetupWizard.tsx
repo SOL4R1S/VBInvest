@@ -2,8 +2,13 @@
 
 import { useState } from "react";
 
+import { isLanguage, type Language, type LocalizedLabels } from "@/lib/i18n";
+
 type SetupWizardProps = {
   readonly onCompleted: () => void;
+  readonly language: Language;
+  readonly labels: LocalizedLabels["setup"];
+  readonly onLanguageChange: (language: Language) => void;
 };
 
 type SetupError = {
@@ -12,7 +17,7 @@ type SetupError = {
 
 const DEFAULT_DATA_DIRECTORY = "~/Library/Application Support/VBinvest";
 
-export function SetupWizard({ onCompleted }: SetupWizardProps) {
+export function SetupWizard({ onCompleted, language, labels, onLanguageChange }: SetupWizardProps) {
   const [dataDirectory, setDataDirectory] = useState(DEFAULT_DATA_DIRECTORY);
   const [databaseMode, setDatabaseMode] = useState("sqlite");
   const [postgresUrl, setPostgresUrl] = useState("");
@@ -39,7 +44,7 @@ export function SetupWizard({ onCompleted }: SetupWizardProps) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          language: "ko",
+          language,
           data_directory: dataDirectory,
           database: {
             mode: databaseMode,
@@ -62,7 +67,7 @@ export function SetupWizard({ onCompleted }: SetupWizardProps) {
       });
       const payload: unknown = await readJson(response);
       if (!response.ok) {
-        setError({ message: readDetail(payload) || "설정 저장에 실패했습니다." });
+        setError({ message: readDetail(payload) || labels.defaultErrorMessage });
         return;
       }
       onCompleted();
@@ -71,7 +76,7 @@ export function SetupWizard({ onCompleted }: SetupWizardProps) {
         setError({ message: caught.message });
         return;
       }
-      setError({ message: "설정 저장에 실패했습니다." });
+      setError({ message: labels.defaultErrorMessage });
     } finally {
       setSubmitting(false);
     }
@@ -81,108 +86,160 @@ export function SetupWizard({ onCompleted }: SetupWizardProps) {
     <section className="setup-wizard" aria-label="first run setup">
       <div className="setup-heading">
         <p className="eyebrow">VBinvest</p>
-        <h1>초기 설정</h1>
-        <p className="subtle">로컬 데이터와 Obsidian 저장 위치를 정하면 대시보드가 시작됩니다.</p>
+        <h1>{labels.title}</h1>
+        <p className="subtle">{labels.setupInstruction}</p>
       </div>
+
+      <label>
+        <span>{labels.languageField}</span>
+        <select
+          value={language}
+          onChange={(event) => {
+            const nextLanguage = event.target.value;
+            if (isLanguage(nextLanguage)) {
+              onLanguageChange(nextLanguage);
+            }
+          }}
+        >
+          <option value="ko">{labels.languageOptionKo}</option>
+          <option value="en">{labels.languageOptionEn}</option>
+        </select>
+      </label>
 
       <div className="setup-grid">
         <label>
-          <span>Data Directory</span>
-          <input aria-label="Data Directory" value={dataDirectory} onChange={(event) => setDataDirectory(event.target.value)} />
+          <span>{labels.dataDirectoryField}</span>
+          <input aria-label={labels.dataDirectoryField} value={dataDirectory} onChange={(event) => setDataDirectory(event.target.value)} />
         </label>
 
         <label>
-          <span>Database Mode</span>
-          <select aria-label="Database Mode" value={databaseMode} onChange={(event) => setDatabaseMode(event.target.value)}>
-            <option value="sqlite">SQLite 내장 DB (권장)</option>
-            <option value="postgres_docker">PostgreSQL Docker 자동 실행</option>
-            <option value="postgres_url">PostgreSQL 직접 연결</option>
+          <span>{labels.databaseModeField}</span>
+          <select aria-label={labels.databaseModeField} value={databaseMode} onChange={(event) => setDatabaseMode(event.target.value)}>
+            <option value="sqlite">{labels.databaseModeSqlite}</option>
+            <option value="postgres_docker">{labels.databaseModePostgresDocker}</option>
+            <option value="postgres_url">{labels.databaseModePostgresUrl}</option>
           </select>
         </label>
 
         {databaseMode === "postgres_docker" ? (
-          <p className="setup-note">Docker Desktop/Engine이 필요합니다. 없으면 설치 후 다시 시도하세요.</p>
+          <p className="setup-note">{labels.databaseModeDockerHint}</p>
         ) : null}
 
         {databaseMode === "postgres_url" ? (
           <label className="setup-wide">
-            <span>Postgres DSN</span>
-            <input aria-label="Postgres DSN" value={postgresUrl} onChange={(event) => setPostgresUrl(event.target.value)} placeholder="postgresql://user:password@127.0.0.1:5432/vbinvest" />
+            <span>{labels.postgresDsnField}</span>
+            <input
+              aria-label={labels.postgresDsnField}
+              value={postgresUrl}
+              onChange={(event) => setPostgresUrl(event.target.value)}
+              placeholder={labels.postgresDsnPlaceholder}
+            />
           </label>
         ) : null}
 
         <label className="setup-wide">
-          <span>Obsidian Vault Path</span>
-          <input aria-label="Obsidian Vault Path" value={vaultPath} onChange={(event) => setVaultPath(event.target.value)} placeholder="/Volumes/.../ObsidianVault" />
+          <span>{labels.obsidianVaultField}</span>
+          <input
+            aria-label={labels.obsidianVaultField}
+            value={vaultPath}
+            onChange={(event) => setVaultPath(event.target.value)}
+            placeholder={labels.obsidianVaultPlaceholder}
+          />
         </label>
 
         <label>
-          <span>Export Mode</span>
-          <select aria-label="Export Mode" value={exportMode} onChange={(event) => setExportMode(event.target.value)}>
-            <option value="direct">직접 저장</option>
-            <option value="symlink">심링크 (고급)</option>
+          <span>{labels.exportModeField}</span>
+          <select aria-label={labels.exportModeField} value={exportMode} onChange={(event) => setExportMode(event.target.value)}>
+            <option value="direct">{labels.exportModeDirect}</option>
+            <option value="symlink">{labels.exportModeSymlink}</option>
           </select>
         </label>
 
         <label>
-          <span>OpenDART API Key</span>
-          <input aria-label="OpenDART API Key" value={opendartKey} onChange={(event) => setOpendartKey(event.target.value)} placeholder="선택 사항" />
+          <span>{labels.opendartApiKeyField}</span>
+          <input
+            aria-label={labels.opendartApiKeyField}
+            value={opendartKey}
+            onChange={(event) => setOpendartKey(event.target.value)}
+            placeholder={labels.opendartApiKeyHint}
+          />
         </label>
 
         <p className="setup-note">
-          OpenDART 공시를 받으려면 OpenDART에서 API 키를 발급해 입력하세요. 사용량과 제한은 사용자 키 책임이며, 비워두면 한국 공시 수집만 비활성화됩니다.
+          {labels.opendartApiKeyHint}
         </p>
 
         <label>
-          <span>AI Mode</span>
-          <select aria-label="AI Mode" value={aiMode} onChange={(event) => setAiMode(event.target.value)}>
-            <option value="none">사용 안 함</option>
-            <option value="openai_compatible">AI API 연동</option>
-            <option value="codex_cli">Codex CLI (계정 제한/정지 가능성 있음)</option>
-            <option value="copilot_cli">Copilot CLI (계정 제한/정지 가능성 있음)</option>
+          <span>{labels.aiModeField}</span>
+          <select aria-label={labels.aiModeField} value={aiMode} onChange={(event) => setAiMode(event.target.value)}>
+            <option value="none">{labels.aiModeNone}</option>
+            <option value="openai_compatible">{labels.aiModeCompatible}</option>
+            <option value="codex_cli">{labels.aiModeCodex}</option>
+            <option value="copilot_cli">{labels.aiModeCopilot}</option>
           </select>
         </label>
 
         {aiMode === "openai_compatible" ? (
           <>
             <label>
-              <span>AI API Type</span>
-              <select aria-label="AI API Type" value={aiApiType} onChange={(event) => setAiApiType(event.target.value)}>
-                <option value="cloud">Cloud model provider</option>
-                <option value="local">Local LLM</option>
+              <span>{labels.aiTypeField}</span>
+              <select aria-label={labels.aiTypeField} value={aiApiType} onChange={(event) => setAiApiType(event.target.value)}>
+                <option value="cloud">{labels.aiTypeCloud}</option>
+                <option value="local">{labels.aiTypeLocal}</option>
               </select>
             </label>
 
             {aiApiType === "cloud" ? (
               <label>
-                <span>Cloud Model Provider</span>
-                <select aria-label="Cloud Model Provider" value={aiProviderName} onChange={(event) => setAiProviderName(event.target.value)}>
-                  <option value="openai">OpenAI</option>
-                  <option value="openrouter">OpenRouter</option>
-                  <option value="deepseek">DeepSeek</option>
-                  <option value="qwen_dashscope">Qwen / DashScope</option>
-                  <option value="kimi_moonshot">Kimi / Moonshot</option>
-                  <option value="glm_zai">GLM / Z.AI</option>
-                  <option value="custom">Custom provider</option>
+                <span>{labels.cloudProviderField}</span>
+                <select
+                  aria-label={labels.cloudProviderField}
+                  value={aiProviderName}
+                  onChange={(event) => setAiProviderName(event.target.value)}
+                >
+                  <option value="openai">{labels.cloudProviderOpenai}</option>
+                  <option value="openrouter">{labels.cloudProviderOpenrouter}</option>
+                  <option value="deepseek">{labels.cloudProviderDeepseek}</option>
+                  <option value="qwen_dashscope">{labels.cloudProviderQwen}</option>
+                  <option value="kimi_moonshot">{labels.cloudProviderKimi}</option>
+                  <option value="glm_zai">{labels.cloudProviderGlm}</option>
+                  <option value="custom">{labels.cloudProviderCustom}</option>
                 </select>
               </label>
             ) : (
-              <p className="setup-note">Ollama, LM Studio, llama.cpp 같은 로컬 OpenAI-compatible endpoint를 사용할 수 있습니다.</p>
+              <p className="setup-note">{labels.localProviderHint}</p>
             )}
 
             <label className="setup-wide">
-              <span>AI Base URL</span>
-              <input aria-label="AI Base URL" value={aiBaseUrl} onChange={(event) => setAiBaseUrl(event.target.value)} placeholder="https://api.openai.com/v1" />
+              <span>{labels.aiBaseUrlField}</span>
+              <input
+                aria-label={labels.aiBaseUrlField}
+                value={aiBaseUrl}
+                onChange={(event) => setAiBaseUrl(event.target.value)}
+                placeholder={labels.aiBaseUrlPlaceholder}
+              />
             </label>
 
             <label>
-              <span>AI Model</span>
-              <input aria-label="AI Model" value={aiModel} onChange={(event) => setAiModel(event.target.value)} placeholder="gpt-4.1-mini" />
+              <span>{labels.aiModelField}</span>
+              <input
+                aria-label={labels.aiModelField}
+                value={aiModel}
+                onChange={(event) => setAiModel(event.target.value)}
+                placeholder={labels.aiModelPlaceholder}
+              />
             </label>
 
             <label>
-              <span>Context Size</span>
-              <input aria-label="Context Size" type="number" min={1024} max={262144} value={aiContextSize} onChange={(event) => setAiContextSize(Number(event.target.value))} />
+              <span>{labels.aiContextSizeField}</span>
+              <input
+                aria-label={labels.aiContextSizeField}
+                type="number"
+                min={1024}
+                max={262144}
+                value={aiContextSize}
+                onChange={(event) => setAiContextSize(Number(event.target.value))}
+              />
             </label>
           </>
         ) : null}
@@ -192,7 +249,7 @@ export function SetupWizard({ onCompleted }: SetupWizardProps) {
 
       <div className="setup-actions">
         <button type="button" onClick={() => void submitSetup()} disabled={!vaultPath.trim() || submitting}>
-          {submitting ? "저장 중" : "설정 완료"}
+          {submitting ? labels.completeButtonSaving : labels.completeButton}
         </button>
       </div>
     </section>

@@ -3,6 +3,7 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { APPROVED_OPINIONS } from "@/lib/research";
 import { generateResearchReport, ReportGenerationError, type GeneratedResearch } from "@/lib/report-generation";
+import type { LocalizedLabels } from "@/lib/i18n";
 
 type ReportGenerationState =
   | { readonly status: "idle"; readonly report: GeneratedResearch | null; readonly message: string | null }
@@ -12,6 +13,7 @@ type ReportGenerationState =
 
 type ResearchCardProps = {
   readonly symbol: string;
+  readonly labels: LocalizedLabels["report"];
 };
 
 const INITIAL_REPORT_STATE: ReportGenerationState = {
@@ -20,7 +22,7 @@ const INITIAL_REPORT_STATE: ReportGenerationState = {
   message: null,
 };
 
-export function ResearchCard({ symbol }: ResearchCardProps) {
+export function ResearchCard({ symbol, labels }: ResearchCardProps) {
   const [reportState, setReportState] = useState<ReportGenerationState>(INITIAL_REPORT_STATE);
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -42,14 +44,14 @@ export function ResearchCard({ symbol }: ResearchCardProps) {
     setReportState((previous) => ({
       status: "generating",
       report: previous.report,
-      message: "실시간 분석 중",
+      message: labels.generating,
     }));
     try {
       const report = await generateResearchReport(symbol, { signal: abortController.signal });
-      setReportState({ status: "success", report, message: "리포트 발행 완료" });
+      setReportState({ status: "success", report, message: labels.generated });
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {
-        setReportState((previous) => ({ status: "error", report: previous.report, message: "취소됨" }));
+        setReportState((previous) => ({ status: "error", report: previous.report, message: labels.canceled }));
         return;
       }
       if (error instanceof ReportGenerationError) {
@@ -60,7 +62,7 @@ export function ResearchCard({ symbol }: ResearchCardProps) {
       setReportState((previous) => ({
         status: "error",
         report: previous.report,
-        message: "리포트 발행에 실패했습니다. 설정과 백엔드 연결을 확인해주세요.",
+        message: labels.defaultError,
       }));
     } finally {
       if (abortControllerRef.current === abortController) {
@@ -77,7 +79,7 @@ export function ResearchCard({ symbol }: ResearchCardProps) {
     setReportState((previous) => ({
       status: "error",
       report: previous.report,
-      message: "취소됨",
+      message: labels.canceled,
     }));
   }
 
@@ -87,21 +89,21 @@ export function ResearchCard({ symbol }: ResearchCardProps) {
     if (report.reportUrl) {
       items.push(
         <a key="report-url" href={report.reportUrl} target="_blank" rel="noreferrer">
-          리포트 링크 보기
+          {labels.reportLink}
         </a>,
       );
     }
     if (report.reportPath) {
       items.push(
         <p key="report-path">
-          리포트 경로: <span>{report.reportPath}</span>
+          {labels.reportPath}: <span>{report.reportPath}</span>
         </p>,
       );
     }
     if (report.obsidianPath) {
       items.push(
         <p key="obsidian-path">
-          Obsidian 경로: <span>{report.obsidianPath}</span>
+          {labels.obsidianPath}: <span>{report.obsidianPath}</span>
         </p>,
       );
     }
@@ -113,16 +115,18 @@ export function ResearchCard({ symbol }: ResearchCardProps) {
 
   return (
     <article className="research-card">
-      <h3>리서치 의견</h3>
+      <h3>{labels.heading}</h3>
       {reportState.report ? (
         <div className="generated-report">
-          <div className={`badge ${reportState.report.opinion}`}>투자의견 {reportState.report.opinion}</div>
+          <div className={`badge ${reportState.report.opinion}`}>{labels.opinionPrefix} {reportState.report.opinion}</div>
           <p>{reportState.report.thesis}</p>
-          <span>근거 {reportState.report.sourcesCount}개</span>
+          <span>
+            {labels.sources(reportState.report.sourcesCount)}
+          </span>
           {renderReportLinks(reportState.report)}
         </div>
       ) : (
-        <p>아직 발행된 리서치가 없습니다. 현재는 DB 가격/지표를 기반으로 차트를 확인할 수 있습니다.</p>
+        <p>{labels.noReport}</p>
       )}
       {reportState.message ? (
         <div className={`research-status ${reportState.status}`} role="status" aria-live="polite">
@@ -130,16 +134,16 @@ export function ResearchCard({ symbol }: ResearchCardProps) {
         </div>
       ) : null}
       <button type="button" onClick={() => void generateReport()} disabled={reportState.status === "generating"}>
-        {reportState.status === "generating" ? "실시간 분석 중" : "리포트 발행"}
+        {reportState.status === "generating" ? labels.generating : labels.generateAction}
       </button>
       {isGenerating ? (
         <div className="report-generation-backdrop" data-testid="report-generation-backdrop">
-          <div className="report-generation-modal" role="dialog" aria-label="리포트 발행 중">
+          <div className="report-generation-modal" role="dialog" aria-label={labels.modalTitle}>
             <div className="research-status generating" role="status" aria-live="polite">
-              실시간 분석 중
+              {labels.generating}
             </div>
             <button type="button" onClick={() => void cancelGeneration()}>
-              취소
+              {labels.cancelAction}
             </button>
           </div>
         </div>

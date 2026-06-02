@@ -154,6 +154,7 @@ function hasFetchCallWithHeaders(
 
 type FetchMock = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 type MockedFetch = { mock: { calls: Array<Parameters<FetchMock>> } };
+type TestStorage = Pick<Storage, "getItem" | "setItem" | "removeItem" | "clear">;
 
 function schedulerSettingsResponse(): Response {
   return jsonResponse({
@@ -178,6 +179,9 @@ function withSchedulerFallback(fetchMock: FetchMock): FetchMock {
 
 describe("WatchlistDashboard", () => {
   beforeEach(() => {
+    const storage = createTestStorage({ vbinvest_language: "ko" });
+    Object.defineProperty(window, "localStorage", { value: storage, configurable: true });
+    Object.defineProperty(window.navigator, "language", { value: "ko-KR", configurable: true });
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL, _init?: RequestInit): Promise<Response> => {
@@ -553,9 +557,8 @@ describe("WatchlistDashboard", () => {
     render(<WatchlistDashboard />);
 
     await waitFor(() => {
-      expect(screen.getByText("저장된 관심 그룹이 없습니다.")).toBeInTheDocument();
+      expect(screen.getAllByText("저장된 관심 그룹이 없습니다.")).toHaveLength(1);
     });
-    expect(screen.getByText("표시할 관심 그룹이 없습니다.")).toBeInTheDocument();
     expect(fetchMock.mock.calls.some(([request]) => String(request).includes("/api/watchlists/semiconductor-core/dashboard"))).toBe(false);
   });
 
@@ -1600,3 +1603,19 @@ describe("WatchlistDashboard", () => {
     expect(screen.queryByText("DB 가격 지표와 공개 소스를 바탕으로 모멘텀을 점검했습니다.")).not.toBeInTheDocument();
   });
 });
+
+function createTestStorage(initial: Record<string, string> = {}): TestStorage {
+  const values = new Map(Object.entries(initial));
+  return {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      values.set(key, value);
+    },
+    removeItem: (key: string) => {
+      values.delete(key);
+    },
+    clear: () => {
+      values.clear();
+    },
+  };
+}

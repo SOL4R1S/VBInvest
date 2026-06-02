@@ -25,6 +25,33 @@ export type ProviderSummary = {
   readonly aiMode: string | null;
 };
 
+export type StartupStatusLabels = {
+  readonly checking: string;
+  readonly running: string;
+  readonly setupRequired: string;
+  readonly ready: string;
+  readonly partial: string;
+  readonly skipped: string;
+  readonly failed: string;
+};
+
+export type ProviderSummaryLabels = {
+  readonly opendartEnabled: string;
+  readonly opendartDisabled: string;
+  readonly aiDisabled: string;
+};
+
+export type CollectionStatusLabels = {
+  readonly collected: string;
+  readonly synthetic: string;
+  readonly missing: string;
+};
+
+export type RuntimeSettings = {
+  readonly providerSummary: ProviderSummary | null;
+  readonly language: "ko" | "en" | null;
+};
+
 export type CollectionAssetStatus = {
   readonly symbol: string;
   readonly displayNameKo: string | null;
@@ -66,6 +93,30 @@ export async function fetchProviderSummary(): Promise<ProviderSummary | null> {
     firstRunCompleted: payload.first_run_completed !== false,
     opendartConfigured: opendart.configured === true,
     aiMode: typeof ai.mode === "string" ? ai.mode : null,
+  };
+}
+
+export async function fetchRuntimeSettings(): Promise<RuntimeSettings> {
+  const response = await fetch("/api/settings");
+  if (!response.ok) {
+    return { providerSummary: null, language: null };
+  }
+  const payload: unknown = await response.json();
+  if (!isRecord(payload)) {
+    return { providerSummary: null, language: null };
+  }
+
+  const providerStatus = isRecord(payload.provider_status) ? payload.provider_status : {};
+  const opendart = isRecord(providerStatus.opendart) ? providerStatus.opendart : {};
+  const ai = isRecord(providerStatus.ai) ? providerStatus.ai : {};
+
+  return {
+    providerSummary: {
+      firstRunCompleted: payload.first_run_completed !== false,
+      opendartConfigured: opendart.configured === true,
+      aiMode: typeof ai.mode === "string" ? ai.mode : null,
+    },
+    language: parseLanguage(payload.language),
   };
 }
 
@@ -114,39 +165,64 @@ export function parseStartupRefresh(payload: unknown): StartupRefreshView {
   };
 }
 
-export function startupStatusLabel(status: StartupRefreshStatus): string {
+export function startupStatusLabel(
+  status: StartupRefreshStatus,
+  labels: StartupStatusLabels = {
+    checking: "확인 중",
+    running: "데이터 갱신 진행 중",
+    setupRequired: "초기 설정 필요",
+    ready: "시장 데이터 준비 완료",
+    partial: "일부 소스 비활성화",
+    skipped: "최근 갱신 사용",
+    failed: "시장 데이터 갱신 실패",
+  },
+): string {
   switch (status) {
     case "checking":
-      return "확인 중";
+      return labels.checking;
     case "running":
-      return "데이터 갱신 진행 중";
+      return labels.running;
     case "setup_required":
-      return "초기 설정 필요";
+      return labels.setupRequired;
     case "ready":
-      return "시장 데이터 준비 완료";
+      return labels.ready;
     case "partial":
-      return "일부 소스 비활성화";
+      return labels.partial;
     case "skipped":
-      return "최근 갱신 사용";
+      return labels.skipped;
     case "failed":
-      return "시장 데이터 갱신 실패";
+      return labels.failed;
   }
 }
 
-export function providerSummaryLabel(summary: ProviderSummary): string {
-  const dart = summary.opendartConfigured ? "OpenDART 설정됨" : "OpenDART 미설정";
-  const ai = summary.aiMode ? `AI ${summary.aiMode}` : "AI disabled";
+export function providerSummaryLabel(
+  summary: ProviderSummary,
+  labels: ProviderSummaryLabels = {
+    opendartEnabled: "OpenDART 설정됨",
+    opendartDisabled: "OpenDART 미설정",
+    aiDisabled: "AI disabled",
+  },
+): string {
+  const dart = summary.opendartConfigured ? labels.opendartEnabled : labels.opendartDisabled;
+  const ai = summary.aiMode ? `AI ${summary.aiMode}` : labels.aiDisabled;
   return `${dart} · ${ai}`;
 }
 
-export function collectionStatusLabel(status: CollectionAssetStatus["status"]): string {
+export function collectionStatusLabel(
+  status: CollectionAssetStatus["status"],
+  labels: CollectionStatusLabels = {
+    collected: "실제 수집",
+    synthetic: "예시 데이터 포함",
+    missing: "수집 기록 없음",
+  },
+): string {
   switch (status) {
     case "collected":
-      return "실제 수집";
+      return labels.collected;
     case "synthetic":
-      return "예시 데이터 포함";
+      return labels.synthetic;
     case "missing":
-      return "수집 기록 없음";
+      return labels.missing;
   }
 }
 
@@ -260,6 +336,10 @@ function isProviderDisabled(value: unknown): value is ProviderDisabled {
     && typeof value.provider === "string"
     && typeof value.reason === "string"
   );
+}
+
+function parseLanguage(value: unknown): "ko" | "en" | null {
+  return value === "ko" || value === "en" ? value : null;
 }
 
 function numberValue(value: unknown): number {

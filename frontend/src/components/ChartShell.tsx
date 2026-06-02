@@ -15,10 +15,12 @@ import {
   type LogicalRangeChangeEventHandler,
 } from "lightweight-charts";
 import type { ChartPoint } from "@/lib/dashboard-data";
+import type { LocalizedLabels } from "@/lib/i18n";
 
 type Props = {
   symbol: string;
   points: ChartPoint[];
+  labels: LocalizedLabels["chart"];
 };
 
 type Mode = "line" | "candle";
@@ -35,7 +37,7 @@ function formatLogicalRange(range: LogicalRange | null) {
   };
 }
 
-export function ChartShell({ symbol, points }: Props) {
+export function ChartShell({ symbol, points, labels }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candleRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
@@ -205,13 +207,13 @@ export function ChartShell({ symbol, points }: Props) {
     <section className="chart-shell" aria-label={`${symbol} 차트`}>
       <div className="chart-toolbar">
         <button type="button" className={mode === "line" ? "active" : ""} onClick={() => setMode("line")} data-testid="mode-line">
-          라인
+          {labels.line}
         </button>
         <button type="button" className={mode === "candle" ? "active" : ""} onClick={() => setMode("candle")} data-testid="mode-candle">
-          캔들
+          {labels.candle}
         </button>
         <button type="button" onClick={() => chartRef.current?.timeScale().fitContent()} data-testid="chart-reset">
-          줌 초기화
+          {labels.reset}
         </button>
       </div>
       <div
@@ -224,7 +226,7 @@ export function ChartShell({ symbol, points }: Props) {
         data-rsi-line-width={RSI_LINE_WIDTH}
         data-pane-count={paneCount}
       />
-      <div className="legend">상단 가격 · 하단 거래량/RSI14 · 5일선 · 20일선 · 50일선 · 120일선 · 휠 줌 · 드래그 팬</div>
+      <div className="legend">{labels.legend}</div>
     </section>
   );
 }

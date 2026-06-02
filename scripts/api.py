@@ -4,12 +4,13 @@ import os
 import json
 import shutil
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 if __package__ is None or __package__ == "":
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from typing import Any, Callable
+from typing import Any, Callable, Literal
 
 from fastapi import Depends, FastAPI, Header, HTTPException, status
 from fastapi.responses import FileResponse, HTMLResponse
@@ -152,6 +153,10 @@ class FirstRunSetupPayload(BaseModel):
     database: FirstRunDatabasePayload = Field(default_factory=FirstRunDatabasePayload)
     obsidian: FirstRunObsidianPayload
     providers: FirstRunProviderPayload = Field(default_factory=FirstRunProviderPayload)
+
+
+class LanguageSettingsPayload(BaseModel):
+    language: Literal["ko", "en"]
 
 
 class SchedulerSettingsPayload(BaseModel):
@@ -343,6 +348,20 @@ def save_first_run_settings(payload: FirstRunSetupPayload):
     return {
         **config.redacted(),
         "provider_status": provider_status(config, os.environ),
+    }
+
+
+@app.patch("/api/settings/language")
+def patch_settings_language(payload: LanguageSettingsPayload, user: AuthUser = Depends(current_user)):
+    try:
+        config = load_local_config()
+        updated = replace(config, language=payload.language)
+        write_local_config(updated, config_path_from_env(os.environ))
+    except ConfigError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {
+        **updated.redacted(),
+        "provider_status": provider_status(updated, os.environ),
     }
 
 
