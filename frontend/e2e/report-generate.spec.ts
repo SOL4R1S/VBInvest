@@ -15,21 +15,21 @@ test("report button generates and renders research", async ({ page }) => {
   const seenGenerateRequests: string[] = [];
 
   await routeDashboardData(page);
-  await page.route("**/api/backend/settings", async (route) => {
+  await page.route("**/api/settings", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({ provider_status: { opendart: { configured: true }, ai: { mode: "local" } } }),
     });
   });
-  await page.route("**/api/backend/startup/market-refresh?**", async (route) => {
+  await page.route("**/api/startup/market-refresh?**", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({ status: "ok", price_rows: 2, indicator_rows: 2, news_items: 4, disclosures: 1 }),
     });
   });
-  await page.route("**/api/backend/research/NVDA/generate", async (route) => {
+  await page.route("**/api/research/NVDA/generate", async (route) => {
     seenGenerateRequests.push(`${route.request().method()} ${route.request().url()}`);
     await route.fulfill({
       status: 201,

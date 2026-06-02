@@ -12,14 +12,14 @@ async function writeEvidence(name: string, content: string | Buffer) {
 
 async function routeStartupOk(page: Page) {
   await routeDashboardData(page);
-  await page.route("**/api/backend/settings", async (route) => {
+  await page.route("**/api/settings", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({ provider_status: { opendart: { configured: true }, ai: { mode: "local" } } }),
     });
   });
-  await page.route("**/api/backend/startup/market-refresh?**", async (route) => {
+  await page.route("**/api/startup/market-refresh?**", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",

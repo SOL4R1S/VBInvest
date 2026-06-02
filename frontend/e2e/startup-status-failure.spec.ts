@@ -12,7 +12,7 @@ async function writeEvidence(name: string, content: string | Buffer) {
 
 test("dashboard shows failed refresh banner without layout overlap", async ({ page }) => {
   await routeDashboardData(page);
-  await page.route("**/api/backend/settings", async (route) => {
+  await page.route("**/api/settings", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -32,7 +32,7 @@ test("dashboard shows failed refresh banner without layout overlap", async ({ pa
       }),
     });
   });
-  await page.route("**/api/backend/startup/market-refresh?**", async (route) => {
+  await page.route("**/api/startup/market-refresh?**", async (route) => {
     await route.fulfill({
       status: 500,
       contentType: "application/json",

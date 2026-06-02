@@ -12,7 +12,7 @@ async function writeEvidence(name: string, content: string | Buffer) {
 
 test("report button shows safe AI configuration error", async ({ page }) => {
   await routeDashboardData(page);
-  await page.route("**/api/backend/settings", async (route) => {
+  await page.route("**/api/settings", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -22,14 +22,14 @@ test("report button shows safe AI configuration error", async ({ page }) => {
       }),
     });
   });
-  await page.route("**/api/backend/startup/market-refresh?**", async (route) => {
+  await page.route("**/api/startup/market-refresh?**", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({ status: "ok", price_rows: 2, indicator_rows: 2, news_items: 4, disclosures: 1 }),
     });
   });
-  await page.route("**/api/backend/research/NVDA/generate", async (route) => {
+  await page.route("**/api/research/NVDA/generate", async (route) => {
     await route.fulfill({
       status: 503,
       contentType: "application/json",

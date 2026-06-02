@@ -44,7 +44,7 @@ export const INITIAL_STARTUP_REFRESH: StartupRefreshView = {
 };
 
 export async function fetchProviderSummary(): Promise<ProviderSummary | null> {
-  const response = await fetch("/api/backend/settings");
+  const response = await fetch("/api/settings");
   if (!response.ok) {
     return null;
   }
@@ -62,7 +62,7 @@ export async function fetchProviderSummary(): Promise<ProviderSummary | null> {
 }
 
 export async function fetchCollectionStatus(slug: string): Promise<readonly CollectionAssetStatus[]> {
-  const response = await fetch(`/api/backend/watchlists/${encodeURIComponent(slug)}/collection-status`);
+  const response = await fetch(`/api/watchlists/${encodeURIComponent(slug)}/collection-status`);
   if (!response.ok) {
     return [];
   }

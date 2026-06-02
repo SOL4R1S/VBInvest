@@ -10,11 +10,6 @@ else
   PYTHON_BIN="python3"
 fi
 
-if ! command -v npm >/dev/null 2>&1; then
-  echo "npm was not found. Install Node.js, then run this launcher again."
-  exit 1
-fi
-
 save_secret() {
   local account="$1"
   local value="${(P)account:-}"
@@ -61,7 +56,6 @@ PY
 }
 
 API_PORT="$(find_free_port)"
-FRONTEND_PORT="$(find_free_port)"
 export VBINVEST_API_BASE_URL="http://127.0.0.1:${API_PORT}"
 
 "$PYTHON_BIN" -m uvicorn scripts.api:app --host 127.0.0.1 --port "$API_PORT" &
@@ -74,8 +68,7 @@ trap cleanup EXIT INT TERM
 
 (
   sleep 3
-  open "http://127.0.0.1:${FRONTEND_PORT}"
+  open "http://127.0.0.1:${API_PORT}"
 ) &
 
-cd "$ROOT_DIR/frontend"
-npx next dev -p "$FRONTEND_PORT"
+wait "$API_PID"

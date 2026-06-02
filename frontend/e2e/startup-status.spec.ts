@@ -19,7 +19,7 @@ test("dashboard shows startup source counts without raw provider secrets", async
   });
 
   await routeDashboardData(page);
-  await page.route("**/api/backend/settings", async (route) => {
+  await page.route("**/api/settings", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -43,7 +43,7 @@ test("dashboard shows startup source counts without raw provider secrets", async
       }),
     });
   });
-  await page.route("**/api/backend/startup/market-refresh?**", async (route) => {
+  await page.route("**/api/startup/market-refresh?**", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -87,14 +87,14 @@ test("dashboard shows startup source counts without raw provider secrets", async
 
 test("dashboard loads global styling on first render", async ({ page }) => {
   await routeDashboardData(page);
-  await page.route("**/api/backend/settings", async (route) => {
+  await page.route("**/api/settings", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({ provider_status: { opendart: { configured: true }, ai: { mode: "local" } } }),
     });
   });
-  await page.route("**/api/backend/startup/market-refresh?**", async (route) => {
+  await page.route("**/api/startup/market-refresh?**", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",

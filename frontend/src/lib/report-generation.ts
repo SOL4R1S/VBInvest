@@ -20,7 +20,7 @@ export class ReportGenerationError extends Error {
 export async function generateResearchReport(symbol: string): Promise<GeneratedResearch> {
   let response: Response;
   try {
-    response = await fetch(`/api/backend/research/${encodeURIComponent(symbol)}/generate`, { method: "POST" });
+    response = await fetch(`/api/research/${encodeURIComponent(symbol)}/generate`, { method: "POST" });
   } catch (error) {
     if (error instanceof Error) {
       throw new ReportGenerationError("백엔드 연결을 확인해주세요. 프로그램이 실행 중인지 점검한 뒤 다시 시도해주세요.");

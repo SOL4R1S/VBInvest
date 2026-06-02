@@ -151,13 +151,22 @@ def test_cross_platform_local_launchers_are_tracked():
     windows_text = windows_launcher.read_text(encoding="utf-8")
 
     assert "uvicorn scripts.api:app" in mac_text
-    assert "npx next dev" in mac_text
-    assert "open" in mac_text
+    assert 'open "http://127.0.0.1:${API_PORT}"' in mac_text
     assert "uvicorn scripts.api:app" in windows_text
-    assert "npx next dev" in windows_text
-    assert "start" in windows_text
+    assert 'start "" "http://127.0.0.1:%API_PORT%"' in windows_text
     assert "VBINVEST_API_BASE_URL" in mac_text
     assert "VBINVEST_API_BASE_URL" in windows_text
+
+    for forbidden in [
+        "npm was not found",
+        "command -v npm",
+        "where npm",
+        "npx next dev",
+        "next start",
+    ]:
+        assert forbidden not in mac_text
+        assert forbidden not in windows_text
+
     assert 'save_secret "AI_API_KEY"' in mac_text
     assert 'save_secret "OPENDART_API_KEY"' in mac_text
     assert '-m scripts.save_secret "$account"' in mac_text

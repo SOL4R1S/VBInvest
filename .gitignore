@@ -46,6 +46,8 @@ ObsidianVault/
 dist/
 release/
 release-artifacts/
+frontend/.next/
+frontend/out/
 
 # Legacy local/Hermes planning artifacts
 plans/

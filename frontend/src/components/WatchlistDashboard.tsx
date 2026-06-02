@@ -89,7 +89,7 @@ export function WatchlistDashboard() {
         logStartupWarning(error, "settings status refresh failed");
       }
       try {
-        const response = await fetch("/api/backend/startup/market-refresh?no_network=false&include_news=true", { method: "POST" });
+        const response = await fetch("/api/startup/market-refresh?no_network=false&include_news=true", { method: "POST" });
         if (!response.ok) {
           throw new Error(`startup market refresh failed: ${response.status}`);
         }
@@ -143,7 +143,7 @@ export function WatchlistDashboard() {
     setSymbolValidationPending(true);
     setSymbolValidationMessage("");
     try {
-      const response = await fetch(`/api/backend/tickers/validate?symbol=${encodeURIComponent(symbol)}`);
+      const response = await fetch(`/api/tickers/validate?symbol=${encodeURIComponent(symbol)}`);
       if (!response.ok) {
         setSymbolValidationMessage("실제 조회 가능한 티커만 추가할 수 있습니다.");
         return;

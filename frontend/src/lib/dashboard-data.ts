@@ -41,7 +41,7 @@ export const DEFAULT_WATCHLISTS = [
 ];
 
 export async function fetchDashboardData(slug: string): Promise<DashboardModel | null> {
-  const response = await fetch(`/api/backend/watchlists/${encodeURIComponent(slug)}/dashboard?days=260`);
+  const response = await fetch(`/api/watchlists/${encodeURIComponent(slug)}/dashboard?days=260`);
   if (!response.ok) {
     return null;
   }

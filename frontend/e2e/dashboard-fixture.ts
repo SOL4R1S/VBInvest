@@ -16,7 +16,7 @@ export async function routeDashboardData(page: Page): Promise<void> {
   const latestNvda = lastPoint(nvdaHistory);
   const latestSamsung = lastPoint(samsungHistory);
 
-  await page.route("**/api/backend/watchlists/semiconductor-core/dashboard?**", async (route) => {
+  await page.route("**/api/watchlists/semiconductor-core/dashboard?**", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",

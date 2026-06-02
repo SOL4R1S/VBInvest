@@ -10,7 +10,7 @@ if __package__ is None or __package__ == "":
 from typing import Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException, status
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel, Field
 
 from scripts.lib.dashboard import render_dashboard_html
@@ -44,6 +44,37 @@ LOCAL_SHUTDOWN_CALLBACK = None
 
 def db() -> DBRepository:
     return build_database_from_local_config(environ=os.environ)
+
+
+def frontend_out_dir() -> Path:
+    configured = os.environ.get("VBINVEST_FRONTEND_OUT_DIR")
+    if configured:
+        return Path(configured)
+    return Path(__file__).resolve().parents[1] / "frontend" / "out"
+
+
+def frontend_index_file() -> Path | None:
+    index_file = frontend_out_dir() / "index.html"
+    if index_file.is_file():
+        return index_file
+    return None
+
+
+def frontend_asset_file(asset_path: str) -> Path | None:
+    root = frontend_out_dir().resolve()
+    candidate = (root / asset_path).resolve()
+    if candidate != root and root not in candidate.parents:
+        return None
+    if candidate.is_file():
+        return candidate
+    return None
+
+
+def frontend_index_response() -> HTMLResponse:
+    index_file = frontend_index_file()
+    if index_file is None:
+        raise HTTPException(status_code=404, detail="frontend build not found")
+    return HTMLResponse(index_file.read_text(encoding="utf-8"))
 
 
 class WatchlistCreate(BaseModel):
@@ -102,6 +133,19 @@ def health():
         "version": VERSION_METADATA.version,
         "build_version": VERSION_METADATA.build_version,
     }
+
+
+@app.get("/", response_class=HTMLResponse)
+def frontend_root():
+    return frontend_index_response()
+
+
+@app.get("/_next/{asset_path:path}")
+def frontend_next_asset(asset_path: str):
+    asset_file = frontend_asset_file(f"_next/{asset_path}")
+    if asset_file is None:
+        raise HTTPException(status_code=404, detail="frontend asset not found")
+    return FileResponse(asset_file)
 
 
 @app.get("/api/settings")
@@ -355,6 +399,16 @@ def dashboard_html(slug: str, days: int = 260):
     if not items:
         raise HTTPException(status_code=404, detail="dashboard data not found")
     return render_dashboard_html(items, title=f"VBinvest {slug}")
+
+
+@app.get("/{asset_path:path}")
+def frontend_asset_or_route(asset_path: str):
+    if asset_path.startswith("api/") or asset_path == "health" or asset_path.startswith("dashboard/"):
+        raise HTTPException(status_code=404, detail="not found")
+    asset_file = frontend_asset_file(asset_path)
+    if asset_file is not None:
+        return FileResponse(asset_file)
+    return frontend_index_response()
 
 
 def _jsonable_research(row: dict[str, Any], *, locked: bool) -> dict[str, Any]:

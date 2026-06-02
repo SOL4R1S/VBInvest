@@ -10,21 +10,21 @@ async function writeEvidence(name: string, content: string | Buffer) {
 }
 
 test("dashboard renders DB-backed market data instead of example values", async ({ page }) => {
-  await page.route("**/api/backend/settings", async (route) => {
+  await page.route("**/api/settings", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({ provider_status: { opendart: { configured: true }, ai: { mode: "local" } } }),
     });
   });
-  await page.route("**/api/backend/startup/market-refresh?**", async (route) => {
+  await page.route("**/api/startup/market-refresh?**", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({ status: "ok", price_rows: 2, indicator_rows: 2, news_items: 0, disclosures: 0 }),
     });
   });
-  await page.route("**/api/backend/watchlists/semiconductor-core/dashboard?**", async (route) => {
+  await page.route("**/api/watchlists/semiconductor-core/dashboard?**", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
