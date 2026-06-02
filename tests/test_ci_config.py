@@ -20,7 +20,7 @@ def test_ci_workflow_triggers_quality_checks_for_git_flow_push_and_pull_request(
     assert "push:" in workflow
     assert "branches: [develop, main, release/**]" in workflow
     for required in [
-        "pytest -q",
+        "python -m pytest -q",
         "npm run lint",
         "npm run typecheck",
         "npm test -- --run",
@@ -29,6 +29,14 @@ def test_ci_workflow_triggers_quality_checks_for_git_flow_push_and_pull_request(
         "scripts/secret_scan.py",
     ]:
         assert required in workflow
+
+
+def test_backend_pytest_steps_pin_repo_root_on_pythonpath() -> None:
+    for workflow_name in ["ci.yml", "release.yml"]:
+        workflow = read_workflow(workflow_name)
+
+        assert "PYTHONPATH: ${{ github.workspace }}" in workflow
+        assert "python -m pytest -q" in workflow
 
 
 def test_ci_workflow_runs_git_hook_parity_and_launcher_package_smoke() -> None:

@@ -9,6 +9,8 @@ on:
 jobs:
   quality:
     runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: ${{ github.workspace }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -42,7 +44,7 @@ jobs:
           print("pre_push_policy=ok")
           PY
       - name: Backend tests
-        run: pytest -q
+        run: python -m pytest -q
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci

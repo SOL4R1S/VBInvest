@@ -10,6 +10,8 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: ${{ github.workspace }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -30,7 +32,7 @@ jobs:
       - name: Secret scan
         run: python scripts/secret_scan.py
       - name: Backend tests
-        run: pytest -q
+        run: python -m pytest -q
       - name: Frontend checks
         working-directory: frontend
         run: |
