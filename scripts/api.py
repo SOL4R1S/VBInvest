@@ -9,7 +9,7 @@ from pathlib import Path
 if __package__ is None or __package__ == "":
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from typing import Any
+from typing import Any, Callable
 
 from fastapi import Depends, FastAPI, Header, HTTPException, status
 from fastapi.responses import FileResponse, HTMLResponse
@@ -55,7 +55,8 @@ except ImportError:
 VERSION_METADATA = load_version_metadata()
 
 app = FastAPI(title="VBinvest API", version=VERSION_METADATA.version)
-LOCAL_SHUTDOWN_CALLBACK = None
+ShutdownCallback = Callable[[], None]
+LOCAL_SHUTDOWN_CALLBACK: ShutdownCallback | None = None
 
 
 def db() -> DBRepository:
@@ -495,7 +496,7 @@ def run_scheduler_tick(
 
 @app.post("/api/system/shutdown")
 def system_shutdown(user: AuthUser = Depends(current_user)):
-    if LOCAL_SHUTDOWN_CALLBACK is None:
+    if os.environ.get("VBINVEST_LOCAL_SHUTDOWN_ENABLED") != "1" or LOCAL_SHUTDOWN_CALLBACK is None:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="local launcher shutdown is not available")
     LOCAL_SHUTDOWN_CALLBACK()
     return {"status": "shutting_down"}

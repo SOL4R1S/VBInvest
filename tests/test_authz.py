@@ -425,3 +425,22 @@ def test_shutdown_is_disabled_without_launcher_callback(monkeypatch):
 
     assert response.status_code == 503
     assert response.json()["detail"] == "local launcher shutdown is not available"
+
+
+def test_shutdown_invokes_local_callback_when_enabled(monkeypatch):
+    client = client_with_db(monkeypatch, FakeAuthDB())
+    monkeypatch.setenv("VBINVEST_LOCAL_SESSION_TOKEN", "qa-token")
+    monkeypatch.setenv("VBINVEST_LOCAL_SHUTDOWN_ENABLED", "1")
+
+    called = {"count": 0}
+
+    def fake_shutdown() -> None:
+        called["count"] += 1
+
+    monkeypatch.setattr(api, "LOCAL_SHUTDOWN_CALLBACK", fake_shutdown)
+
+    response = client.post("/api/system/shutdown", headers={"Authorization": "Bearer qa-token"})
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "shutting_down"}
+    assert called["count"] == 1

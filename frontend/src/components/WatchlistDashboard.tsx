@@ -37,6 +37,7 @@ import {
   patchSchedulerSettings,
   type SchedulerSettings,
 } from "@/lib/scheduler-settings";
+import { shutdownSystem } from "@/lib/system";
 
 export function WatchlistDashboard() {
   const [watchlists, setWatchlists] = useState<readonly Watchlist[]>([]);
@@ -61,6 +62,9 @@ export function WatchlistDashboard() {
   const [schedulerStateError, setSchedulerStateError] = useState<string | null>(null);
   const [schedulerSaving, setSchedulerSaving] = useState(false);
   const [schedulerLoading, setSchedulerLoading] = useState(false);
+  const [systemShutdownMessage, setSystemShutdownMessage] = useState<string | null>(null);
+  const [systemShuttingDown, setSystemShuttingDown] = useState(false);
+  const [systemShutdownComplete, setSystemShutdownComplete] = useState(false);
 
   const activeWatchlist = watchlists.find((item) => item.id === selectedWatchlist) ?? watchlists[0] ?? null;
   const hasWatchlists = watchlists.length > 0;
@@ -323,6 +327,27 @@ export function WatchlistDashboard() {
     }
   }
 
+  async function shutdownLocalProgram() {
+    if (systemShuttingDown || systemShutdownComplete) {
+      return;
+    }
+    const confirm = window.confirm("로컬 프로그램을 종료하시겠습니까?");
+    if (!confirm) {
+      return;
+    }
+    setSystemShuttingDown(true);
+    setSystemShutdownMessage("종료 처리 중입니다.");
+    const result = await shutdownSystem();
+    if (!result.ok) {
+      setSystemShutdownMessage(result.message);
+      setSystemShuttingDown(false);
+      return;
+    }
+    setSystemShuttingDown(false);
+    setSystemShutdownMessage("종료 요청이 접수되었습니다.");
+    setSystemShutdownComplete(true);
+  }
+
   return (
     <main className="page">
       {setupRequired ? <SetupWizard onCompleted={completeSetup} /> : null}
@@ -442,6 +467,22 @@ export function WatchlistDashboard() {
           <p className="research-status">리포트 발행은 수동 버튼으로 동일하게 실행할 수 있습니다.</p>
           <p className="research-status">{schedulerText}</p>
           {schedulerStateError ? <p className="research-status error">{schedulerStateError}</p> : null}
+        </div>
+
+        <div className="panel-column">
+          <h2>시스템 제어</h2>
+          <button
+            type="button"
+            onClick={() => void shutdownLocalProgram()}
+            disabled={systemShuttingDown || systemShutdownComplete}
+          >
+            종료
+          </button>
+          {systemShutdownMessage ? (
+            <p className={`research-status ${systemShutdownComplete ? "success" : systemShuttingDown ? "" : "error"}`}>
+              {systemShutdownMessage}
+            </p>
+          ) : null}
         </div>
       </section>
 

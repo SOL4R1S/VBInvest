@@ -20,8 +20,17 @@ chmod +x VBinvest.command
 ```
 
 `VBinvest.command` starts both the backend and the web UI, then opens the browser.
+`VBinvest.command` calls the shared launcher `python -m scripts.launcher`.
 
 ### Windows Users
+
+```powershell
+git clone https://github.com/SOL4R1S/VBInvest.git
+cd VBInvest
+VBinvest.ps1
+```
+
+`VBinvest.bat` starts both the backend and the web UI, then opens the browser.
 
 ```powershell
 git clone https://github.com/SOL4R1S/VBInvest.git
@@ -29,7 +38,15 @@ cd VBInvest
 VBinvest.bat
 ```
 
-`VBinvest.bat` starts both the backend and the web UI, then opens the browser.
+Or run the PowerShell wrapper with clearer diagnostics.
+
+```powershell
+git clone https://github.com/SOL4R1S/VBInvest.git
+cd VBInvest
+./VBinvest.ps1
+```
+
+Both `VBinvest.bat` and `VBinvest.ps1` call the shared launcher `python -m scripts.launcher`.
 
 The launcher starts the local backend on `127.0.0.1`, chooses free ports, opens the web UI, and shows the first-run setup wizard.
 

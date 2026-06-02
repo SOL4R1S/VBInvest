@@ -10,10 +10,13 @@ services:
       # Do not expose this directly to the public Internet.
       - "127.0.0.1:5432:5432"
     volumes:
-      - /Volumes/nv6000t/.hermes/postgres/VBinvest:/var/lib/postgresql/data
+      - vbinvest-postgres-data:/var/lib/postgresql/data
       - ./init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 10s
       timeout: 5s
       retries: 5
+
+volumes:
+  vbinvest-postgres-data:

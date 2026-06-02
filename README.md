@@ -20,6 +20,7 @@ chmod +x VBinvest.command
 ```
 
 `VBinvest.command`가 백엔드와 웹 UI를 함께 실행하고 브라우저를 엽니다.
+`VBinvest.command`는 공통 런처인 `python -m scripts.launcher`를 호출합니다.
 
 ### Windows 사용자
 
@@ -30,6 +31,22 @@ VBinvest.bat
 ```
 
 `VBinvest.bat`가 백엔드와 웹 UI를 함께 실행하고 브라우저를 엽니다.
+
+```powershell
+git clone https://github.com/SOL4R1S/VBInvest.git
+cd VBInvest
+./VBinvest.ps1
+```
+
+또는 PowerShell에서 다음을 실행합니다.
+
+```powershell
+./VBinvest.ps1
+```
+
+`VBinvest.ps1`는 실행 환경 진단 메시지를 상세히 출력합니다.
+
+`VBinvest.bat`와 `VBinvest.ps1` 모두 공통 런처인 `python -m scripts.launcher`를 호출합니다.
 
 런처는 `127.0.0.1`에서 로컬 백엔드와 웹 UI를 띄우고, 빈 포트를 자동으로 선택한 뒤 브라우저를 열어 초기 설정 화면으로 이동합니다.
 

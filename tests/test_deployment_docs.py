@@ -48,6 +48,7 @@ def test_readme_documents_cross_platform_launch_paths():
         "./VBinvest.command",
         "chmod +x VBinvest.command",
         "Windows",
+        "VBinvest.ps1",
         "VBinvest.bat",
         "빈 포트를 자동으로 선택",
     ]:
@@ -58,6 +59,7 @@ def test_readme_documents_cross_platform_launch_paths():
         "./VBinvest.command",
         "chmod +x VBinvest.command",
         "Windows",
+        "VBinvest.ps1",
         "VBinvest.bat",
         "chooses free ports",
     ]:
@@ -72,12 +74,14 @@ def test_readme_separates_launch_instructions_by_operating_system():
     korean_windows = korean.index("### Windows 사용자")
     assert korean_macos < korean_windows
     assert "./VBinvest.command" in korean[korean_macos:korean_windows]
+    assert "VBinvest.ps1" in korean[korean_windows:]
     assert "VBinvest.bat" in korean[korean_windows:]
 
     english_macos = english.index("### macOS Users")
     english_windows = english.index("### Windows Users")
     assert english_macos < english_windows
     assert "./VBinvest.command" in english[english_macos:english_windows]
+    assert "VBinvest.ps1" in english[english_windows:]
     assert "VBinvest.bat" in english[english_windows:]
 
 
@@ -215,20 +219,20 @@ def test_readme_documents_secure_storage_and_ai_modes():
 def test_cross_platform_local_launchers_are_tracked():
     mac_launcher = ROOT / "VBinvest.command"
     windows_launcher = ROOT / "VBinvest.bat"
+    windows_ps1_launcher = ROOT / "VBinvest.ps1"
 
     assert mac_launcher.is_file()
     assert windows_launcher.is_file()
+    assert windows_ps1_launcher.is_file()
     assert mac_launcher.stat().st_mode & stat.S_IXUSR
 
     mac_text = mac_launcher.read_text(encoding="utf-8")
     windows_text = windows_launcher.read_text(encoding="utf-8")
+    windows_ps1_text = windows_ps1_launcher.read_text(encoding="utf-8")
 
-    assert "uvicorn scripts.api:app" in mac_text
-    assert 'open "http://127.0.0.1:${API_PORT}"' in mac_text
-    assert "uvicorn scripts.api:app" in windows_text
-    assert 'start "" "http://127.0.0.1:%API_PORT%"' in windows_text
-    assert "VBINVEST_API_BASE_URL" in mac_text
-    assert "VBINVEST_API_BASE_URL" in windows_text
+    assert "-m scripts.launcher" in mac_text
+    assert "-m scripts.launcher" in windows_text
+    assert "-m scripts.launcher" in windows_ps1_text
 
     for forbidden in [
         "npm was not found",
@@ -236,15 +240,20 @@ def test_cross_platform_local_launchers_are_tracked():
         "where npm",
         "npx next dev",
         "next start",
+        "uvicorn scripts.api:app",
+        "uvicorn ",
     ]:
         assert forbidden not in mac_text
         assert forbidden not in windows_text
+        assert forbidden not in windows_ps1_text
 
     assert 'save_secret "AI_API_KEY"' in mac_text
     assert 'save_secret "OPENDART_API_KEY"' in mac_text
     assert '-m scripts.save_secret "$account"' in mac_text
     assert "-m scripts.save_secret AI_API_KEY" in windows_text
     assert "-m scripts.save_secret OPENDART_API_KEY" in windows_text
+    assert "-m scripts.save_secret AI_API_KEY" in windows_ps1_text
+    assert "-m scripts.save_secret OPENDART_API_KEY" in windows_ps1_text
 
 
 def test_hosted_platform_artifacts_are_absent_from_local_first_repository():

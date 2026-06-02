@@ -99,6 +99,10 @@ function watchlistsResponse(): Response {
   });
 }
 
+function shutdownResponse(): Response {
+  return jsonResponse({ status: "shutting_down" }, 200);
+}
+
 function watchlistsResponseWithBody(body: unknown): Response {
   return jsonResponse(body);
 }
@@ -264,6 +268,87 @@ describe("WatchlistDashboard", () => {
     fireEvent.click(screen.getByTestId("symbol-005930.KS"));
 
     expect(screen.getByRole("heading", { name: "005930.KS" })).toBeInTheDocument();
+  });
+
+  it("calls /api/system/shutdown after confirmation and shows shutdown state", async () => {
+    const confirmMock = vi.spyOn(window, "confirm").mockReturnValue(true);
+    window.__VBINVEST_LOCAL_SESSION_TOKEN__ = "qa-task15-token";
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      const url = String(input);
+      if (url === "/api/system/shutdown" && init?.method === "POST") {
+        return shutdownResponse();
+      }
+      if (url.includes("/api/watchlists/semiconductor-core/dashboard")) {
+        return dashboardResponse();
+      }
+      if (url.includes("/api/watchlists/semiconductor-core/collection-status")) {
+        return collectionStatusResponse();
+      }
+      if (url.includes("/api/scheduler/settings")) {
+        return schedulerSettingsResponse();
+      }
+      if (url.includes("/api/watchlists")) {
+        return watchlistsResponse();
+      }
+      return jsonResponse({ status: "ok", price_rows: 1, indicator_rows: 1, news_items: 0, disclosures: 0 });
+    });
+    vi.stubGlobal("fetch", withSchedulerFallback(fetchMock));
+
+    render(<WatchlistDashboard />);
+
+    await waitForWatchlistControls();
+    fireEvent.click(screen.getByRole("button", { name: "종료" }));
+    expect(confirmMock).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(screen.getByText("종료 요청이 접수되었습니다.")).toBeInTheDocument();
+    });
+    expect(
+      hasFetchCallWithHeaders(fetchMock, "/api/system/shutdown", "POST", { Authorization: "Bearer qa-task15-token" }),
+    ).toBe(true);
+
+    const shutdownButton = screen.getByRole("button", { name: "종료" });
+    expect(shutdownButton).toBeDisabled();
+    fireEvent.click(shutdownButton);
+    expect(
+      fetchMock.mock.calls.filter(([input, requestInit]) => String(input) === "/api/system/shutdown" && requestInit?.method === "POST")
+        .length,
+    ).toBe(1);
+    confirmMock.mockRestore();
+  });
+
+  it("shows a safe shutdown error message when shutdown is not available", async () => {
+    const confirmMock = vi.spyOn(window, "confirm").mockReturnValue(true);
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      const url = String(input);
+      if (url === "/api/system/shutdown" && init?.method === "POST") {
+        return jsonResponse({ detail: "shutdown unavailable" }, 503);
+      }
+      if (url.includes("/api/watchlists/semiconductor-core/dashboard")) {
+        return dashboardResponse();
+      }
+      if (url.includes("/api/watchlists/semiconductor-core/collection-status")) {
+        return collectionStatusResponse();
+      }
+      if (url.includes("/api/scheduler/settings")) {
+        return schedulerSettingsResponse();
+      }
+      if (url.includes("/api/watchlists")) {
+        return watchlistsResponse();
+      }
+      return jsonResponse({ status: "ok", price_rows: 1, indicator_rows: 1, news_items: 0, disclosures: 0 });
+    });
+    vi.stubGlobal("fetch", withSchedulerFallback(fetchMock));
+
+    render(<WatchlistDashboard />);
+
+    await waitForWatchlistControls();
+    fireEvent.click(screen.getByRole("button", { name: "종료" }));
+    expect(confirmMock).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(screen.getByText("종료 요청이 현재 비활성화되어 있습니다.")).toBeInTheDocument();
+    });
+    expect(screen.getByRole("button", { name: "종료" })).not.toBeDisabled();
+    confirmMock.mockRestore();
   });
 
   it("does not render demo symbols before persisted watchlists resolve", async () => {
