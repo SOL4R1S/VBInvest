@@ -38,6 +38,7 @@ class FakeAuthDB:
             }
         }
         self.generated = []
+        self.report_runs = []
 
     def fetch_profile_by_auth_user(self, auth_user_id: str):
         return {"profile_id": 1, "auth_user_id": auth_user_id, "slug": auth_user_id, "email": f"{auth_user_id}@example.com"}
@@ -116,7 +117,7 @@ class FakeAuthDB:
     def fetch_latest_research_for_asset(self, symbol: str):
         return self.research.get(symbol)
 
-    def generate_research_for_asset(self, auth_user_id: str, symbol: str):
+    def generate_research_for_asset(self, auth_user_id: str, symbol: str, *, obsidian_vault_path=None):
         row = {
             "target_slug": symbol,
             "opinion": "중립",
@@ -129,6 +130,13 @@ class FakeAuthDB:
         self.research[symbol] = row
         self.generated.append({"auth_user_id": auth_user_id, "symbol": symbol})
         return row
+
+    def cancel_report_run(self, run_id: str):
+        return {"run_id": run_id, "status": "canceled", "error_message": "canceled by user"}
+
+    def record_report_run(self, **kwargs):
+        self.report_runs.append(kwargs)
+        return f"run-{len(self.report_runs)}"
 
     def user_has_research_entitlement(self, auth_user_id: str, symbol: str):
         raise AssertionError("local research access must not call entitlement gate")
@@ -319,6 +327,31 @@ def test_generate_research_runs_only_for_authenticated_user_request(monkeypatch)
     assert generated.json()["locked"] is False
     assert generated.json()["thesis"] == "Generated on-demand thesis for NVDA"
     assert fake_db.generated == [{"auth_user_id": "user-a", "symbol": "NVDA"}]
+
+
+def test_cancel_research_job_requires_auth_and_returns_status(monkeypatch):
+    client = client_with_db(monkeypatch, FakeAuthDB())
+    token = create_test_token("user-a")
+
+    unauthenticated = client.delete("/api/research-jobs/run-1")
+    canceled = client.delete("/api/research-jobs/run-1", headers={"Authorization": f"Bearer {token}"})
+
+    assert unauthenticated.status_code == 401
+    assert canceled.status_code == 200
+    assert canceled.json() == {"run_id": "run-1", "status": "canceled", "error_message": "canceled by user"}
+
+
+def test_cancel_current_symbol_generation_records_canceled_run(monkeypatch):
+    fake_db = FakeAuthDB()
+    client = client_with_db(monkeypatch, fake_db)
+    token = create_test_token("user-a")
+
+    response = client.delete("/api/research/NVDA/generate", headers={"Authorization": f"Bearer {token}"})
+
+    assert response.status_code == 200
+    assert response.json() == {"run_id": "run-1", "status": "canceled", "error_message": "canceled by user"}
+    assert fake_db.report_runs[0]["status"] == "canceled"
+    assert fake_db.report_runs[0]["scope_slug"] == "NVDA"
 
 
 def test_ad_unlock_endpoint_is_disabled_in_local_mode(monkeypatch):

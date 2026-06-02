@@ -73,3 +73,15 @@ class DBRepository(Protocol):
 
     def fetch_latest_research_for_asset(self, symbol: str) -> dict[str, Any] | None:
         ...
+
+    def generate_research_for_asset(
+        self,
+        auth_user_id: str,
+        symbol: str,
+        *,
+        obsidian_vault_path: str | None = None,
+    ) -> dict[str, Any]:
+        ...
+
+    def cancel_report_run(self, run_id: str) -> dict[str, Any] | None:
+        ...

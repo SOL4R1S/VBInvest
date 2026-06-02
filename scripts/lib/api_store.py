@@ -203,11 +203,14 @@ class ApiStore:
             "access_tier": row[10],
         }
 
-    def generate_research_for_asset(self, auth_user_id: str, symbol: str) -> dict[str, Any]:
-        return self.db.generate_research_for_asset(auth_user_id, symbol)
+    def generate_research_for_asset(self, auth_user_id: str, symbol: str, *, obsidian_vault_path=None) -> dict[str, Any]:
+        return self.db.generate_research_for_asset(auth_user_id, symbol, obsidian_vault_path=obsidian_vault_path)
 
     def fetch_latest_report_run(self, run_type: str, scope_slug: str | None) -> dict[str, Any] | None:
         return self.db.fetch_latest_report_run(run_type, scope_slug)
+
+    def cancel_report_run(self, run_id: str) -> dict[str, Any] | None:
+        return self.db.cancel_report_run(run_id)
 
     def user_has_research_entitlement(self, auth_user_id: str, symbol: str) -> bool:
         query = """

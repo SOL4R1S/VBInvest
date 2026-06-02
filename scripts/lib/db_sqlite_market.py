@@ -340,3 +340,88 @@ class SQLiteMarketMixin:
                 item.update(views.get(asset["symbol"], {}))
                 items.append(item)
         return items
+
+    def fetch_asset_dashboard_item(self, symbol: str, *, days: int = 260) -> dict[str, Any] | None:
+        with self.connect() as conn:
+            asset = conn.execute(
+                """
+                SELECT asset_id, symbol, display_name_ko, exchange, currency
+                FROM assets
+                WHERE symbol = ? AND active = 1
+                LIMIT 1
+                """,
+                (symbol,),
+            ).fetchone()
+            if asset is None:
+                return None
+            rows = conn.execute(
+                """
+                SELECT p.date, p.open, p.high, p.low, p.close, p.volume, p.source,
+                       i.return_1d, i.return_1w, i.return_1m, i.return_3m, i.return_6m, i.return_ytd,
+                       i.ma5, i.ma20, i.ma50, i.ma120, i.rsi14, i.vol20, i.drawdown_52w, i.high_52w
+                FROM daily_prices p
+                LEFT JOIN daily_indicators i ON i.asset_id = p.asset_id AND i.date = p.date
+                WHERE p.asset_id = ?
+                ORDER BY p.date DESC
+                LIMIT ?
+                """,
+                (asset["asset_id"], days),
+            ).fetchall()
+            news = conn.execute(
+                """
+                SELECT ni.provider, ni.source, COALESCE(ni.canonical_url, ni.url) AS url, ni.title, ni.published_at
+                FROM asset_news_map anm
+                JOIN news_items ni ON ni.news_id = anm.news_id
+                WHERE anm.asset_id = ?
+                ORDER BY ni.published_at DESC, ni.news_id DESC
+                LIMIT 10
+                """,
+                (asset["asset_id"],),
+            ).fetchall()
+            disclosures = conn.execute(
+                """
+                SELECT provider, title, url, published_at, provider_disclosure_id
+                FROM disclosures
+                WHERE asset_id = ?
+                ORDER BY published_at DESC, disclosure_id DESC
+                LIMIT 10
+                """,
+                (asset["asset_id"],),
+            ).fetchall()
+        if not rows:
+            return None
+        frame = pd.DataFrame([dict(row) for row in rows]).sort_values("date").reset_index(drop=True)
+        for column in [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume",
+            "return_1d",
+            "return_1w",
+            "return_1m",
+            "return_3m",
+            "return_6m",
+            "return_ytd",
+            "ma5",
+            "ma20",
+            "ma50",
+            "ma120",
+            "rsi14",
+            "vol20",
+            "drawdown_52w",
+            "high_52w",
+        ]:
+            frame[column] = pd.to_numeric(frame[column], errors="coerce")
+        return {
+            "asset": {
+                "asset_id": asset["asset_id"],
+                "symbol": asset["symbol"],
+                "display_name_ko": asset["display_name_ko"],
+                "exchange": asset["exchange"],
+                "currency": asset["currency"],
+            },
+            "history": frame,
+            "news": [dict(row) for row in news],
+            "disclosures": [dict(row) for row in disclosures],
+        }

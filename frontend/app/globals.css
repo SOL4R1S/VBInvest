@@ -569,6 +569,30 @@ h3 {
   color: var(--negative);
 }
 
+.report-generation-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  background: rgb(19 30 22 / 22%);
+}
+
+.report-generation-modal {
+  display: grid;
+  gap: 12px;
+  width: min(360px, calc(100vw - 36px));
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper-strong);
+  box-shadow: 0 16px 34px rgb(36 32 20 / 14%);
+}
+
+.report-generation-modal .research-status {
+  margin-bottom: 0;
+}
+
 @media (max-width: 900px) {
   .page {
     width: min(100vw - 20px, 1680px);

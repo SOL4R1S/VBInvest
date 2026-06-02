@@ -13,9 +13,8 @@ from urllib.parse import quote_plus
 
 import pandas as pd
 
-from scripts.lib.ai_provider import build_research_ai_client_from_env
 from scripts.lib.keychain import SecretStore, resolve_secret
-from scripts.lib.research import build_on_demand_research_view, build_source_packet
+from scripts.lib.on_demand_report import generate_on_demand_research_for_asset
 
 
 @dataclass(frozen=True)
@@ -549,6 +548,41 @@ class VBinvestDB:
             "error_message": row[9],
         }
 
+    def cancel_report_run(self, run_id: str) -> dict[str, Any] | None:
+        with self.connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE report_runs
+                SET status = 'canceled', error_message = 'canceled by user'
+                WHERE run_id = %s AND status IN ('queued', 'running')
+                """,
+                (run_id,),
+            )
+            cur.execute(
+                """
+                SELECT run_id, run_type, scope_type, scope_slug, completed_at, status, failed_assets, output_summary, output_path, error_message
+                FROM report_runs
+                WHERE run_id = %s
+                LIMIT 1
+                """,
+                (run_id,),
+            )
+            row = cur.fetchone()
+        if row is None:
+            return None
+        return {
+            "run_id": row[0],
+            "run_type": row[1],
+            "scope_type": row[2],
+            "scope_slug": row[3],
+            "completed_at": row[4],
+            "status": row[5],
+            "failed_assets": row[6] or [],
+            "output_summary": row[7],
+            "output_path": row[8],
+            "error_message": row[9],
+        }
+
     def fetch_latest_price_dates(self, asset_ids: list[int]) -> dict[int, datetime.date]:
         if not asset_ids:
             return {}
@@ -848,35 +882,19 @@ class VBinvestDB:
                 "report_date": row[9],
             }
 
-    def generate_research_for_asset(self, auth_user_id: str, symbol: str) -> dict[str, Any]:
-        profile = self.fetch_profile_by_auth_user(auth_user_id)
-        if profile is None:
-            raise LookupError("authenticated profile not found")
-        item = self.fetch_asset_dashboard_item(symbol)
-        if item is None:
-            raise LookupError("asset data not found")
-        history = item["history"]
-        latest = history.iloc[-1].to_dict()
-        packet = build_source_packet(item["asset"], latest, news=item.get("news", []), disclosures=item.get("disclosures", []))
-        ai_client = build_research_ai_client_from_env(os.environ)
-        row = build_on_demand_research_view(
-            item["asset"],
-            latest,
-            packet,
-            ai_credentials_present=ai_client is not None,
-            model_provider=ai_client.provider_name if ai_client is not None else None,
-            ai_client=ai_client,
+    def generate_research_for_asset(
+        self,
+        auth_user_id: str,
+        symbol: str,
+        *,
+        obsidian_vault_path: str | Path | None = None,
+    ) -> dict[str, Any]:
+        return generate_on_demand_research_for_asset(
+            self,
+            auth_user_id,
+            symbol,
+            obsidian_vault_path=obsidian_vault_path,
         )
-        self.upsert_research_views([row])
-        self.record_report_run(
-            run_type="on-demand-research",
-            scope_type="asset",
-            scope_slug=symbol,
-            failed_assets=[],
-            output_summary=f"research=1 opinion={row['opinion']}",
-            output_path=None,
-        )
-        return row
 
     def fetch_asset_dashboard_item(self, symbol: str, *, days: int = 260) -> dict[str, Any] | None:
         query = """

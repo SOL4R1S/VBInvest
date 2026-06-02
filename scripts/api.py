@@ -40,6 +40,7 @@ from scripts.lib.config import (
 from scripts.lib.db_factory import build_database_from_local_config
 from scripts.lib.db_repository import DBRepository
 from scripts.lib.disclosures import check_opendart_api_key
+from scripts.lib.on_demand_report import OnDemandReportError
 from scripts.lib.prices import validate_ticker_symbol
 from scripts.lib.startup_market_refresh import run_startup_market_refresh
 from scripts.lib.version import load_version_metadata
@@ -564,12 +565,45 @@ def generate_research(symbol: str, user: AuthUser = Depends(current_user)):
     if not hasattr(store, "generate_research_for_asset"):
         raise HTTPException(status_code=501, detail="on-demand research is not available")
     try:
-        row = store.generate_research_for_asset(user.auth_user_id, symbol)
+        row = store.generate_research_for_asset(user.auth_user_id, symbol, obsidian_vault_path=_obsidian_vault_path())
+    except OnDemandReportError as exc:
+        raise HTTPException(status_code=503, detail=exc.user_message) from exc
     except AIProviderConfigError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return _jsonable_research(row, locked=False)
+
+
+@app.delete("/api/research-jobs/{run_id}")
+def cancel_research_job(run_id: str, user: AuthUser = Depends(current_user)):
+    store = auth_db()
+    if not hasattr(store, "cancel_report_run"):
+        raise HTTPException(status_code=501, detail="research job cancellation is not available")
+    row = store.cancel_report_run(run_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="research job not found")
+    return {
+        "run_id": row.get("run_id"),
+        "status": row.get("status"),
+        "error_message": row.get("error_message"),
+    }
+
+
+@app.delete("/api/research/{symbol}/generate")
+def cancel_research_generation(symbol: str, user: AuthUser = Depends(current_user)):
+    store = auth_db()
+    run_id = store.record_report_run(
+        run_type="on-demand-research",
+        status="canceled",
+        scope_type="asset",
+        scope_slug=symbol,
+        failed_assets=[],
+        output_summary="user-canceled",
+        output_path=None,
+        error_message="canceled by user",
+    )
+    return {"run_id": run_id, "status": "canceled", "error_message": "canceled by user"}
 
 
 @app.post("/api/research/{symbol}/ad-unlock")
@@ -609,5 +643,29 @@ def _jsonable_research(row: dict[str, Any], *, locked: bool) -> dict[str, Any]:
         "bull": row.get("bull"),
         "base": row.get("base"),
         "bear": row.get("bear"),
-        "sources": row.get("sources") or [],
+        "sources": _jsonable_list(row.get("sources")),
+        "run_id": row.get("run_id"),
+        "report_date": row.get("report_date"),
+        "report_path": row.get("report_path"),
+        "obsidian_path": row.get("obsidian_path"),
+        "report_url": row.get("report_url"),
     }
+
+
+def _obsidian_vault_path() -> Path | None:
+    try:
+        return load_local_config(environ=os.environ).obsidian.vault_path
+    except ConfigError:
+        return None
+
+
+def _jsonable_list(value: Any) -> list[Any]:
+    if isinstance(value, list):
+        return value
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+        except json.JSONDecodeError:
+            return []
+        return parsed if isinstance(parsed, list) else []
+    return []

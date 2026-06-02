@@ -168,6 +168,20 @@ CREATE TABLE IF NOT EXISTS report_runs (
 CREATE INDEX IF NOT EXISTS idx_report_runs_scope_completed
   ON report_runs(run_type, scope_slug, completed_at DESC);
 
+CREATE TABLE IF NOT EXISTS obsidian_exports (
+  export_id TEXT PRIMARY KEY,
+  view_id INTEGER,
+  target_slug TEXT NOT NULL,
+  report_date DATE NOT NULL,
+  vault_path TEXT NOT NULL,
+  relative_path TEXT NOT NULL,
+  file_hash TEXT NOT NULL,
+  status TEXT NOT NULL,
+  error_message TEXT,
+  exported_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (target_slug, report_date, relative_path)
+);
+
 CREATE TABLE IF NOT EXISTS job_locks (
   lock_name TEXT PRIMARY KEY,
   holder TEXT NOT NULL,

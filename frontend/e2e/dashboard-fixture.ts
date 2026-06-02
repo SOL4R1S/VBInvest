@@ -16,6 +16,23 @@ export async function routeDashboardData(page: Page): Promise<void> {
   const latestNvda = lastPoint(nvdaHistory);
   const latestSamsung = lastPoint(samsungHistory);
 
+  await page.route("**/api/watchlists", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        watchlists: [
+          {
+            watchlist_id: "semiconductor-core",
+            slug: "semiconductor-core",
+            name: "Semiconductor Core",
+            symbols: ["NVDA", "005930.KS"],
+          },
+        ],
+      }),
+    });
+  });
+
   await page.route("**/api/watchlists/semiconductor-core/dashboard?**", async (route) => {
     await route.fulfill({
       status: 200,

@@ -39,8 +39,30 @@ class FakeResearchDB:
     def user_has_research_entitlement(self, auth_user_id: str, symbol: str):
         return True
 
-    def generate_research_for_asset(self, auth_user_id: str, symbol: str):
+    def generate_research_for_asset(self, auth_user_id: str, symbol: str, *, obsidian_vault_path=None):
         raise AIProviderConfigError("AI provider API key is required for non-local providers")
+
+
+class FakeGeneratedResearchDB:
+    def fetch_profile_by_auth_user(self, auth_user_id: str):
+        return {"profile_id": 1, "auth_user_id": auth_user_id, "slug": auth_user_id, "email": f"{auth_user_id}@example.com"}
+
+    def generate_research_for_asset(self, auth_user_id: str, symbol: str, *, obsidian_vault_path=None):
+        return {
+            "target_slug": symbol,
+            "opinion": "아웃퍼폼",
+            "thesis": "DB 가격 지표와 공개 소스를 바탕으로 모멘텀을 점검했습니다.",
+            "bull": "bull",
+            "base": "base",
+            "bear": "bear",
+            "risks": [],
+            "triggers": [],
+            "sources": [{"kind": "db_price_indicator"}],
+            "run_id": "run-on-demand",
+            "report_date": "2026-06-02",
+            "report_path": "/vault/30 Projects/VBinvest/NVDA/2026-06-02.md",
+            "obsidian_path": "/vault/30 Projects/VBinvest/NVDA/2026-06-02.md",
+        }
 
 
 class FakeDashboardDB:
@@ -223,6 +245,24 @@ def test_generate_research_returns_503_for_cloud_ai_missing_key(monkeypatch):
 
     assert response.status_code == 503
     assert response.json()["detail"] == "AI provider API key is required for non-local providers"
+
+
+def test_generate_research_response_includes_report_job_metadata(monkeypatch):
+    token = create_test_token("user-a", email="user-a@example.com")
+    client = client_with_db(monkeypatch, FakeGeneratedResearchDB())
+
+    response = client.post(
+        "/api/research/NVDA/generate",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["target_slug"] == "NVDA"
+    assert payload["opinion"] == "아웃퍼폼"
+    assert payload["run_id"] == "run-on-demand"
+    assert payload["obsidian_path"].endswith("NVDA/2026-06-02.md")
+    assert payload["report_path"].endswith("NVDA/2026-06-02.md")
 
 
 def test_watchlist_dashboard_api_includes_serialized_history(monkeypatch):

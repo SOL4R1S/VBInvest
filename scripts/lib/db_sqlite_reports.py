@@ -3,10 +3,12 @@ from __future__ import annotations
 import json
 import uuid
 from datetime import date, datetime, timezone
+from pathlib import Path
 from typing import Any
 
 from scripts.lib.db import json_dumps
 from scripts.lib.db_sqlite_values import json_loads_list
+from scripts.lib.on_demand_report import generate_on_demand_research_for_asset
 
 
 class SQLiteReportsMixin:
@@ -46,6 +48,20 @@ class SQLiteReportsMixin:
                 ),
             )
         return run_id
+
+    def cancel_report_run(self, run_id: str) -> dict[str, Any] | None:
+        with self.connect() as conn:
+            conn.execute(
+                """
+                UPDATE report_runs
+                SET status = 'canceled',
+                    completed_at = ?,
+                    error_message = 'canceled by user'
+                WHERE run_id = ? AND status = 'running'
+                """,
+                (self._to_db_timestamp(datetime.now(timezone.utc)), run_id),
+            )
+        return self._fetch_report_run(run_id)
 
     def fetch_latest_report_run(self, run_type: str, scope_slug: str | None) -> dict[str, Any] | None:
         return self._fetch_latest_report_run(run_type, scope_slug, successful_only=False)
@@ -110,6 +126,62 @@ class SQLiteReportsMixin:
             "report_date": row["report_date"],
         }
 
+    def record_obsidian_export(
+        self,
+        *,
+        export_id: str,
+        view_id: int | None,
+        target_slug: str,
+        report_date: str,
+        vault_path: str,
+        relative_path: str,
+        file_path: str,
+        file_hash: str,
+        status: str,
+        error_message: str | None,
+    ) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO obsidian_exports (
+                  export_id, view_id, target_slug, report_date, vault_path,
+                  relative_path, file_hash, status, error_message
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (target_slug, report_date, relative_path) DO UPDATE SET
+                  view_id = excluded.view_id,
+                  vault_path = excluded.vault_path,
+                  file_hash = excluded.file_hash,
+                  status = excluded.status,
+                  error_message = excluded.error_message,
+                  exported_at = CURRENT_TIMESTAMP
+                """,
+                (
+                    export_id,
+                    view_id,
+                    target_slug,
+                    self._to_db_date(report_date),
+                    vault_path,
+                    relative_path,
+                    file_hash,
+                    status,
+                    error_message,
+                ),
+            )
+
+    def generate_research_for_asset(
+        self,
+        auth_user_id: str,
+        symbol: str,
+        *,
+        obsidian_vault_path: str | Path | None = None,
+    ) -> dict[str, Any]:
+        return generate_on_demand_research_for_asset(
+            self,
+            auth_user_id,
+            symbol,
+            obsidian_vault_path=obsidian_vault_path,
+        )
+
     def _fetch_latest_report_run(self, run_type: str, scope_slug: str | None, *, successful_only: bool) -> dict[str, Any] | None:
         status_clause = "AND status = 'ok'" if successful_only else ""
         with self.connect() as conn:
@@ -138,6 +210,32 @@ class SQLiteReportsMixin:
             "error_message": row["error_message"],
         }
 
+    def _fetch_report_run(self, run_id: str) -> dict[str, Any] | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                """
+                SELECT run_id, run_type, scope_type, scope_slug, completed_at, status, failed_assets, output_summary, output_path, error_message
+                FROM report_runs
+                WHERE run_id = ?
+                LIMIT 1
+                """,
+                (run_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return {
+            "run_id": row["run_id"],
+            "run_type": row["run_type"],
+            "scope_type": row["scope_type"],
+            "scope_slug": row["scope_slug"],
+            "completed_at": self._coerce_datetime(row["completed_at"]),
+            "status": row["status"],
+            "failed_assets": json_loads_list(row["failed_assets"]),
+            "output_summary": row["output_summary"],
+            "output_path": row["output_path"],
+            "error_message": row["error_message"],
+        }
+
     def _research_view_params(self, row: dict[str, Any]) -> tuple[Any, ...]:
         return (
             row["target_type"],
@@ -146,14 +244,18 @@ class SQLiteReportsMixin:
             row.get("horizon") or "on_demand",
             row.get("opinion"),
             row.get("thesis"),
-            json_dumps(row.get("rationale")),
+            _json_text(row.get("rationale")),
             row.get("bull"),
             row.get("base"),
             row.get("bear"),
-            json_dumps(row.get("risks")),
-            json_dumps(row.get("triggers")),
-            json_dumps(row.get("sources")),
+            _json_text(row.get("risks")),
+            _json_text(row.get("triggers")),
+            _json_text(row.get("sources")),
             row.get("confidence"),
             row.get("source_freshness_status") or "unknown",
             row.get("access_tier") or "free",
         )
+
+
+def _json_text(value: Any) -> str:
+    return value if isinstance(value, str) else json_dumps(value)

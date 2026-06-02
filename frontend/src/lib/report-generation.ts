@@ -5,6 +5,10 @@ export type GeneratedResearch = {
   readonly opinion: Opinion;
   readonly thesis: string;
   readonly sourcesCount: number;
+  readonly runId: string | null;
+  readonly reportPath: string | null;
+  readonly obsidianPath: string | null;
+  readonly reportUrl: string | null;
 };
 
 export class ReportGenerationError extends Error {
@@ -17,11 +21,22 @@ export class ReportGenerationError extends Error {
   }
 }
 
-export async function generateResearchReport(symbol: string): Promise<GeneratedResearch> {
+export async function generateResearchReport(
+  symbol: string,
+  options: { readonly signal?: AbortSignal } = {},
+): Promise<GeneratedResearch> {
   let response: Response;
+  const headers = authHeaders();
   try {
-    response = await fetch(`/api/research/${encodeURIComponent(symbol)}/generate`, { method: "POST" });
+    response = await fetch(`/api/research/${encodeURIComponent(symbol)}/generate`, {
+      method: "POST",
+      headers,
+      signal: options.signal,
+    });
   } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw error;
+    }
     if (error instanceof Error) {
       throw new ReportGenerationError("백엔드 연결을 확인해주세요. 프로그램이 실행 중인지 점검한 뒤 다시 시도해주세요.");
     }
@@ -65,6 +80,10 @@ function parseGeneratedResearch(payload: unknown): GeneratedResearch | null {
     opinion: normalizeOpinion(typeof payload.opinion === "string" ? payload.opinion : null),
     thesis: payload.thesis,
     sourcesCount: Array.isArray(payload.sources) ? payload.sources.length : 0,
+    runId: typeof payload.run_id === "string" ? payload.run_id : null,
+    reportPath: stringField(payload, "report_path"),
+    obsidianPath: stringField(payload, "obsidian_path"),
+    reportUrl: stringField(payload, "report_url"),
   };
 }
 
@@ -86,6 +105,32 @@ function readDetail(payload: unknown): string {
   return payload.detail;
 }
 
+function stringField(record: Record<string, unknown>, key: string): string | null {
+  const value = record[key];
+  return typeof value === "string" && value.trim() !== "" ? value : null;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function authHeaders(): Record<string, string> {
+  const token = localSessionToken();
+  if (!token) {
+    return {};
+  }
+  return { Authorization: `Bearer ${token}` };
+}
+
+function localSessionToken(): string {
+  if (typeof window === "undefined") {
+    return "";
+  }
+  return window.__VBINVEST_LOCAL_SESSION_TOKEN__ ?? "";
+}
+
+declare global {
+  interface Window {
+    __VBINVEST_LOCAL_SESSION_TOKEN__?: string;
+  }
 }
