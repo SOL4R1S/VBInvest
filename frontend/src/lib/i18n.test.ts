@@ -30,6 +30,8 @@ describe("i18n resources", () => {
     expect(en.app.dashboardHeading).toBe("Investment Dashboard");
     expect(ko.setup.title).toBe("초기 설정");
     expect(en.setup.title).toBe("First Run Setup");
+    expect(ko.setup.databaseModeDockerHint).not.toContain("설치 후 다시 시도");
+    expect(en.setup.databaseModeDockerHint).not.toContain("Install it and try again");
     expect(ko.report.generateAction).toBe("리포트 발행");
     expect(en.report.generateAction).toBe("Generate report");
     expect(ko.controls.shutdownAction).toBe("종료");
