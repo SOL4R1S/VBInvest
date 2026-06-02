@@ -75,9 +75,29 @@ def test_origin_validation_rejects_other_remote() -> None:
 
 
 def test_branch_validation_accepts_git_flow_branches() -> None:
-    accepted = ["main", "develop", "feature/local-launcher", "release/v0.1.0", "hotfix/auth-fix"]
+    accepted = [
+        "main",
+        "develop",
+        "feature/local-launcher",
+        "release/v0.1.0",
+        "hotfix/auth-fix",
+        "fix/1-ci-quality-readiness",
+        "feat/12-local-qa",
+        "docs/2-readme",
+        "ci/3-actions",
+    ]
 
-    assert [validate_branch_name(branch).ok for branch in accepted] == [True, True, True, True, True]
+    assert [validate_branch_name(branch).ok for branch in accepted] == [
+        True,
+        True,
+        True,
+        True,
+        True,
+        True,
+        True,
+        True,
+        True,
+    ]
 
 
 def test_branch_validation_rejects_unplanned_branch() -> None:

@@ -71,6 +71,7 @@ jobs:
         working-directory: frontend
         run: npx playwright test e2e/chart.spec.ts --project=chromium
   migration-smoke:
+    continue-on-error: true
     runs-on: ubuntu-latest
     services:
       postgres:

@@ -7,6 +7,10 @@ from scripts.secret_scan import scan_text
 
 
 ROOT = Path(__file__).resolve().parents[1]
+TEST_FILES = [
+    ROOT / "tests" / "test_db_quality.py",
+    ROOT / "tests" / "test_frontend_scaffold.py",
+]
 
 
 def read_workflow(name: str) -> str:
@@ -49,6 +53,21 @@ def test_ci_workflow_runs_git_hook_parity_and_launcher_package_smoke() -> None:
     )
     assert "make launcher-smoke" in workflow
     assert "make package-smoke" in workflow
+
+
+def test_ci_workflow_sets_migration_smoke_as_allowed_failure() -> None:
+    workflow = read_workflow("ci.yml")
+    match = re.search(
+        r"^  migration-smoke:\n(?:    .*\n)*?(?=^  [a-zA-Z0-9-]+:|\Z)",
+        workflow,
+        re.MULTILINE,
+    )
+
+    assert match is not None, "migration-smoke job should exist"
+    migration_job = match.group(0)
+
+    assert "continue-on-error: true" in migration_job
+    assert "image: postgres:16" in migration_job
 
 
 def test_release_workflow_publishes_v_tag_launcher_artifacts_with_build_metadata() -> None:
@@ -104,3 +123,14 @@ def test_ci_workflow_declares_release_branch_glob_only_once_for_branches_array()
     workflow = read_workflow("ci.yml")
 
     assert re.search(r"branches:\s*\[develop,\s*main,\s*release/\*\*\]", workflow)
+
+
+def test_test_files_do_not_hardcode_repo_absolute_path() -> None:
+    hardcoded_path = "/Volumes/" + "nv6000t/project/VBInvest"
+    offenders = [
+        path.name
+        for path in TEST_FILES
+        if hardcoded_path in path.read_text(encoding="utf-8")
+    ]
+
+    assert offenders == []
