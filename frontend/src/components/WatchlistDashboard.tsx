@@ -21,7 +21,6 @@ import {
 } from "@/lib/dashboard-data";
 import { ChartShell } from "@/components/ChartShell";
 import { ResearchCard } from "@/components/ResearchCard";
-import { signInWithProvider } from "@/lib/supabase-auth";
 
 type Watchlist = {
   readonly id: string;
@@ -150,11 +149,7 @@ export function WatchlistDashboard() {
         <div>
           <p className="eyebrow">VBinvest</p>
           <h1>투자 대시보드</h1>
-          <p className="subtle">로그인 후 관심 그룹과 종목을 관리하고, 차트와 리서치 의견을 같은 화면에서 확인합니다.</p>
-        </div>
-        <div className="auth-buttons">
-          <button type="button" onClick={() => void signInWithProvider("google")}>Google로 로그인</button>
-          <button type="button" onClick={() => void signInWithProvider("kakao")}>Kakao로 로그인</button>
+          <p className="subtle">로컬 프로그램에서 관심 그룹과 종목을 관리하고, 차트와 리서치 의견을 같은 화면에서 확인합니다.</p>
         </div>
       </header>
 

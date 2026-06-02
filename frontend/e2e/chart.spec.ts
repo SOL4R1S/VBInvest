@@ -39,8 +39,7 @@ test("dashboard chart interactions preserve stable stroke width", async ({ page 
   await routeStartupOk(page);
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "투자 대시보드" })).toBeVisible();
-  await page.getByRole("button", { name: "Google로 로그인" }).click();
-  await page.getByRole("button", { name: "Kakao로 로그인" }).click();
+  await expect(page.getByText(/로 로그인/)).toHaveCount(0);
 
   const initialChart = page.getByTestId("chart-frame");
   await expect(initialChart).toHaveAttribute("data-pane-count", "2");

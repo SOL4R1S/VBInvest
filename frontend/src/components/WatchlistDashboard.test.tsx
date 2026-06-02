@@ -78,8 +78,7 @@ describe("WatchlistDashboard", () => {
     render(<WatchlistDashboard />);
 
     expect(screen.getByRole("heading", { name: "투자 대시보드" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Google로 로그인" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Kakao로 로그인" })).toBeInTheDocument();
+    expect(screen.queryAllByText(/로 로그인/)).toHaveLength(0);
     expect(screen.getByTestId("mode-line")).toHaveTextContent("라인");
     expect(screen.getByTestId("mode-candle")).toHaveTextContent("캔들");
     expect(screen.getByTestId("chart-reset")).toHaveTextContent("줌 초기화");

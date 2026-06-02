@@ -14,8 +14,6 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@supabase/ssr": "^0.10.3",
-    "@supabase/supabase-js": "^2.106.2",
     "lightweight-charts": "^5.0.8",
     "next": "^15.1.7",
     "react": "^19.0.0",

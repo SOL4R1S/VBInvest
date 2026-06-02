@@ -33,22 +33,22 @@ def client_with_db(monkeypatch, fake_db: BootstrapDB):
 def test_first_login_bootstraps_profile(monkeypatch):
     fake_db = BootstrapDB()
     client = client_with_db(monkeypatch, fake_db)
-    token = create_test_token("google-user", email="google@example.com")
+    token = create_test_token("local-user", email="local@example.com")
 
     response = client.get("/api/me", headers={"Authorization": f"Bearer {token}"})
 
     assert response.status_code == 200
-    assert response.json()["profile"]["auth_user_id"] == "google-user"
-    assert fake_db.created[0]["email"] == "google@example.com"
+    assert response.json()["profile"]["auth_user_id"] == "local-user"
+    assert fake_db.created[0]["email"] == "local@example.com"
 
 
-def test_kakao_login_without_email_bootstraps_profile(monkeypatch):
+def test_local_session_without_email_bootstraps_profile(monkeypatch):
     fake_db = BootstrapDB()
     client = client_with_db(monkeypatch, fake_db)
-    token = create_test_token("kakao-user")
+    token = create_test_token("local-user-without-email")
 
     response = client.get("/api/me", headers={"Authorization": f"Bearer {token}"})
 
     assert response.status_code == 200
-    assert response.json()["profile"]["auth_user_id"] == "kakao-user"
+    assert response.json()["profile"]["auth_user_id"] == "local-user-without-email"
     assert response.json()["profile"]["email"] is None

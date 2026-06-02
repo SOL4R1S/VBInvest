@@ -42,7 +42,7 @@ export async function generateResearchReport(symbol: string): Promise<GeneratedR
 function safeReportErrorMessage(status: number, payload: unknown): string {
   const detail = readDetail(payload);
   if (status === 401) {
-    return "로그인이 필요합니다. Google 또는 Kakao 로그인 후 다시 시도해주세요.";
+    return "로컬 세션 확인이 필요합니다. 프로그램을 다시 실행한 뒤 시도해주세요.";
   }
   if (status === 404) {
     return "종목 데이터가 아직 준비되지 않았습니다. 프로그램 시작 갱신 후 다시 시도해주세요.";
