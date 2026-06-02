@@ -2,13 +2,31 @@
 
 [한국어](README.md) | [English](README.en.md)
 
-VBinvest is a local-first, open-source investing research dashboard. It refreshes market data when the local program starts, shows charts and indicators, and generates AI-assisted research reports with credentials owned by the user.
+VBinvest is a local-first open-source research dashboard. It stores price/volume/RSI14/MA 5/20/50/120/history, news, SEC filings, and OpenDART disclosures for tracked symbols in local storage and generates per-symbol reports.
 
-VBinvest is not a hosted SaaS by default. Users run it locally, store data locally, and pay any market data, OpenDART, AI API, or local model cost through their own accounts or hardware.
+## Table of Contents
+
+- [Quick Start](#quick-start)
+- [First-Run Choices](#first-run-choices)
+- [OpenDART setup](#opendart-setup)
+- [AI API and models](#ai-api-and-models)
+- [Data and reports](#data-and-reports)
+- [Obsidian export](#obsidian-export)
+- [Screenshots](#screenshots)
+- [Optional Scheduled Runs](#optional-scheduled-runs)
+- [Backup and uninstall](#backup-and-uninstall)
+- [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing)
+- [License](#license)
+- [Disclaimer](#disclaimer)
 
 ## Quick Start
 
-Local program mode is the primary path. Follow only the section for your operating system.
+VBinvest is local-first. Source execution requires Python and Node.js for development workflows, while packaged releases are expected to run without Node.js at runtime when distribution bundles are produced.
+Developer environment requires Python and Node.js.
+
+The launcher chooses free ports automatically from `4173` upward, so if the default port is busy it will try another available port.
+Node.js runtime is not required for packaged releases.
 
 ### macOS Users
 
@@ -19,18 +37,9 @@ chmod +x VBinvest.command
 ./VBinvest.command
 ```
 
-`VBinvest.command` starts both the backend and the web UI, then opens the browser.
-`VBinvest.command` calls the shared launcher `python -m scripts.launcher`.
+`chmod +x VBinvest.command` marks the launcher as executable.
 
 ### Windows Users
-
-```powershell
-git clone https://github.com/SOL4R1S/VBInvest.git
-cd VBInvest
-VBinvest.ps1
-```
-
-`VBinvest.bat` starts both the backend and the web UI, then opens the browser.
 
 ```powershell
 git clone https://github.com/SOL4R1S/VBInvest.git
@@ -38,7 +47,7 @@ cd VBInvest
 VBinvest.bat
 ```
 
-Or run the PowerShell wrapper with clearer diagnostics.
+For diagnostic launch in PowerShell:
 
 ```powershell
 git clone https://github.com/SOL4R1S/VBInvest.git
@@ -46,41 +55,84 @@ cd VBInvest
 ./VBinvest.ps1
 ```
 
-Both `VBinvest.bat` and `VBinvest.ps1` call the shared launcher `python -m scripts.launcher`.
-
-The launcher starts the local backend on `127.0.0.1`, chooses free ports, opens the web UI, and shows the first-run setup wizard.
+`VBinvest.bat` and `VBinvest.ps1` both run `python -m scripts.launcher`.
 
 ## First-Run Choices
 
-- Database: `SQLite built-in DB (recommended)`, automatic detection/connection for a running `PostgreSQL Docker` container, or `PostgreSQL direct connection`
-- Obsidian: choose a vault path for generated Markdown reports
-- OpenDART: optional `OPENDART_API_KEY` for Korean disclosures
-- AI: AI API integration, local LLM endpoints such as Ollama, OpenAI-compatible cloud providers, Codex CLI, Copilot CLI, or disabled
+You can choose startup mode from the first-run screen.
 
-On macOS, launcher-provided `AI_API_KEY` and `OPENDART_API_KEY` values are saved to Keychain service `VBinvest` through `save_secret "AI_API_KEY"` and `save_secret "OPENDART_API_KEY"` instead of being persisted in local config files. On Windows, the same accounts are stored in Windows Credential Manager.
+- **Database**
+  - `SQLite` (default): data stored in local app data directory.
+  - `PostgreSQL Docker` (advanced users): use Docker-hosted PostgreSQL bound to loopback.
+  - `Direct PostgreSQL DSN` / `Direct DSN` (advanced users): connect to your own PostgreSQL DSN.
+- **AI mode**: `AI API`, `Local LLM`, `Disable`.
+- **OpenDART**: optional.
+- **Obsidian path**: where generated notes are exported.
 
-OpenAI-compatible local models can run without a key. For example, Ollama or an OpenAI-compatible endpoint on `127.0.0.1`/`localhost` is allowed without `AI_API_KEY`. OpenAI-compatible cloud AI providers require an API key; without one, report generation is blocked safely and only a configuration error is shown. Codex/Copilot CLI modes are OAuth-capable advanced options, but they may be affected by provider policies or account limits and are not the default path.
+VBinvest does not centralize or monetize user storage. Data remains in the user-selected storage, so **data ownership** and backup responsibility stays with you.
+- You own your data
 
-### AI API Integration Options
+## OpenDART setup
 
-- Cloud model provider: OpenAI, OpenRouter, DeepSeek, Qwen/DashScope, Kimi/Moonshot, GLM/Z.AI, or a custom OpenAI-compatible provider
-- Local LLM: an OpenAI-compatible `http://127.0.0.1:<port>/v1` endpoint from Ollama, LM Studio, llama.cpp, or similar tools
-- Settings: provider, base URL, model, context size, and API key
-- Codex CLI / Copilot CLI: VBinvest checks only installation and login status, and never stores OAuth tokens. The UI shows an account limitation/suspension risk label for these modes.
+- OpenDART integration is optional and requires a user-paid, user-owned `OPENDART_API_KEY`.
+- If you do not set `OPENDART_API_KEY`, only Korean disclosure crawling is disabled; other features still run.
+- SEC filings are public records and can be collected without an OpenDART key.
+- On macOS, launcher secrets are stored via Keychain; on Windows, via Windows Credential Manager.
 
-## Source Refresh And Reports
+## AI API and models
 
-When the program starts, it refreshes prices, indicators, news, SEC filings, and OpenDART disclosures for the saved tickers where possible. If no OpenDART key is configured, only Korean disclosure collection is disabled; prices, indicators, news, and SEC refresh continue.
+VBinvest supports cloud and local providers through OpenAI-compatible endpoints:
 
-The `Generate Report` button does not perform live web browsing. It uses the latest DB-backed prices, RSI, moving averages, volume, news, and SEC/OpenDART disclosures. If required sources are missing, the generated report keeps a `source_gap` so the user can see which evidence is unavailable.
+- Cloud: OpenAI, OpenRouter, DeepSeek, Qwen/DashScope, Kimi/Moonshot, GLM/Z.AI, custom compatible provider
+- Local: Ollama, LM Studio, llama.cpp via `http://127.0.0.1:<port>/v1`
+
+Notes:
+
+- local models can run without a key.
+- cloud AI providers require an API key.
+- Codex/Copilot CLI are launched under your own CLI account and OAuth state; VBinvest does not store or read those access tokens.
+- A warning should be shown in UI for account restriction/suspension risk when using Codex/Copilot.
+
+Security snippets used by the launcher include:
+
+```bash
+save_secret "AI_API_KEY"
+save_secret "OPENDART_API_KEY"
+```
+
+On Windows these keys are stored using Credential Manager.
+
+## Data and reports
+
+When the program starts, it updates price, indicators, news, SEC filings, and OpenDART filings within the configured capabilities.
+
+- Report generation does not perform live web browsing.
+- It uses the latest DB-backed prices and metrics saved to local DB.
+- Missing required inputs are tracked as `source_gap`.
+- `Generate Report` creates a Markdown note in Obsidian and a DB record.
+
+## Obsidian export
+
+Generated reports are exported as Markdown to the configured Obsidian folder.
+Generated notes can include marker `<!-- Vbinvest:generated -->` to separate authored notes.
+
+Recommended setup:
+
+- Use a separate folder for generated notes.
+- Keep generated notes identifiable with your own marker or folder naming.
+- Contributions are welcome.
+- Back up both your Obsidian export folder and DB backups together.
+
+## Screenshots
+
+TODO: screenshots are not committed yet.
+GitHub placeholder text is provided only; no fake screenshot is bundled.
 
 ## Optional Scheduled Runs
 
-If you want refresh jobs to run while the app is closed, you can install operating-system schedulers as an optional path. This is not the default, and it does not replace the app's own scheduler while the app is running.
+You can install optional scheduled runs for background sync when the app is not open.
 
-### macOS launchd
-
-On macOS, use `ops/launchd/vbinvest-daily.plist` and `ops/launchd/vbinvest-weekly.plist` as templates.
+macOS launchd:
 
 ```bash
 mkdir -p ~/Library/LaunchAgents
@@ -90,46 +142,72 @@ launchctl load -w ~/Library/LaunchAgents/com.vbinvest.daily.plist
 launchctl load -w ~/Library/LaunchAgents/com.vbinvest.weekly.plist
 ```
 
-```bash
-launchctl unload -w ~/Library/LaunchAgents/com.vbinvest.daily.plist
-launchctl unload -w ~/Library/LaunchAgents/com.vbinvest.weekly.plist
-rm -f ~/Library/LaunchAgents/com.vbinvest.daily.plist ~/Library/LaunchAgents/com.vbinvest.weekly.plist
-```
-
-### Linux cron
-
-On Linux, use `ops/cron/vbinvest-daily.cron` and `ops/cron/vbinvest-weekly.cron` as templates. Weekly precompute remains disabled by default and should only be installed when needed.
+Linux cron:
 
 ```bash
 crontab ops/cron/vbinvest-daily.cron
 crontab ops/cron/vbinvest-weekly.cron
 ```
 
+Weekly precompute remains disabled by default.
+
+Uninstall scheduler:
+
 ```bash
+launchctl unload -w ~/Library/LaunchAgents/com.vbinvest.daily.plist 2>/dev/null || true
+launchctl unload -w ~/Library/LaunchAgents/com.vbinvest.weekly.plist 2>/dev/null || true
 crontab -l | sed '/vbinvest-daily.cron/d;/vbinvest-weekly.cron/d' | crontab -
 ```
 
-## Cost And Risk Policy
+## Backup and uninstall
 
-- VBinvest does not provide centralized free market data or AI credits.
-- yfinance, OpenDART, AI providers, local LLM hardware, and cloud model calls are the user's responsibility.
-- Codex/Copilot CLI modes are advanced options and may be subject to account limits or provider policy restrictions.
+### Backup
 
-## Development
+- SQLite: copy `vbinvest.sqlite3` from app data directory.
+- PostgreSQL: use `pg_dump` for backup or your PostgreSQL snapshot process.
+- Obsidian: back up the generated report folder as part of your knowledge base.
 
-Developers need Python and Node.js. End users of packaged local releases should not need Node.js at runtime.
+### Uninstall
+
+- Close the app with launcher shutdown or UI exit.
+- Remove app data directory after backup if you want a clean uninstall.
+- Remove launchd/cron items listed above before deleting dependencies.
+
+## Troubleshooting
+
+- Browser did not open: open `http://127.0.0.1:<port>` from the printed output.
+- Port is not available: stop competing processes and restart.
+- OpenDART not configured: confirm key and entitlement.
+- AI mode fails: check cloud key/base URL/model or local LLM server status.
+- Codex/Copilot CLI fails: check CLI install/login status and account restrictions.
+
+## Contributing
 
 ```bash
 ./.venv/bin/python -m pytest -q
 cd frontend && npm run lint && npm run typecheck && npm test -- --run && npm run build
 ```
 
-Install Git hooks before feature work:
+Install Git hooks before contributions:
 
 ```bash
 ./.venv/bin/python scripts/git_hooks/install_hooks.py
 ```
 
+- Fork and create feature branches from `develop`.
+- Use Conventional Commits.
+- Submissions are expected to include tests/docs updates for behavior-impacting changes.
+
+## License
+
+Public contributions are expected to follow the project license file once added.
+Check `LICENSE` before redistribution.
+
 ## Disclaimer
 
-VBinvest creates research and learning artifacts only. It is not investment advice, a brokerage service, or a trading system.
+VBinvest does not include centralized market data or AI credits as a default bundled service.
+User-paid data and AI costs are your responsibility.
+yfinance, OpenDART, cloud model calls, local LLM compute, and any related API costs are paid by the user.
+
+VBinvest generates research/learning material, not investment advice, brokerage, or automated trading execution.
+All investment decisions, trading outcomes, and risks are your own responsibility.

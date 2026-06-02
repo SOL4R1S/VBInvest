@@ -15,7 +15,7 @@ def test_readme_has_required_local_first_sections():
         "[English](README.en.md)",
         "로컬 우선",
         "빠른 시작",
-        "초기 설정",
+        "처음 실행 설정",
         "OpenDART",
         "AI API",
         "SQLite",
@@ -139,6 +139,38 @@ def test_readme_documents_optional_schedulers_and_uninstall():
         assert required in english
 
 
+def test_readme_documents_backup_uninstall_contribution_and_cost_responsibility():
+    korean = (ROOT / "README.md").read_text(encoding="utf-8")
+    english = (ROOT / "README.en.md").read_text(encoding="utf-8")
+    english_lower = english.lower()
+
+    for required in [
+        "백업과 삭제",
+        "vbinvest.sqlite3",
+        "pg_dump",
+        "<!-- Vbinvest:generated -->",
+        "개발과 기여",
+        "Conventional Commits",
+        "라이선스",
+        "비용과 면책",
+        "사용자 책임",
+    ]:
+        assert required in korean
+
+    for required in [
+        "backup and uninstall",
+        "vbinvest.sqlite3",
+        "pg_dump",
+        "<!-- Vbinvest:generated -->",
+        "contributing",
+        "Conventional Commits",
+        "License",
+        "Disclaimer",
+        "your own responsibility",
+    ]:
+        assert required.lower() in english_lower
+
+
 def test_scheduler_templates_are_present_and_generic():
     daily_launchd = ROOT / "ops" / "launchd" / "vbinvest-daily.plist"
     weekly_launchd = ROOT / "ops" / "launchd" / "vbinvest-weekly.plist"
@@ -214,6 +246,122 @@ def test_readme_documents_secure_storage_and_ai_modes():
         "Codex/Copilot CLI",
     ]:
         assert required in english
+
+
+def test_readme_documents_cover_screenshot_and_distribution_notes():
+    korean = (ROOT / "README.md").read_text(encoding="utf-8")
+    english = (ROOT / "README.en.md").read_text(encoding="utf-8")
+
+    for required in [
+        "## 스크린샷",
+        "TODO",
+        "스크린샷이 준비되는 대로 추가",
+        "개발 환경",
+        "Python",
+        "Node",
+        "패키지 배포본은",
+        "런타임에 Node.js가 필요하지 않을 수 있음",
+    ]:
+        assert required in korean
+
+    for required in [
+        "## Screenshots",
+        "TODO",
+        "screenshots are not committed yet",
+        "Developer environment",
+        "Python",
+        "Node",
+        "packaged releases",
+        "Node.js runtime is not required",
+    ]:
+        assert required in english
+
+
+def test_readme_documents_db_modes_and_data_responsibility():
+    korean = (ROOT / "README.md").read_text(encoding="utf-8")
+    english = (ROOT / "README.en.md").read_text(encoding="utf-8")
+    english_lower = english.lower()
+
+    for required in [
+        "SQLite",
+        "기본값",
+        "PostgreSQL Docker",
+        "고급 사용자",
+        "직접 DSN",
+        "데이터 소유권",
+        "사용자 소유",
+    ]:
+        assert required in korean
+
+    for required in [
+        "SQLite",
+        "default",
+        "PostgreSQL Docker",
+        "advanced users",
+        "Direct DSN",
+        "data ownership",
+        "you own your data",
+    ]:
+        assert required.lower() in english_lower
+
+
+def test_readme_documents_obsidian_backup_uninstall_disclaimer_contributing():
+    korean = (ROOT / "README.md").read_text(encoding="utf-8")
+    english = (ROOT / "README.en.md").read_text(encoding="utf-8")
+
+    for required in [
+        "Obsidian",
+        "백업",
+        "삭제",
+        "문제 해결",
+        "기여",
+        "Git hooks",
+        "기여는",
+        "라이선스",
+        "면책",
+        "사용자 비용",
+    ]:
+        assert required in korean
+
+    for required in [
+        "Obsidian",
+        "Backup",
+        "Uninstall",
+        "Troubleshooting",
+        "Contributing",
+        "Git hooks",
+        "Contributing",
+        "License",
+        "Disclaimer",
+        "user-paid data and AI costs",
+    ]:
+        assert required.lower() in english.lower()
+
+
+def test_readme_documents_disallow_central_free_and_fake_service_mentions():
+    combined = "\n".join(
+        [
+            (ROOT / "README.md").read_text(encoding="utf-8"),
+            (ROOT / "README.en.md").read_text(encoding="utf-8"),
+        ]
+    )
+    combined_lower = combined.lower()
+
+    forbidden = [
+        "Vercel",
+        "Supabase",
+        "ad unlock",
+        "subscription",
+        "subscription model",
+        "subscription-based",
+        "free centralized market data",
+        "free ai credits",
+    ]
+
+    for phrase in forbidden:
+        assert phrase.lower() not in combined_lower
+
+    assert "user-paid data and ai costs" in combined_lower
 
 
 def test_cross_platform_local_launchers_are_tracked():
