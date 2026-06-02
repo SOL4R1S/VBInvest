@@ -137,3 +137,89 @@ class SQLiteMarketMixin:
             if parsed is not None:
                 result[int(row["asset_id"])] = parsed
         return result
+
+    def fetch_watchlist_collection_status(self, slug: str) -> list[dict[str, Any]]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                WITH wl_assets AS (
+                  SELECT a.asset_id, a.symbol, a.display_name_ko, a.exchange, wm.sort_order
+                  FROM watchlists w
+                  JOIN watchlist_members wm ON wm.watchlist_id = w.watchlist_id
+                  JOIN assets a ON a.asset_id = wm.asset_id
+                  WHERE w.slug = ? AND w.archived_at IS NULL AND a.active = 1
+                ),
+                price_counts AS (
+                  SELECT dp.asset_id,
+                         COUNT(*) AS price_rows,
+                         MAX(dp.date) AS latest_price_date,
+                         SUM(CASE WHEN COALESCE(dp.provider, dp.source) = 'synthetic' THEN 1 ELSE 0 END) AS synthetic_rows
+                  FROM daily_prices dp
+                  JOIN wl_assets wa ON wa.asset_id = dp.asset_id
+                  GROUP BY dp.asset_id
+                ),
+                latest_dates AS (
+                  SELECT dp.asset_id, MAX(dp.date) AS latest_price_date
+                  FROM daily_prices dp
+                  JOIN wl_assets wa ON wa.asset_id = dp.asset_id
+                  GROUP BY dp.asset_id
+                ),
+                latest_prices AS (
+                  SELECT dp.asset_id,
+                         COALESCE(dp.provider, dp.source) AS provider,
+                         dp.fetched_at AS latest_fetched_at
+                  FROM daily_prices dp
+                  JOIN latest_dates ld ON ld.asset_id = dp.asset_id AND ld.latest_price_date = dp.date
+                  WHERE dp.fetched_at = (
+                    SELECT MAX(inner_price.fetched_at)
+                    FROM daily_prices inner_price
+                    WHERE inner_price.asset_id = dp.asset_id AND inner_price.date = dp.date
+                  )
+                ),
+                indicator_counts AS (
+                  SELECT di.asset_id, COUNT(*) AS indicator_rows
+                  FROM daily_indicators di
+                  JOIN wl_assets wa ON wa.asset_id = di.asset_id
+                  GROUP BY di.asset_id
+                )
+                SELECT wa.symbol, wa.display_name_ko, wa.exchange, lp.provider,
+                       pc.latest_price_date, lp.latest_fetched_at,
+                       COALESCE(pc.price_rows, 0) AS price_rows,
+                       COALESCE(ic.indicator_rows, 0) AS indicator_rows,
+                       COALESCE(pc.synthetic_rows, 0) > 0 AS has_synthetic
+                FROM wl_assets wa
+                LEFT JOIN price_counts pc ON pc.asset_id = wa.asset_id
+                LEFT JOIN latest_prices lp ON lp.asset_id = wa.asset_id
+                LEFT JOIN indicator_counts ic ON ic.asset_id = wa.asset_id
+                ORDER BY wa.sort_order, wa.symbol
+                """,
+                (slug,),
+            ).fetchall()
+        result: list[dict[str, Any]] = []
+        for row in rows:
+            price_rows = int(row["price_rows"])
+            has_synthetic = bool(row["has_synthetic"])
+            latest_price_date = row["latest_price_date"]
+            parsed_date = date.fromisoformat(latest_price_date) if isinstance(latest_price_date, str) else latest_price_date
+            result.append(
+                {
+                    "symbol": row["symbol"],
+                    "display_name_ko": row["display_name_ko"],
+                    "exchange": row["exchange"],
+                    "provider": row["provider"],
+                    "latest_price_date": parsed_date,
+                    "latest_fetched_at": self._coerce_datetime(row["latest_fetched_at"]),
+                    "price_rows": price_rows,
+                    "indicator_rows": int(row["indicator_rows"]),
+                    "has_synthetic": has_synthetic,
+                    "status": self._collection_status(price_rows, has_synthetic),
+                }
+            )
+        return result
+
+    def _collection_status(self, price_rows: int, has_synthetic: bool) -> str:
+        if price_rows == 0:
+            return "missing"
+        if has_synthetic:
+            return "synthetic"
+        return "collected"

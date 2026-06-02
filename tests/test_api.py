@@ -44,6 +44,35 @@ class FakeResearchDB:
 
 
 class FakeDashboardDB:
+    def fetch_watchlist_collection_status(self, slug: str):
+        assert slug == "semiconductor-core"
+        return [
+            {
+                "symbol": "NVDA",
+                "display_name_ko": "엔비디아",
+                "exchange": "NASDAQ",
+                "provider": "yfinance",
+                "latest_price_date": datetime(2026, 6, 1, tzinfo=timezone.utc).date(),
+                "latest_fetched_at": datetime(2026, 6, 2, 1, 0, tzinfo=timezone.utc),
+                "price_rows": 260,
+                "indicator_rows": 260,
+                "has_synthetic": False,
+                "status": "collected",
+            },
+            {
+                "symbol": "005930.KS",
+                "display_name_ko": "삼성전자",
+                "exchange": "KRX",
+                "provider": "synthetic",
+                "latest_price_date": datetime(2026, 6, 1, tzinfo=timezone.utc).date(),
+                "latest_fetched_at": datetime(2026, 6, 2, 1, 0, tzinfo=timezone.utc),
+                "price_rows": 260,
+                "indicator_rows": 260,
+                "has_synthetic": True,
+                "status": "synthetic",
+            },
+        ]
+
     def fetch_dashboard_items(self, slug: str, *, days: int = 260):
         assert slug == "semiconductor-core"
         assert days == 260
@@ -242,3 +271,26 @@ def test_watchlist_dashboard_api_includes_serialized_history(monkeypatch):
             "rsi14": 64.2,
         },
     ]
+
+
+def test_watchlist_collection_status_exposes_data_provenance(monkeypatch):
+    client = client_with_db(monkeypatch, FakeDashboardDB())
+
+    response = client.get("/api/watchlists/semiconductor-core/collection-status")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["watchlist"] == "semiconductor-core"
+    assert payload["assets"][0] == {
+        "symbol": "NVDA",
+        "display_name_ko": "엔비디아",
+        "exchange": "NASDAQ",
+        "provider": "yfinance",
+        "latest_price_date": "2026-06-01",
+        "latest_fetched_at": "2026-06-02T01:00:00+00:00",
+        "price_rows": 260,
+        "indicator_rows": 260,
+        "has_synthetic": False,
+        "status": "collected",
+    }
+    assert payload["assets"][1]["status"] == "synthetic"

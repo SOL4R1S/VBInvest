@@ -256,6 +256,14 @@ def watchlist_assets(slug: str):
     return {"watchlist": slug, "assets": assets}
 
 
+@app.get("/api/watchlists/{slug}/collection-status")
+def watchlist_collection_status(slug: str):
+    assets = db().fetch_watchlist_collection_status(slug)
+    if not assets:
+        raise HTTPException(status_code=404, detail="watchlist not found or empty")
+    return {"watchlist": slug, "assets": assets}
+
+
 @app.get("/api/watchlists/{slug}/dashboard")
 def dashboard_data(slug: str, days: int = 260):
     items = db().fetch_dashboard_items(slug, days=days)

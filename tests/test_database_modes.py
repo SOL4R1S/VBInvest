@@ -84,6 +84,33 @@ def test_shared_repository_roundtrip_works_for_sqlite_mode(tmp_path: Path) -> No
     asset_id = repo.fetch_watchlist_assets(created["slug"])[0]["asset_id"]
     assert repo.upsert_prices(build_price_rows(asset_id, price_frame)) == 2
     assert repo.upsert_indicators(build_indicator_rows(asset_id, indicator_frame)) == 2
+    collection_status = repo.fetch_watchlist_collection_status(created["slug"])
+    assert collection_status == [
+        {
+            "symbol": "NVDA",
+            "display_name_ko": None,
+            "exchange": None,
+            "provider": "yfinance",
+            "latest_price_date": date(2026, 6, 2),
+            "latest_fetched_at": collection_status[0]["latest_fetched_at"],
+            "price_rows": 2,
+            "indicator_rows": 2,
+            "has_synthetic": False,
+            "status": "collected",
+        },
+        {
+            "symbol": "TSM",
+            "display_name_ko": None,
+            "exchange": None,
+            "provider": None,
+            "latest_price_date": None,
+            "latest_fetched_at": None,
+            "price_rows": 0,
+            "indicator_rows": 0,
+            "has_synthetic": False,
+            "status": "missing",
+        },
+    ]
 
     run_id = repo.record_report_run(
         run_type="startup-market-refresh",

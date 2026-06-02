@@ -159,6 +159,42 @@ input:focus {
   border-color: color-mix(in srgb, var(--negative) 36%, var(--line));
 }
 
+.collection-status-strip {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: -8px 0 18px;
+}
+
+.collection-status-pill {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 10px;
+  background: var(--paper-strong);
+  color: var(--muted);
+  font-size: 12px;
+  box-shadow: 0 8px 20px rgb(52 42 27 / 4%);
+}
+
+.collection-status-pill strong {
+  color: var(--ink);
+}
+
+.collection-status-pill.collected {
+  border-color: color-mix(in srgb, var(--positive) 30%, var(--line));
+}
+
+.collection-status-pill.synthetic,
+.collection-status-pill.missing {
+  border-color: color-mix(in srgb, var(--warning) 36%, var(--line));
+  background: #fffaf0;
+}
+
 .hero,
 .control-panel,
 .detail-header,
@@ -498,5 +534,10 @@ h3 {
 
   .chart-toolbar button {
     flex: 1 1 96px;
+  }
+
+  .collection-status-pill {
+    width: 100%;
+    justify-content: flex-start;
   }
 }

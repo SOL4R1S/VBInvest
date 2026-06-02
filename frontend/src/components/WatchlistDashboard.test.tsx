@@ -57,6 +57,38 @@ function dashboardResponse(): Response {
   });
 }
 
+function collectionStatusResponse(): Response {
+  return jsonResponse({
+    watchlist: "semiconductor-core",
+    assets: [
+      {
+        symbol: "NVDA",
+        display_name_ko: "엔비디아",
+        exchange: "NASDAQ",
+        provider: "yfinance",
+        latest_price_date: "2026-06-01",
+        latest_fetched_at: "2026-06-02T01:00:00+00:00",
+        price_rows: 260,
+        indicator_rows: 260,
+        has_synthetic: false,
+        status: "collected",
+      },
+      {
+        symbol: "005930.KS",
+        display_name_ko: "삼성전자",
+        exchange: "KRX",
+        provider: "synthetic",
+        latest_price_date: "2026-06-01",
+        latest_fetched_at: "2026-06-02T01:00:00+00:00",
+        price_rows: 260,
+        indicator_rows: 260,
+        has_synthetic: true,
+        status: "synthetic",
+      },
+    ],
+  });
+}
+
 describe("WatchlistDashboard", () => {
   beforeEach(() => {
     vi.stubGlobal(
@@ -64,6 +96,9 @@ describe("WatchlistDashboard", () => {
       vi.fn(async (input: RequestInfo | URL, _init?: RequestInit): Promise<Response> => {
         if (String(input).includes("/api/backend/watchlists/semiconductor-core/dashboard")) {
           return dashboardResponse();
+        }
+        if (String(input).includes("/api/backend/watchlists/semiconductor-core/collection-status")) {
+          return collectionStatusResponse();
         }
         return jsonResponse({ status: "ok", price_rows: 1, indicator_rows: 1, news_items: 0, disclosures: 0 });
       }),
@@ -197,6 +232,18 @@ describe("WatchlistDashboard", () => {
     expect(screen.getByText("64.2")).toBeInTheDocument();
     expect(screen.getByText("990.1 / 970.2 / 950.3 / 930.4")).toBeInTheDocument();
     expect(screen.queryByText("예시 값")).not.toBeInTheDocument();
+  });
+
+  it("shows whether stored market rows came from real providers or synthetic fixtures", async () => {
+    render(<WatchlistDashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("collection-status")).toHaveTextContent("NVDA");
+    });
+    expect(screen.getByTestId("collection-status")).toHaveTextContent("실제 수집");
+    expect(screen.getByTestId("collection-status")).toHaveTextContent("예시 데이터 포함");
+    expect(screen.getByTestId("collection-status")).toHaveTextContent("최신 2026-06-01");
+    expect(screen.getByTestId("collection-status")).toHaveTextContent("가격 260 / 지표 260");
   });
 
   it("does not run startup market refresh before first-run setup is completed", async () => {

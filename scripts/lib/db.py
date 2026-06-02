@@ -80,6 +80,14 @@ def _research_source_type(kind: str | None) -> str:
     return "manual"
 
 
+def _collection_status(price_rows: int, has_synthetic: bool) -> str:
+    if price_rows == 0:
+        return "missing"
+    if has_synthetic:
+        return "synthetic"
+    return "collected"
+
+
 def _profile_slug(auth_user_id: str) -> str:
     value = re.sub(r"[^A-Za-z0-9_-]+", "-", auth_user_id).strip("-").lower()
     return value or f"profile-{uuid.uuid4()}"
@@ -553,6 +561,73 @@ class VBinvestDB:
             cur.execute(sql, asset_ids)
             rows = cur.fetchall()
         return {int(asset_id): latest_date for asset_id, latest_date in rows if latest_date is not None}
+
+    def fetch_watchlist_collection_status(self, slug: str) -> list[dict[str, Any]]:
+        query = """
+        WITH wl_assets AS (
+          SELECT a.asset_id, a.symbol, a.display_name_ko, a.exchange, wm.sort_order
+          FROM watchlists w
+          JOIN watchlist_members wm ON wm.watchlist_id = w.watchlist_id
+          JOIN assets a ON a.asset_id = wm.asset_id
+          WHERE w.slug = %s AND a.active = TRUE
+        ),
+        price_counts AS (
+          SELECT dp.asset_id,
+                 COUNT(*) AS price_rows,
+                 MAX(dp.date) AS latest_price_date,
+                 BOOL_OR(COALESCE(dp.provider, dp.source) = 'synthetic') AS has_synthetic
+          FROM daily_prices dp
+          JOIN wl_assets wa ON wa.asset_id = dp.asset_id
+          GROUP BY dp.asset_id
+        ),
+        latest_prices AS (
+          SELECT DISTINCT ON (dp.asset_id)
+                 dp.asset_id,
+                 COALESCE(dp.provider, dp.source) AS provider,
+                 dp.fetched_at AS latest_fetched_at
+          FROM daily_prices dp
+          JOIN wl_assets wa ON wa.asset_id = dp.asset_id
+          ORDER BY dp.asset_id, dp.date DESC, dp.fetched_at DESC
+        ),
+        indicator_counts AS (
+          SELECT di.asset_id, COUNT(*) AS indicator_rows
+          FROM daily_indicators di
+          JOIN wl_assets wa ON wa.asset_id = di.asset_id
+          GROUP BY di.asset_id
+        )
+        SELECT wa.symbol, wa.display_name_ko, wa.exchange, lp.provider,
+               pc.latest_price_date, lp.latest_fetched_at,
+               COALESCE(pc.price_rows, 0) AS price_rows,
+               COALESCE(ic.indicator_rows, 0) AS indicator_rows,
+               COALESCE(pc.has_synthetic, FALSE) AS has_synthetic
+        FROM wl_assets wa
+        LEFT JOIN price_counts pc ON pc.asset_id = wa.asset_id
+        LEFT JOIN latest_prices lp ON lp.asset_id = wa.asset_id
+        LEFT JOIN indicator_counts ic ON ic.asset_id = wa.asset_id
+        ORDER BY wa.sort_order, wa.symbol
+        """
+        with self.connect() as conn, conn.cursor() as cur:
+            cur.execute(query, (slug,))
+            rows = cur.fetchall()
+        result: list[dict[str, Any]] = []
+        for row in rows:
+            price_rows = int(row[6])
+            has_synthetic = bool(row[8])
+            result.append(
+                {
+                    "symbol": row[0],
+                    "display_name_ko": row[1],
+                    "exchange": row[2],
+                    "provider": row[3],
+                    "latest_price_date": row[4],
+                    "latest_fetched_at": row[5],
+                    "price_rows": price_rows,
+                    "indicator_rows": int(row[7]),
+                    "has_synthetic": has_synthetic,
+                    "status": _collection_status(price_rows, has_synthetic),
+                }
+            )
+        return result
 
     def fetch_dashboard_items(self, slug: str, *, days: int = 260) -> list[dict[str, Any]]:
         assets = self.fetch_watchlist_assets(slug)

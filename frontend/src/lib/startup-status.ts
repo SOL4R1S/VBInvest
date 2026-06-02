@@ -21,6 +21,19 @@ export type ProviderSummary = {
   readonly aiMode: string | null;
 };
 
+export type CollectionAssetStatus = {
+  readonly symbol: string;
+  readonly displayNameKo: string | null;
+  readonly exchange: string | null;
+  readonly provider: string | null;
+  readonly latestPriceDate: string | null;
+  readonly latestFetchedAt: string | null;
+  readonly priceRows: number;
+  readonly indicatorRows: number;
+  readonly hasSynthetic: boolean;
+  readonly status: "collected" | "synthetic" | "missing";
+};
+
 export const INITIAL_STARTUP_REFRESH: StartupRefreshView = {
   status: "checking",
   priceRows: 0,
@@ -46,6 +59,18 @@ export async function fetchProviderSummary(): Promise<ProviderSummary | null> {
     opendartConfigured: opendart.configured === true,
     aiMode: typeof ai.mode === "string" ? ai.mode : null,
   };
+}
+
+export async function fetchCollectionStatus(slug: string): Promise<readonly CollectionAssetStatus[]> {
+  const response = await fetch(`/api/backend/watchlists/${encodeURIComponent(slug)}/collection-status`);
+  if (!response.ok) {
+    return [];
+  }
+  const payload: unknown = await response.json();
+  if (!isRecord(payload) || !Array.isArray(payload.assets)) {
+    return [];
+  }
+  return payload.assets.map(parseCollectionAssetStatus).filter((item): item is CollectionAssetStatus => item !== null);
 }
 
 export function parseStartupRefresh(payload: unknown): StartupRefreshView {
@@ -86,6 +111,42 @@ export function providerSummaryLabel(summary: ProviderSummary): string {
   return `${dart} · ${ai}`;
 }
 
+export function collectionStatusLabel(status: CollectionAssetStatus["status"]): string {
+  switch (status) {
+    case "collected":
+      return "실제 수집";
+    case "synthetic":
+      return "예시 데이터 포함";
+    case "missing":
+      return "수집 기록 없음";
+  }
+}
+
+function parseCollectionAssetStatus(value: unknown): CollectionAssetStatus | null {
+  if (!isRecord(value) || typeof value.symbol !== "string") {
+    return null;
+  }
+  return {
+    symbol: value.symbol,
+    displayNameKo: stringOrNull(value.display_name_ko),
+    exchange: stringOrNull(value.exchange),
+    provider: stringOrNull(value.provider),
+    latestPriceDate: stringOrNull(value.latest_price_date),
+    latestFetchedAt: stringOrNull(value.latest_fetched_at),
+    priceRows: numberValue(value.price_rows),
+    indicatorRows: numberValue(value.indicator_rows),
+    hasSynthetic: value.has_synthetic === true,
+    status: parseCollectionStatus(value.status),
+  };
+}
+
+function parseCollectionStatus(value: unknown): CollectionAssetStatus["status"] {
+  if (value === "collected" || value === "synthetic" || value === "missing") {
+    return value;
+  }
+  return "missing";
+}
+
 function normalizeStartupStatus(status: string, disabledCount: number): StartupRefreshStatus {
   if (status === "skipped") {
     return "skipped";
@@ -117,6 +178,10 @@ function isProviderDisabled(value: unknown): value is ProviderDisabled {
 
 function numberValue(value: unknown): number {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function stringOrNull(value: unknown): string | null {
+  return typeof value === "string" && value.length > 0 ? value : null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

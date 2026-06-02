@@ -3,10 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   INITIAL_STARTUP_REFRESH,
+  collectionStatusLabel,
+  fetchCollectionStatus,
   fetchProviderSummary,
   parseStartupRefresh,
   providerSummaryLabel,
   startupStatusLabel,
+  type CollectionAssetStatus,
   type ProviderSummary,
   type StartupRefreshView,
 } from "@/lib/startup-status";
@@ -40,6 +43,7 @@ export function WatchlistDashboard() {
   const [symbolValidationPending, setSymbolValidationPending] = useState(false);
   const [startupRefresh, setStartupRefresh] = useState<StartupRefreshView>(INITIAL_STARTUP_REFRESH);
   const [providerSummary, setProviderSummary] = useState<ProviderSummary | null>(null);
+  const [collectionStatus, setCollectionStatus] = useState<readonly CollectionAssetStatus[]>([]);
 
   const activeWatchlist = watchlists.find((item) => item.id === selectedWatchlist) ?? watchlists[0];
   const currentSymbol = activeWatchlist?.symbols.includes(selectedSymbol) ? selectedSymbol : activeWatchlist?.symbols[0] ?? "NVDA";
@@ -62,6 +66,13 @@ export function WatchlistDashboard() {
       setSelectedSymbol((symbol) => (dashboard.symbols.includes(symbol) ? symbol : dashboard.symbols[0] ?? symbol));
     }
 
+    async function loadCollectionStatus(slug: string) {
+      const statusRows = await fetchCollectionStatus(slug);
+      if (!cancelled) {
+        setCollectionStatus(statusRows);
+      }
+    }
+
     async function refreshMarketData() {
       try {
         const nextProviderSummary = await fetchProviderSummary();
@@ -70,6 +81,7 @@ export function WatchlistDashboard() {
           if (nextProviderSummary?.firstRunCompleted === false) {
             setStartupRefresh({ ...INITIAL_STARTUP_REFRESH, status: "setup_required" });
             await loadDashboardData("semiconductor-core");
+            await loadCollectionStatus("semiconductor-core");
             return;
           }
         }
@@ -95,6 +107,11 @@ export function WatchlistDashboard() {
         await loadDashboardData("semiconductor-core");
       } catch (error) {
         logStartupWarning(error, "dashboard data refresh failed");
+      }
+      try {
+        await loadCollectionStatus("semiconductor-core");
+      } catch (error) {
+        logStartupWarning(error, "collection status refresh failed");
       }
     }
 
@@ -178,6 +195,20 @@ export function WatchlistDashboard() {
           <span>뉴스 {startupRefresh.newsItems} · 공시 {startupRefresh.disclosures}</span>
           {providerSummary ? <span>{providerSummaryLabel(providerSummary)}</span> : null}
           {startupRefresh.providerDisabled.length > 0 ? <span>비활성 소스 {startupRefresh.providerDisabled.length}개</span> : null}
+        </section>
+      ) : null}
+
+      {collectionStatus.length > 0 ? (
+        <section className="collection-status-strip" aria-label="data collection status" data-testid="collection-status">
+          {collectionStatus.map((item) => (
+            <span key={item.symbol} className={`collection-status-pill ${item.status}`}>
+              <strong>{item.symbol}</strong>
+              <span>{collectionStatusLabel(item.status)}</span>
+              <span>최신 {item.latestPriceDate ?? "-"}</span>
+              <span>{item.provider ?? "provider 없음"}</span>
+              <span>가격 {item.priceRows} / 지표 {item.indicatorRows}</span>
+            </span>
+          ))}
         </section>
       ) : null}
 

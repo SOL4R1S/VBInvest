@@ -8,6 +8,9 @@ class DBRepository(Protocol):
     def fetch_watchlist_assets(self, slug: str) -> list[dict[str, Any]]:
         ...
 
+    def fetch_watchlist_collection_status(self, slug: str) -> list[dict[str, Any]]:
+        ...
+
     def fetch_profile_by_auth_user(self, auth_user_id: str) -> dict[str, Any] | None:
         ...
 
