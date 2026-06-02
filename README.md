@@ -22,8 +22,8 @@
 
 ## 빠른 시작
 
-VBinvest는 로컬 우선 설계입니다. 개발 환경에서는 Python 3.10+와 Node.js가 필요합니다.
-패키지 배포본은 런타임에 Node.js가 필요하지 않을 수 있음.
+VBinvest는 로컬 우선 설계입니다. 개발 환경에서 소스 빌드를 하려면 Python 3.10+와 Node.js가 필요합니다.
+패키지 배포본은 정적 프론트엔드를 포함하므로 런타임에 Node.js가 필요하지 않습니다.
 실행 직후 기본 포트 `4173`에서 열리지 않으면 `4174`부터 빈 포트를 자동으로 찾습니다.
 
 ### macOS 사용자
@@ -53,7 +53,8 @@ cd VBInvest
 ./VBinvest.ps1
 ```
 
-`VBinvest.bat`와 `VBinvest.ps1`는 공통 런처 `python -m scripts.launcher`를 호출하며, 문제 발생 시 Python 및 런처 경로를 먼저 점검하세요.
+`VBinvest.bat`와 `VBinvest.ps1`는 공통 런처 `python -m scripts.launcher`를 호출합니다.
+문제 발생 시 PowerShell의 `./VBinvest.ps1`이 더 자세한 진단 메시지를 보여줍니다.
 
 ## 처음 실행 설정
 
@@ -198,8 +199,8 @@ cd frontend && npm run lint && npm run typecheck && npm test -- --run && npm run
 
 ## 라이선스
 
-현재 공개 라이선스 파일은 `.LICENSE` 또는 `LICENSE` 추가 여부에 따라 적용 범위가 달라질 수 있습니다.
-공개 배포 전에는 해당 파일이 추가되었는지 확인하고 준수하세요.
+라이선스는 저장소의 `LICENSE` 파일을 기준으로 합니다.
+`LICENSE`가 없는 배포본은 재배포 전에 라이선스 상태를 먼저 확인하세요.
 
 ## 비용과 면책
 
