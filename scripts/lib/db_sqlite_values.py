@@ -42,3 +42,17 @@ class SQLiteValueMixin:
                 return None
             return self._coerce_datetime(parsed)
         return None
+
+    def fetch_setting(self, key: str) -> str | None:
+        with self.connect() as conn:
+            row = conn.execute("SELECT value FROM settings_metadata WHERE key = ?", (key,)).fetchone()
+        if row is None:
+            return None
+        return row[0]
+
+    def upsert_setting(self, key: str, value: str) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                "INSERT INTO settings_metadata (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP",
+                (key, value),
+            )

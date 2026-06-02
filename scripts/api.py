@@ -13,7 +13,7 @@ from typing import Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException, status
 from fastapi.responses import FileResponse, HTMLResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StrictBool
 
 from scripts.lib.dashboard import render_dashboard_html
 from scripts.lib.dashboard_payload import serialize_dashboard_items
@@ -30,6 +30,7 @@ from scripts.lib.config import (
     LocalConfig,
     ObsidianSettings,
     ProviderSettings,
+    SchedulerSettings,
     config_path_from_env,
     load_local_config,
     load_opendart_api_key,
@@ -38,6 +39,7 @@ from scripts.lib.config import (
     write_local_config,
 )
 from scripts.lib.db_factory import build_database_from_local_config
+from scripts.lib.local_scheduler import LocalScheduler
 from scripts.lib.db_repository import DBRepository
 from scripts.lib.disclosures import check_opendart_api_key
 from scripts.lib.on_demand_report import OnDemandReportError
@@ -151,6 +153,13 @@ class FirstRunSetupPayload(BaseModel):
     providers: FirstRunProviderPayload = Field(default_factory=FirstRunProviderPayload)
 
 
+class SchedulerSettingsPayload(BaseModel):
+    daily_refresh_enabled: StrictBool | None = None
+    weekly_precompute_enabled: StrictBool | None = None
+    watchlist: str | None = Field(default=None, max_length=1000)
+    include_news: StrictBool | None = None
+
+
 def hosted_monetization_disabled() -> HTTPException:
     return HTTPException(status_code=status.HTTP_410_GONE, detail="hosted monetization is disabled in local mode")
 
@@ -165,6 +174,10 @@ def check_postgres_url(postgres_url: str) -> bool:
             return True
     except PostgresOperationalError:
         return False
+
+
+def _local_scheduler() -> LocalScheduler:
+    return LocalScheduler(db())
 
 
 def build_first_run_config(payload: FirstRunSetupPayload) -> LocalConfig:
@@ -197,6 +210,10 @@ def build_first_run_config(payload: FirstRunSetupPayload) -> LocalConfig:
         database=database,
         obsidian=ObsidianSettings(vault_path=vault_path, export_mode=payload.obsidian.export_mode),
         providers=providers,
+        scheduler=SchedulerSettings(
+            daily_refresh_enabled=True,
+            weekly_precompute_enabled=False,
+        ),
     )
 
 
@@ -423,6 +440,57 @@ def startup_market_refresh(
         "report_run_id": result.report_run_id,
         "last_success_at": result.last_success_at,
     }
+
+
+@app.get("/api/scheduler/status")
+def scheduler_status():
+    try:
+        return _local_scheduler().status()
+    except (ConfigError, ValueError, RuntimeError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/api/scheduler/settings")
+def scheduler_settings():
+    try:
+        return _local_scheduler().get_settings().as_dict()
+    except (ConfigError, ValueError, RuntimeError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.patch("/api/scheduler/settings")
+def patch_scheduler_settings(payload: SchedulerSettingsPayload, user: AuthUser = Depends(current_user)):
+    try:
+        return _local_scheduler().patch_settings(
+            daily_refresh_enabled=payload.daily_refresh_enabled,
+            weekly_precompute_enabled=payload.weekly_precompute_enabled,
+            watchlist=payload.watchlist,
+            include_news=payload.include_news,
+        ).as_dict()
+    except (ConfigError, ValueError, RuntimeError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/scheduler/tick")
+def run_scheduler_tick(
+    dry_run: bool = False,
+    no_network: bool = False,
+    include_news: bool = True,
+    limit: int = 0,
+    force: bool = False,
+    user: AuthUser = Depends(current_user),
+):
+    try:
+        return _local_scheduler().tick(
+            dry_run=dry_run,
+            no_network=no_network,
+            include_news=include_news,
+            limit=limit,
+            force=force,
+            dart_api_key=load_opendart_api_key(),
+        )
+    except (ConfigError, ValueError, RuntimeError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.post("/api/system/shutdown")

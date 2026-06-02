@@ -1,0 +1,6 @@
+# Optional local daily scheduler tick: 17:00 Asia/Seoul.
+# Replace /path/to/VBinvest before installing with: crontab ops/cron/vbinvest-daily.cron
+SHELL=/bin/zsh
+PATH=/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin
+
+0 17 * * * cd /path/to/VBinvest && mkdir -p logs && ./.venv/bin/python scripts/local_scheduler_tick.py --include-news >> logs/daily-scheduler.log 2>&1

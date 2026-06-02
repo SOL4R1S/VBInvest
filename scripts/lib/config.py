@@ -64,6 +64,18 @@ class ObsidianSettings:
 
 
 @dataclass(frozen=True, slots=True)
+class SchedulerSettings:
+    daily_refresh_enabled: bool
+    weekly_precompute_enabled: bool
+
+    def redacted(self) -> dict[str, RedactedValue]:
+        return {
+            "daily_refresh_enabled": self.daily_refresh_enabled,
+            "weekly_precompute_enabled": self.weekly_precompute_enabled,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class ProviderSettings:
     opendart_api_key: str
     ai_provider_name: str
@@ -90,6 +102,7 @@ class LocalConfig:
     database: DatabaseSettings
     obsidian: ObsidianSettings
     providers: ProviderSettings
+    scheduler: SchedulerSettings
 
     def redacted(self) -> dict[str, RedactedValue]:
         return {
@@ -98,6 +111,7 @@ class LocalConfig:
             "database": self.database.redacted(),
             "obsidian": self.obsidian.redacted(),
             "providers": self.providers.redacted(),
+            "scheduler": self.scheduler.redacted(),
         }
 
 
@@ -114,12 +128,14 @@ def load_local_config(
     database = _parse_database(_table(raw, "database"), app_dir)
     obsidian = _parse_obsidian(_table(raw, "obsidian"))
     providers = _parse_providers(_table(raw, "providers"), env, system_name=system_name, secret_store=secret_store)
+    scheduler = _parse_scheduler(_table(raw, "scheduler"))
     return LocalConfig(
         first_run_completed=_bool(raw, "first_run_completed", False),
         language=_text(raw, "language", "ko"),
         database=database,
         obsidian=obsidian,
         providers=providers,
+        scheduler=scheduler,
     )
 
 
@@ -278,6 +294,13 @@ def _parse_obsidian(raw: TomlTable) -> ObsidianSettings:
     if vault_path is not None and not vault_path.exists():
         raise ConfigError("obsidian.vault_path", "does not exist")
     return ObsidianSettings(vault_path=vault_path, export_mode=export_mode)
+
+
+def _parse_scheduler(raw: TomlTable) -> SchedulerSettings:
+    return SchedulerSettings(
+        daily_refresh_enabled=_bool(raw, "daily_refresh_enabled", True),
+        weekly_precompute_enabled=_bool(raw, "weekly_precompute_enabled", False),
+    )
 
 
 def _parse_providers(
@@ -506,6 +529,9 @@ def _to_toml(config: LocalConfig) -> str:
         f'ai_model = "{config.providers.ai_model}"',
         f"ai_context_size = {config.providers.ai_context_size}",
         f'ai_api_key = "{config.providers.ai_api_key}"',
+        "[scheduler]",
+        f"daily_refresh_enabled = {_toml_bool(config.scheduler.daily_refresh_enabled)}",
+        f"weekly_precompute_enabled = {_toml_bool(config.scheduler.weekly_precompute_enabled)}",
     ]
     return "\n".join(lines) + "\n"
 

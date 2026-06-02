@@ -328,6 +328,27 @@ h3 {
   color: var(--paper-strong);
 }
 
+.scheduler-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin-bottom: 6px;
+}
+
+.scheduler-toggle-row input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--brand);
+  cursor: pointer;
+}
+
+.scheduler-toggle-row input[type="checkbox"]:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
 .content-grid {
   display: grid;
   grid-template-columns: minmax(260px, 330px) minmax(0, 1fr);

@@ -57,6 +57,41 @@ When the program starts, it refreshes prices, indicators, news, SEC filings, and
 
 The `Generate Report` button does not perform live web browsing. It uses the latest DB-backed prices, RSI, moving averages, volume, news, and SEC/OpenDART disclosures. If required sources are missing, the generated report keeps a `source_gap` so the user can see which evidence is unavailable.
 
+## Optional Scheduled Runs
+
+If you want refresh jobs to run while the app is closed, you can install operating-system schedulers as an optional path. This is not the default, and it does not replace the app's own scheduler while the app is running.
+
+### macOS launchd
+
+On macOS, use `ops/launchd/vbinvest-daily.plist` and `ops/launchd/vbinvest-weekly.plist` as templates.
+
+```bash
+mkdir -p ~/Library/LaunchAgents
+cp ops/launchd/vbinvest-daily.plist ~/Library/LaunchAgents/com.vbinvest.daily.plist
+cp ops/launchd/vbinvest-weekly.plist ~/Library/LaunchAgents/com.vbinvest.weekly.plist
+launchctl load -w ~/Library/LaunchAgents/com.vbinvest.daily.plist
+launchctl load -w ~/Library/LaunchAgents/com.vbinvest.weekly.plist
+```
+
+```bash
+launchctl unload -w ~/Library/LaunchAgents/com.vbinvest.daily.plist
+launchctl unload -w ~/Library/LaunchAgents/com.vbinvest.weekly.plist
+rm -f ~/Library/LaunchAgents/com.vbinvest.daily.plist ~/Library/LaunchAgents/com.vbinvest.weekly.plist
+```
+
+### Linux cron
+
+On Linux, use `ops/cron/vbinvest-daily.cron` and `ops/cron/vbinvest-weekly.cron` as templates. Weekly precompute remains disabled by default and should only be installed when needed.
+
+```bash
+crontab ops/cron/vbinvest-daily.cron
+crontab ops/cron/vbinvest-weekly.cron
+```
+
+```bash
+crontab -l | sed '/vbinvest-daily.cron/d;/vbinvest-weekly.cron/d' | crontab -
+```
+
 ## Cost And Risk Policy
 
 - VBinvest does not provide centralized free market data or AI credits.

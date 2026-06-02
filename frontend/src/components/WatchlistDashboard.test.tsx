@@ -126,6 +126,52 @@ function headerValue(init: RequestInit | undefined, key: string): string | null 
   return null;
 }
 
+function hasFetchCall(fetchMock: MockedFetch, expectedUrl: string): boolean {
+  return fetchMock.mock.calls.some(([input]) => String(input) === expectedUrl);
+}
+
+function hasFetchCallWithMethod(fetchMock: MockedFetch, expectedUrl: string, expectedMethod: string): boolean {
+  return fetchMock.mock.calls.some(([input, init]) => String(input) === expectedUrl && init?.method === expectedMethod);
+}
+
+function hasFetchCallWithHeaders(
+  fetchMock: MockedFetch,
+  expectedUrl: string,
+  expectedMethod: string,
+  expectedHeaders: Record<string, string>,
+): boolean {
+  return fetchMock.mock.calls.some(([input, init]) => {
+    if (String(input) !== expectedUrl || init?.method !== expectedMethod) {
+      return false;
+    }
+    return Object.entries(expectedHeaders).every(([key, value]) => headerValue(init, key) === value);
+  });
+}
+
+type FetchMock = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+type MockedFetch = { mock: { calls: Array<Parameters<FetchMock>> } };
+
+function schedulerSettingsResponse(): Response {
+  return jsonResponse({
+    daily_refresh_enabled: true,
+    weekly_precompute_enabled: false,
+    watchlist: "semiconductor-core",
+    include_news: true,
+  });
+}
+
+function withSchedulerFallback(fetchMock: FetchMock): FetchMock {
+  return async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    if (String(input).includes("/api/scheduler/settings") && (init?.method === undefined || init.method === "GET")) {
+      return schedulerSettingsResponse();
+    }
+    if (init === undefined) {
+      return fetchMock(input);
+    }
+    return fetchMock(input, init);
+  };
+}
+
 describe("WatchlistDashboard", () => {
   beforeEach(() => {
     vi.stubGlobal(
@@ -136,6 +182,9 @@ describe("WatchlistDashboard", () => {
         }
         if (String(input).includes("/api/watchlists/semiconductor-core/collection-status")) {
           return collectionStatusResponse();
+        }
+        if (String(input).includes("/api/scheduler/settings")) {
+          return schedulerSettingsResponse();
         }
         if (String(input).includes("/api/watchlists")) {
           return watchlistsResponse();
@@ -199,12 +248,12 @@ describe("WatchlistDashboard", () => {
       }
       return jsonResponse({ status: "ok", price_rows: 1, indicator_rows: 1, news_items: 0, disclosures: 0 });
     });
-    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("fetch", withSchedulerFallback(fetchMock));
 
     render(<WatchlistDashboard />);
 
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith("/api/watchlists");
+      expect(hasFetchCall(fetchMock, "/api/watchlists")).toBe(true);
     });
     expect(await screen.findByRole("button", { name: "QA Persisted" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Semiconductor Core" })).not.toBeInTheDocument();
@@ -232,7 +281,7 @@ describe("WatchlistDashboard", () => {
       }
       return jsonResponse({ status: "ok", price_rows: 1, indicator_rows: 1, news_items: 0, disclosures: 0 });
     });
-    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("fetch", withSchedulerFallback(fetchMock));
 
     render(<WatchlistDashboard />);
 
@@ -269,7 +318,7 @@ describe("WatchlistDashboard", () => {
       }
       return jsonResponse({ status: "ok", price_rows: 1, indicator_rows: 1, news_items: 0, disclosures: 0 });
     });
-    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("fetch", withSchedulerFallback(fetchMock));
 
     render(<WatchlistDashboard />);
 
@@ -277,7 +326,7 @@ describe("WatchlistDashboard", () => {
     fireEvent.change(screen.getByLabelText("새 그룹 이름"), { target: { value: "QA Persist" } });
     fireEvent.click(screen.getByRole("button", { name: "새 그룹" }));
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith("/api/watchlists", expect.objectContaining({ method: "POST" }));
+      expect(hasFetchCallWithMethod(fetchMock, "/api/watchlists", "POST")).toBe(true);
     });
     expect(await screen.findByRole("button", { name: "QA Persist" })).toBeInTheDocument();
     expect(await screen.findByText("선택한 관심 그룹에 종목이 없습니다.")).toBeInTheDocument();
@@ -287,13 +336,10 @@ describe("WatchlistDashboard", () => {
     fireEvent.change(screen.getByLabelText("새 종목 심볼"), { target: { value: "AAPL" } });
     fireEvent.click(screen.getByRole("button", { name: "추가" }));
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith("/api/tickers/validate?symbol=AAPL");
+      expect(hasFetchCall(fetchMock, "/api/tickers/validate?symbol=AAPL")).toBe(true);
     });
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith(
-        "/api/watchlists/qa-persist-id/assets",
-        expect.objectContaining({ method: "POST" }),
-      );
+      expect(hasFetchCallWithMethod(fetchMock, "/api/watchlists/qa-persist-id/assets", "POST")).toBe(true);
     });
     await waitFor(() => {
       expect(screen.getByTestId("symbol-AAPL")).toHaveTextContent("AAPL");
@@ -321,7 +367,7 @@ describe("WatchlistDashboard", () => {
       }
       return jsonResponse({ status: "ok", price_rows: 1, indicator_rows: 1, news_items: 0, disclosures: 0 });
     });
-    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("fetch", withSchedulerFallback(fetchMock));
 
     render(<WatchlistDashboard />);
 
@@ -332,7 +378,7 @@ describe("WatchlistDashboard", () => {
     fireEvent.click(screen.getByRole("button", { name: "추가" }));
 
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith("/api/tickers/validate?symbol=NOTREAL");
+      expect(hasFetchCall(fetchMock, "/api/tickers/validate?symbol=NOTREAL")).toBe(true);
     });
     expect(screen.getByText("실제 조회 가능한 티커만 추가할 수 있습니다.")).toBeInTheDocument();
     expect(screen.queryByTestId("symbol-NOTREAL")).not.toBeInTheDocument();
@@ -346,7 +392,7 @@ describe("WatchlistDashboard", () => {
       }
       return jsonResponse({ status: "ok", price_rows: 1, indicator_rows: 1, news_items: 0, disclosures: 0 });
     });
-    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("fetch", withSchedulerFallback(fetchMock));
 
     render(<WatchlistDashboard />);
 
@@ -355,10 +401,9 @@ describe("WatchlistDashboard", () => {
     await waitFor(() => {
       expect(screen.getByText("그룹 이름은 비워둘 수 없습니다.")).toBeInTheDocument();
     });
-    expect(fetchMock).not.toHaveBeenCalledWith(
-      "/api/watchlists",
-      expect.objectContaining({ method: "POST" }),
-    );
+    expect(
+      fetchMock.mock.calls.every(([input, init]) => !(String(input) === "/api/watchlists" && init?.method === "POST")),
+    ).toBe(true);
   });
 
   it("rejects empty symbols and keeps the watchlist unchanged", async () => {
@@ -375,7 +420,7 @@ describe("WatchlistDashboard", () => {
       }
       return jsonResponse({ status: "ok", price_rows: 1, indicator_rows: 1, news_items: 0, disclosures: 0 });
     });
-    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("fetch", withSchedulerFallback(fetchMock));
 
     render(<WatchlistDashboard />);
 
@@ -401,7 +446,7 @@ describe("WatchlistDashboard", () => {
       }
       return jsonResponse({ status: "ok", price_rows: 1, indicator_rows: 1, news_items: 0, disclosures: 0 });
     });
-    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("fetch", withSchedulerFallback(fetchMock));
 
     render(<WatchlistDashboard />);
 
@@ -418,7 +463,7 @@ describe("WatchlistDashboard", () => {
       }
       return jsonResponse({ status: "ok", price_rows: 1, indicator_rows: 1, news_items: 0, disclosures: 0 });
     });
-    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("fetch", withSchedulerFallback(fetchMock));
 
     render(<WatchlistDashboard />);
 
@@ -444,7 +489,7 @@ describe("WatchlistDashboard", () => {
       }
       return jsonResponse({ status: "ok", price_rows: 1, indicator_rows: 1, news_items: 0, disclosures: 0 });
     });
-    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("fetch", withSchedulerFallback(fetchMock));
 
     render(<WatchlistDashboard />);
 
@@ -473,7 +518,7 @@ describe("WatchlistDashboard", () => {
       }
       return jsonResponse({ status: "ok", price_rows: 1, indicator_rows: 1, news_items: 0, disclosures: 0 });
     });
-    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("fetch", withSchedulerFallback(fetchMock));
 
     render(<WatchlistDashboard />);
 
@@ -501,7 +546,7 @@ describe("WatchlistDashboard", () => {
       }
       return jsonResponse({ status: "ok", price_rows: 1, indicator_rows: 1, news_items: 0, disclosures: 0 });
     });
-    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("fetch", withSchedulerFallback(fetchMock));
 
     render(<WatchlistDashboard />);
 
@@ -542,7 +587,7 @@ describe("WatchlistDashboard", () => {
       }
       return jsonResponse({ status: "ok", price_rows: 1, indicator_rows: 1, news_items: 0, disclosures: 0 });
     });
-    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("fetch", withSchedulerFallback(fetchMock));
 
     render(<WatchlistDashboard />);
 
@@ -565,6 +610,78 @@ describe("WatchlistDashboard", () => {
     expect(calls.some(([input, init]) => String(input) === "/api/watchlists" && init?.method === "POST" && headerValue(init, "Authorization") === "Bearer session-token")).toBe(true);
     expect(calls.some(([input, init]) => String(input) === "/api/watchlists/semiconductor-core/assets" && init?.method === "POST" && headerValue(init, "Authorization") === "Bearer session-token")).toBe(true);
     expect(calls.some(([input, init]) => String(input) === "/api/watchlists/semiconductor-core/assets/NVDA" && init?.method === "DELETE" && headerValue(init, "Authorization") === "Bearer session-token")).toBe(true);
+  });
+
+  it("loads scheduler settings on dashboard load and enables weekly precompute on toggle", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      const url = String(input);
+      if (url === "/api/scheduler/settings" && init?.method === "PATCH") {
+        const body =
+          typeof init.body === "string"
+            ? init.body
+            : init.body instanceof URLSearchParams
+              ? init.body.toString()
+              : JSON.stringify(init.body);
+        expect(body).toBe(JSON.stringify({ weekly_precompute_enabled: true }));
+        return jsonResponse({
+          daily_refresh_enabled: true,
+          weekly_precompute_enabled: true,
+          watchlist: "semiconductor-core",
+          include_news: true,
+        });
+      }
+      if (url.includes("/api/watchlists/semiconductor-core/dashboard")) {
+        return dashboardResponse();
+      }
+      if (url === "/api/watchlists") {
+        return watchlistsResponse();
+      }
+      return jsonResponse({ status: "ok", price_rows: 1, indicator_rows: 1, news_items: 0, disclosures: 0 });
+    });
+    vi.stubGlobal("fetch", withSchedulerFallback(fetchMock));
+
+    render(<WatchlistDashboard />);
+
+    const precomputeCheckbox = await screen.findByRole("checkbox", { name: "주간 사전 리포트" });
+    expect(precomputeCheckbox).not.toBeChecked();
+
+    fireEvent.click(precomputeCheckbox);
+
+    await waitFor(() => {
+      expect(precomputeCheckbox).toBeChecked();
+    });
+    expect(hasFetchCallWithHeaders(fetchMock, "/api/scheduler/settings", "PATCH", { "Content-Type": "application/json" })).toBe(true);
+  });
+
+  it("keeps previous weekly precompute state when PATCH settings fails", async () => {
+    window.__VBINVEST_LOCAL_SESSION_TOKEN__ = "task14-session-token";
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      const url = String(input);
+      if (url === "/api/scheduler/settings" && init?.method === "PATCH") {
+        return jsonResponse({ detail: "patch failed" }, 500);
+      }
+      if (url.includes("/api/watchlists/semiconductor-core/dashboard")) {
+        return dashboardResponse();
+      }
+      if (url === "/api/watchlists") {
+        return watchlistsResponse();
+      }
+      return jsonResponse({ status: "ok", price_rows: 1, indicator_rows: 1, news_items: 0, disclosures: 0 });
+    });
+    vi.stubGlobal("fetch", withSchedulerFallback(fetchMock));
+
+    render(<WatchlistDashboard />);
+
+    const precomputeCheckbox = await screen.findByRole("checkbox", { name: "주간 사전 리포트" });
+    fireEvent.click(precomputeCheckbox);
+
+    await waitFor(() => {
+      expect(precomputeCheckbox).not.toBeChecked();
+    });
+    expect(
+      hasFetchCallWithHeaders(fetchMock, "/api/scheduler/settings", "PATCH", { Authorization: "Bearer task14-session-token" }),
+    ).toBe(true);
+    expect(screen.getByText("스케줄러 설정 저장 실패")).toBeInTheDocument();
   });
 
   it("writes watchlist component evidence for manual QA", async () => {
@@ -594,7 +711,7 @@ describe("WatchlistDashboard", () => {
         headers: { "Content-Type": "application/json" },
       });
     });
-    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("fetch", withSchedulerFallback(fetchMock));
 
     render(<WatchlistDashboard />);
 
@@ -630,7 +747,7 @@ describe("WatchlistDashboard", () => {
       }
       return jsonResponse({ provider_status: { opendart: { configured: true }, ai: { mode: "local" } } });
     });
-    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("fetch", withSchedulerFallback(fetchMock));
 
     render(<WatchlistDashboard />);
 
@@ -663,7 +780,7 @@ describe("WatchlistDashboard", () => {
       }
       return jsonResponse({ provider_status: { opendart: { configured: true }, ai: { mode: "local" } } });
     });
-    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("fetch", withSchedulerFallback(fetchMock));
 
     render(<WatchlistDashboard />);
 
@@ -689,7 +806,7 @@ describe("WatchlistDashboard", () => {
       }
       return jsonResponse({ provider_status: { opendart: { configured: true }, ai: { mode: "local" } } });
     });
-    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("fetch", withSchedulerFallback(fetchMock));
 
     render(<WatchlistDashboard />);
 
@@ -720,7 +837,7 @@ describe("WatchlistDashboard", () => {
       }
       return jsonResponse({ provider_status: { opendart: { configured: true }, ai: { mode: "local" } } });
     });
-    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("fetch", withSchedulerFallback(fetchMock));
 
     render(<WatchlistDashboard />);
 
@@ -753,7 +870,7 @@ describe("WatchlistDashboard", () => {
       }
       return jsonResponse({ status: "ok", price_rows: 1, indicator_rows: 1, news_items: 0, disclosures: 0 });
     });
-    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("fetch", withSchedulerFallback(fetchMock));
 
     render(<WatchlistDashboard />);
 
@@ -785,7 +902,7 @@ describe("WatchlistDashboard", () => {
       }
       return jsonResponse({ status: "ok", price_rows: 1, indicator_rows: 1, news_items: 0, disclosures: 0 });
     });
-    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("fetch", withSchedulerFallback(fetchMock));
 
     render(<WatchlistDashboard />);
 
@@ -809,15 +926,15 @@ describe("WatchlistDashboard", () => {
       }
       return jsonResponse({ status: "ok", price_rows: 1, indicator_rows: 1, news_items: 0, disclosures: 0 });
     });
-    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("fetch", withSchedulerFallback(fetchMock));
 
     render(<WatchlistDashboard />);
 
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith("/api/settings");
+      expect(hasFetchCall(fetchMock, "/api/settings")).toBe(true);
     });
-    expect(fetchMock).toHaveBeenCalledWith("/api/startup/market-refresh?no_network=false&include_news=true", { method: "POST" });
-    expect(fetchMock).toHaveBeenCalledWith("/api/watchlists/semiconductor-core/dashboard?days=260");
+    expect(hasFetchCallWithMethod(fetchMock, "/api/startup/market-refresh?no_network=false&include_news=true", "POST")).toBe(true);
+    expect(hasFetchCall(fetchMock, "/api/watchlists/semiconductor-core/dashboard?days=260")).toBe(true);
     expect(fetchMock.mock.calls.map(([input]) => String(input))).not.toContain("/api/backend/settings");
   });
 
@@ -835,12 +952,12 @@ describe("WatchlistDashboard", () => {
       }
       return jsonResponse({ status: "ok", price_rows: 2, indicator_rows: 2, news_items: 0, disclosures: 0 });
     });
-    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("fetch", withSchedulerFallback(fetchMock));
 
     render(<WatchlistDashboard />);
 
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith("/api/watchlists/semiconductor-core/dashboard?days=260");
+      expect(hasFetchCall(fetchMock, "/api/watchlists/semiconductor-core/dashboard?days=260")).toBe(true);
     });
     expect(screen.getByText("999.12")).toBeInTheDocument();
     expect(screen.getByText("+3.88%")).toBeInTheDocument();
@@ -876,7 +993,7 @@ describe("WatchlistDashboard", () => {
       }
       return jsonResponse({ status: "ok", price_rows: 1, indicator_rows: 1, news_items: 0, disclosures: 0 });
     });
-    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("fetch", withSchedulerFallback(fetchMock));
 
     render(<WatchlistDashboard />);
 
@@ -909,7 +1026,7 @@ describe("WatchlistDashboard", () => {
       }
       return jsonResponse({ status: "ok", price_rows: 1, indicator_rows: 1, news_items: 0, disclosures: 0 });
     });
-    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("fetch", withSchedulerFallback(fetchMock));
 
     render(<WatchlistDashboard />);
 
@@ -934,7 +1051,7 @@ describe("WatchlistDashboard", () => {
       }
       return jsonResponse({ status: "ok", price_rows: 1, indicator_rows: 1, news_items: 0, disclosures: 0 });
     });
-    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("fetch", withSchedulerFallback(fetchMock));
 
     render(<WatchlistDashboard />);
 
@@ -1033,7 +1150,7 @@ describe("WatchlistDashboard", () => {
       }
       return jsonResponse({ status: "ok", price_rows: 1, indicator_rows: 1, news_items: 0, disclosures: 0 });
     });
-    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("fetch", withSchedulerFallback(fetchMock));
 
     render(<WatchlistDashboard />);
 
@@ -1146,7 +1263,7 @@ describe("WatchlistDashboard", () => {
       }
       return jsonResponse({ status: "ok", price_rows: 1, indicator_rows: 1, news_items: 0, disclosures: 0 });
     });
-    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("fetch", withSchedulerFallback(fetchMock));
 
     render(<WatchlistDashboard />);
 
@@ -1238,7 +1355,7 @@ describe("WatchlistDashboard", () => {
       }
       return jsonResponse({ status: "ok", price_rows: 1, indicator_rows: 1, news_items: 0, disclosures: 0 });
     });
-    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("fetch", withSchedulerFallback(fetchMock));
 
     render(<WatchlistDashboard />);
 
@@ -1278,7 +1395,7 @@ describe("WatchlistDashboard", () => {
       }
       return jsonResponse({ status: "ok", price_rows: 1, indicator_rows: 1, news_items: 0, disclosures: 0 });
     });
-    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("fetch", withSchedulerFallback(fetchMock));
 
     render(<WatchlistDashboard />);
 
@@ -1348,7 +1465,7 @@ describe("WatchlistDashboard", () => {
       }
       return jsonResponse({ status: "ok", price_rows: 1, indicator_rows: 1, news_items: 0, disclosures: 0 });
     });
-    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("fetch", withSchedulerFallback(fetchMock));
 
     render(<WatchlistDashboard />);
 
@@ -1382,7 +1499,7 @@ describe("WatchlistDashboard", () => {
       }
       return jsonResponse({ status: "ok", price_rows: 1, indicator_rows: 1, news_items: 0, disclosures: 0 });
     });
-    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("fetch", withSchedulerFallback(fetchMock));
 
     render(<WatchlistDashboard />);
 

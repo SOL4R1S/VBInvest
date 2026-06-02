@@ -31,6 +31,12 @@ import {
 import { ChartShell } from "@/components/ChartShell";
 import { ResearchCard } from "@/components/ResearchCard";
 import { SetupWizard } from "@/components/SetupWizard";
+import {
+  FALLBACK_SCHEDULER_SETTINGS,
+  fetchSchedulerSettings,
+  patchSchedulerSettings,
+  type SchedulerSettings,
+} from "@/lib/scheduler-settings";
 
 export function WatchlistDashboard() {
   const [watchlists, setWatchlists] = useState<readonly Watchlist[]>([]);
@@ -51,6 +57,10 @@ export function WatchlistDashboard() {
   const [dashboardLoadError, setDashboardLoadError] = useState<string | null>(null);
   const [setupRequired, setSetupRequired] = useState(false);
   const [setupRevision, setSetupRevision] = useState(0);
+  const [schedulerSettings, setSchedulerSettings] = useState<SchedulerSettings>(FALLBACK_SCHEDULER_SETTINGS);
+  const [schedulerStateError, setSchedulerStateError] = useState<string | null>(null);
+  const [schedulerSaving, setSchedulerSaving] = useState(false);
+  const [schedulerLoading, setSchedulerLoading] = useState(false);
 
   const activeWatchlist = watchlists.find((item) => item.id === selectedWatchlist) ?? watchlists[0] ?? null;
   const hasWatchlists = watchlists.length > 0;
@@ -62,6 +72,7 @@ export function WatchlistDashboard() {
   const asset = assetCards[currentSymbol] ?? fallbackAsset(currentSymbol);
   const points = useMemo(() => seriesBySymbol[currentSymbol] ?? [], [currentSymbol, seriesBySymbol]);
   const startupInProgress = startupRefresh.status === "checking" || startupRefresh.status === "running";
+  const schedulerText = schedulerSettings.weeklyPrecomputeEnabled ? "주간 사전 리포트 켜짐" : "주간 사전 리포트 꺼짐";
 
   useEffect(() => {
     let cancelled = false;
@@ -87,6 +98,32 @@ export function WatchlistDashboard() {
       }
     }
 
+    async function loadSchedulerSettings() {
+      setSchedulerLoading(true);
+      setSchedulerStateError(null);
+      try {
+        const nextStatus = await fetchSchedulerSettings();
+        if (!cancelled) {
+          if (nextStatus === null) {
+            setSchedulerSettings(FALLBACK_SCHEDULER_SETTINGS);
+            setSchedulerStateError("스케줄러 설정 저장 실패");
+          } else {
+            setSchedulerSettings(nextStatus);
+          }
+        }
+      } catch (error) {
+        logStartupWarning(error, "scheduler status refresh failed");
+        if (!cancelled) {
+          setSchedulerSettings(FALLBACK_SCHEDULER_SETTINGS);
+          setSchedulerStateError("스케줄러 설정 저장 실패");
+        }
+      } finally {
+        if (!cancelled) {
+          setSchedulerLoading(false);
+        }
+      }
+    }
+
     async function refreshMarketData() {
       setWatchlistsLoaded(false);
       try {
@@ -99,6 +136,7 @@ export function WatchlistDashboard() {
             return;
           }
           setSetupRequired(false);
+          void loadSchedulerSettings();
         }
       } catch (error) {
         logStartupWarning(error, "settings status refresh failed");
@@ -168,6 +206,27 @@ export function WatchlistDashboard() {
     setSetupRequired(false);
     setStartupRefresh(INITIAL_STARTUP_REFRESH);
     setSetupRevision((value) => value + 1);
+  }
+
+  async function updateWeeklyPrecompute(enabled: boolean) {
+    const previousStatus = schedulerSettings;
+    const optimisticStatus = { ...schedulerSettings, weeklyPrecomputeEnabled: enabled };
+    setSchedulerSaving(true);
+    setSchedulerStateError(null);
+    setSchedulerSettings(optimisticStatus);
+    try {
+      const nextStatus = await patchSchedulerSettings({ weeklyPrecomputeEnabled: enabled });
+      if (nextStatus === null) {
+        throw new Error("invalid patch response");
+      }
+      setSchedulerSettings(nextStatus);
+    } catch (error) {
+      logStartupWarning(error, "scheduler settings update failed");
+      setSchedulerSettings(previousStatus);
+      setSchedulerStateError("스케줄러 설정 저장 실패");
+    } finally {
+      setSchedulerSaving(false);
+    }
   }
 
   async function createWatchlist() {
@@ -363,6 +422,26 @@ export function WatchlistDashboard() {
             </button>
           </div>
           {symbolValidationMessage ? <p className="research-status error">{symbolValidationMessage}</p> : null}
+        </div>
+
+        <div className="panel-column">
+          <h2>주간 사전 리포트</h2>
+          <div className="inline-form scheduler-toggle-row">
+            <span>주간 사전 리포트 계산</span>
+            <input
+              aria-label="주간 사전 리포트"
+              type="checkbox"
+              checked={schedulerSettings.weeklyPrecomputeEnabled}
+              onChange={(event) => {
+                void updateWeeklyPrecompute(event.target.checked);
+              }}
+              disabled={schedulerLoading || schedulerSaving}
+            />
+          </div>
+          <p className="research-status">기본은 꺼짐(오프)이며 필요할 때만 사용합니다.</p>
+          <p className="research-status">리포트 발행은 수동 버튼으로 동일하게 실행할 수 있습니다.</p>
+          <p className="research-status">{schedulerText}</p>
+          {schedulerStateError ? <p className="research-status error">{schedulerStateError}</p> : null}
         </div>
       </section>
 

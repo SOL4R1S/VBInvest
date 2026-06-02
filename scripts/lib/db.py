@@ -145,6 +145,7 @@ def build_indicator_rows(asset_id: int, frame: pd.DataFrame) -> list[dict[str, A
 class VBinvestDB:
     def __init__(self, config: DatabaseConfig):
         self.config = config
+        self._settings_metadata_ready = False
         try:
             import psycopg
         except ImportError as exc:
@@ -186,6 +187,41 @@ class VBinvestDB:
                 }
                 for row in cur.fetchall()
             ]
+
+    def ensure_assets_for_refresh(self, assets: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        if not assets:
+            return []
+        ensured: list[dict[str, Any]] = []
+        with self.connect() as conn, conn.cursor() as cur:
+            for asset in assets:
+                symbol = str(asset.get("symbol", "")).strip().upper()
+                if not symbol:
+                    continue
+                cur.execute(
+                    """
+                    INSERT INTO assets (symbol, display_name_ko, exchange, currency)
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (symbol) DO UPDATE SET
+                      display_name_ko = COALESCE(assets.display_name_ko, EXCLUDED.display_name_ko),
+                      exchange = COALESCE(assets.exchange, EXCLUDED.exchange),
+                      currency = COALESCE(assets.currency, EXCLUDED.currency),
+                      updated_at = now()
+                    RETURNING asset_id, symbol, display_name_ko, exchange, currency
+                    """,
+                    (symbol, asset.get("display_name_ko"), asset.get("exchange"), asset.get("currency")),
+                )
+                row = cur.fetchone()
+                ensured.append(
+                    {
+                        **asset,
+                        "asset_id": row[0],
+                        "symbol": row[1],
+                        "display_name_ko": row[2] or asset.get("display_name_ko"),
+                        "exchange": row[3] or asset.get("exchange"),
+                        "currency": row[4] or asset.get("currency"),
+                    }
+                )
+        return ensured
 
     def fetch_profile_by_auth_user(self, auth_user_id: str) -> dict[str, Any] | None:
         query = """
@@ -376,6 +412,20 @@ class VBinvestDB:
         sql = "DELETE FROM job_locks WHERE lock_name = %s AND holder = %s"
         with self.connect() as conn, conn.cursor() as cur:
             cur.execute(sql, (lock_name, holder))
+
+    def fetch_setting(self, key: str) -> str | None:
+        self._ensure_settings_metadata()
+        sql = "SELECT value FROM settings_metadata WHERE key = %s"
+        with self.connect() as conn, conn.cursor() as cur:
+            cur.execute(sql, (key,))
+            row = cur.fetchone()
+        return None if row is None else row[0]
+
+    def upsert_setting(self, key: str, value: str) -> None:
+        self._ensure_settings_metadata()
+        sql = "INSERT INTO settings_metadata (key, value) VALUES (%s, %s) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()"
+        with self.connect() as conn, conn.cursor() as cur:
+            cur.execute(sql, (key, value))
 
     def upsert_news_items(self, rows: list[dict[str, Any]]) -> int:
         if not rows:
@@ -1159,6 +1209,21 @@ class VBinvestDB:
                 (provider, event_id),
             )
         return {"status": "processed", "duplicate": False}
+
+    def _ensure_settings_metadata(self) -> None:
+        if self._settings_metadata_ready:
+            return
+        with self.connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS settings_metadata (
+                  key TEXT PRIMARY KEY,
+                  value TEXT NOT NULL,
+                  updated_at TIMESTAMP NOT NULL DEFAULT now()
+                )
+                """
+            )
+        self._settings_metadata_ready = True
 
     def _ensure_profile(self, cur, auth_user_id: str) -> int:
         slug = f"user-{hashlib_sha(auth_user_id)[:12]}"

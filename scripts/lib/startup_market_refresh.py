@@ -75,6 +75,7 @@ def run_startup_market_refresh(
     )
     if not assets:
         assets = fallback_assets(watchlist)
+    assets = _ensure_assets_for_store(effective_store, assets)
     if limit > 0:
         assets = assets[:limit]
     asset_count = len(assets)
@@ -265,6 +266,15 @@ def _coerce_datetime(value: Any) -> datetime | None:
             return None
         return _coerce_datetime(parsed)
     return None
+
+
+def _ensure_assets_for_store(store: StartupRefreshStore | None, assets: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    if store is None:
+        return assets
+    ensureer = getattr(store, "ensure_assets_for_refresh", None)
+    if not callable(ensureer):
+        return assets
+    return ensureer(assets)
 
 
 def _are_all_assets_fresh(store: StartupRefreshStore | None, assets: list[dict]) -> bool:

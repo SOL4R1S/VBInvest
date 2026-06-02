@@ -29,6 +29,53 @@ class FakeSettingsDB:
         }
 
 
+class FakeSchedulerDB(FakeSettingsDB):
+    def __init__(self, *, locked: bool = False) -> None:
+        self.locked = locked
+        self.settings: dict[str, str] = {}
+        self.lock_calls: list[tuple[str, str, int]] = []
+        self.release_calls: list[tuple[str, str]] = []
+
+    def fetch_setting(self, key: str) -> str | None:
+        return self.settings.get(key)
+
+    def upsert_setting(self, key: str, value: str) -> None:
+        self.settings[key] = value
+
+    def try_acquire_job_lock(self, lock_name: str, holder: str, ttl_seconds: int) -> bool:
+        self.lock_calls.append((lock_name, holder, ttl_seconds))
+        return not self.locked
+
+    def release_job_lock(self, lock_name: str, holder: str) -> None:
+        self.release_calls.append((lock_name, holder))
+
+    def fetch_watchlist_assets(self, slug: str):
+        if slug != "semiconductor-core":
+            return []
+        return [{"asset_id": 1, "symbol": "NVDA", "display_name_ko": "엔비디아", "exchange": "NASDAQ", "currency": "USD"}]
+
+    def fetch_profile_by_auth_user(self, auth_user_id: str):
+        return {"profile_id": 1, "auth_user_id": auth_user_id, "slug": auth_user_id, "email": f"{auth_user_id}@example.com"}
+
+    def record_report_run(self, **kwargs):
+        return "run-scheduler-1"
+
+    def fetch_latest_successful_report_run(self, run_type: str, scope_slug: str):
+        return None
+
+    def fetch_latest_price_dates(self, asset_ids):
+        return {}
+
+    def list_portfolio_holdings(self):
+        return []
+
+    def upsert_prices(self, rows):
+        return len(rows)
+
+    def upsert_indicators(self, rows):
+        return len(rows)
+
+
 class FakeResearchDB:
     def fetch_profile_by_auth_user(self, auth_user_id: str):
         return {"profile_id": 1, "auth_user_id": auth_user_id, "slug": auth_user_id, "email": f"{auth_user_id}@example.com"}
@@ -232,6 +279,62 @@ def test_settings_exposes_latest_startup_refresh_summary(monkeypatch, tmp_path):
     assert payload["latest_startup_refresh"]["provider_disabled"] == [
         {"symbol": "NVDA", "provider": "dart", "reason": "missing-api-key"}
     ]
+
+
+def test_scheduler_settings_defaults_weekly_precompute_disabled(monkeypatch):
+    client = client_with_db(monkeypatch, FakeSchedulerDB())
+
+    response = client.get("/api/scheduler/settings")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["daily_refresh_enabled"] is True
+    assert payload["weekly_precompute_enabled"] is False
+    assert payload["watchlist"] == "semiconductor-core"
+
+
+def test_scheduler_settings_patch_updates_weekly_precompute(monkeypatch):
+    token = create_test_token("user-a", email="user-a@example.com")
+    client = client_with_db(monkeypatch, FakeSchedulerDB())
+
+    response = client.patch(
+        "/api/scheduler/settings",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"weekly_precompute_enabled": True},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["weekly_precompute_enabled"] is True
+
+
+def test_scheduler_tick_runs_daily_and_skips_weekly_when_disabled(monkeypatch):
+    token = create_test_token("user-a", email="user-a@example.com")
+    fake_db = FakeSchedulerDB()
+    client = client_with_db(monkeypatch, fake_db)
+
+    response = client.post(
+        "/api/scheduler/tick?no_network=true&include_news=false",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["daily"]["status"] == "ok"
+    assert payload["weekly"] == {"run_type": "weekly-precompute", "status": "skipped", "reason": "disabled"}
+    assert fake_db.lock_calls[0][0] == "local-scheduler:daily-refresh"
+
+
+def test_scheduler_settings_rejects_malformed_boolean(monkeypatch):
+    token = create_test_token("user-a", email="user-a@example.com")
+    client = client_with_db(monkeypatch, FakeSchedulerDB())
+
+    response = client.patch(
+        "/api/scheduler/settings",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"weekly_precompute_enabled": "yes"},
+    )
+
+    assert response.status_code == 422
 
 
 def test_generate_research_returns_503_for_cloud_ai_missing_key(monkeypatch):

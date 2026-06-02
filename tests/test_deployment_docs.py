@@ -110,6 +110,79 @@ def test_readme_documents_startup_sources_and_report_source_gap():
         assert required in english
 
 
+def test_readme_documents_optional_schedulers_and_uninstall():
+    korean = (ROOT / "README.md").read_text(encoding="utf-8")
+    english = (ROOT / "README.en.md").read_text(encoding="utf-8")
+
+    for required in [
+        "선택적 예약 실행",
+        "macOS launchd",
+        "Linux cron",
+        "주간 사전 계산은 기본 비활성화",
+        "launchctl unload -w",
+        "crontab -l | sed",
+    ]:
+        assert required in korean
+
+    for required in [
+        "Optional Scheduled Runs",
+        "macOS launchd",
+        "Linux cron",
+        "Weekly precompute remains disabled by default",
+        "launchctl unload -w",
+        "crontab -l | sed",
+    ]:
+        assert required in english
+
+
+def test_scheduler_templates_are_present_and_generic():
+    daily_launchd = ROOT / "ops" / "launchd" / "vbinvest-daily.plist"
+    weekly_launchd = ROOT / "ops" / "launchd" / "vbinvest-weekly.plist"
+    daily_cron = ROOT / "ops" / "cron" / "vbinvest-daily.cron"
+    weekly_cron = ROOT / "ops" / "cron" / "vbinvest-weekly.cron"
+
+    for path in [daily_launchd, weekly_launchd, daily_cron, weekly_cron]:
+        assert path.is_file()
+
+    daily_text = daily_launchd.read_text(encoding="utf-8")
+    weekly_text = weekly_launchd.read_text(encoding="utf-8")
+    daily_cron_text = daily_cron.read_text(encoding="utf-8")
+    weekly_cron_text = weekly_cron.read_text(encoding="utf-8")
+
+    for required in [
+        "/path/to/VBinvest",
+        "com.vbinvest.daily",
+        "StartCalendarInterval",
+        "scripts/local_scheduler_tick.py",
+    ]:
+        assert required in daily_text
+
+    for required in [
+        "/path/to/VBinvest",
+        "com.vbinvest.weekly",
+        "scripts/local_scheduler_tick.py",
+    ]:
+        assert required in weekly_text
+
+    for required in [
+        "/path/to/VBinvest",
+        "scripts/local_scheduler_tick.py",
+    ]:
+        assert required in daily_cron_text
+        assert required in weekly_cron_text
+
+    for forbidden in [
+        "/Volumes/nv6000t/project/VBInvest",
+        "/Volumes/nv6000t/ObsidianVault",
+        "daily_market_ingest.py",
+        "weekly_pipeline.py",
+    ]:
+        assert forbidden not in daily_text
+        assert forbidden not in weekly_text
+        assert forbidden not in daily_cron_text
+        assert forbidden not in weekly_cron_text
+
+
 def test_readme_documents_secure_storage_and_ai_modes():
     korean = (ROOT / "README.md").read_text(encoding="utf-8")
     english = (ROOT / "README.en.md").read_text(encoding="utf-8")

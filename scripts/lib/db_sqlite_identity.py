@@ -33,6 +33,54 @@ class SQLiteIdentityMixin:
             for row in rows
         ]
 
+    def ensure_assets_for_refresh(self, assets: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        if not assets:
+            return []
+        normalized_symbols = [str(asset.get("symbol", "")).strip().upper() for asset in assets]
+        normalized_symbols = [symbol for symbol in normalized_symbols if symbol]
+        if not normalized_symbols:
+            return []
+        with self.connect() as conn:
+            for asset in assets:
+                symbol = str(asset.get("symbol", "")).strip().upper()
+                if not symbol:
+                    continue
+                conn.execute(
+                    """
+                    INSERT INTO assets (symbol, display_name_ko, exchange, currency)
+                    VALUES (?, ?, ?, ?)
+                    ON CONFLICT (symbol) DO UPDATE SET
+                      display_name_ko = COALESCE(assets.display_name_ko, excluded.display_name_ko),
+                      exchange = COALESCE(assets.exchange, excluded.exchange),
+                      currency = COALESCE(assets.currency, excluded.currency),
+                      updated_at = CURRENT_TIMESTAMP
+                    """,
+                    (symbol, asset.get("display_name_ko"), asset.get("exchange"), asset.get("currency")),
+                )
+            placeholders = ",".join("?" for _ in normalized_symbols)
+            rows = conn.execute(
+                f"SELECT asset_id, symbol, display_name_ko, exchange, currency FROM assets WHERE symbol IN ({placeholders})",
+                normalized_symbols,
+            ).fetchall()
+        rows_by_symbol = {row["symbol"]: row for row in rows}
+        ensured: list[dict[str, Any]] = []
+        for asset in assets:
+            symbol = str(asset.get("symbol", "")).strip().upper()
+            row = rows_by_symbol.get(symbol)
+            if row is None:
+                continue
+            ensured.append(
+                {
+                    **asset,
+                    "asset_id": int(row["asset_id"]),
+                    "symbol": row["symbol"],
+                    "display_name_ko": row["display_name_ko"] or asset.get("display_name_ko"),
+                    "exchange": row["exchange"] or asset.get("exchange"),
+                    "currency": row["currency"] or asset.get("currency"),
+                }
+            )
+        return ensured
+
     def fetch_profile_by_auth_user(self, auth_user_id: str) -> dict[str, Any] | None:
         with self.connect() as conn:
             row = conn.execute(
