@@ -33,12 +33,7 @@ export type DashboardModel = {
   series: Record<string, ChartPoint[]>;
   symbols: string[];
 };
-
 type JsonObject = Record<string, unknown>;
-
-export const DEFAULT_WATCHLISTS = [
-  { id: "semiconductor-core", name: "Semiconductor Core", symbols: ["NVDA", "005930.KS", "000660.KS"] },
-];
 
 export async function fetchDashboardData(slug: string): Promise<DashboardModel | null> {
   const response = await fetch(`/api/watchlists/${encodeURIComponent(slug)}/dashboard?days=260`);

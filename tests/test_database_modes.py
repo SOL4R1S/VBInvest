@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 import pandas as pd
@@ -151,6 +151,166 @@ def test_shared_repository_roundtrip_works_for_sqlite_mode(tmp_path: Path) -> No
     assert latest_research["opinion"] == "중립"
     assert latest_research["risks"] == ["risk"]
     assert latest_research["sources"] == [{"type": "db"}]
+
+
+def test_sqlite_source_upserts_match_partial_unique_indexes(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.toml"
+    sqlite_path = tmp_path / "data" / "vbinvest.sqlite3"
+    _write_config(config_path, mode="sqlite", sqlite_path=sqlite_path)
+    repo = build_database_from_local_config(config_path=config_path, environ={})
+
+    watchlist = repo.create_user_watchlist("user-1", "뉴스", ["AAPL"])
+    asset_id = repo.fetch_watchlist_assets(watchlist["slug"])[0]["asset_id"]
+    news_row = {
+        "asset_id": asset_id,
+        "provider": "yahoo-rss",
+        "source": "Yahoo Finance",
+        "source_id": "abc-1",
+        "url": "https://example.com/news?id=1",
+        "canonical_url": "https://example.com/news",
+        "title": "Same item",
+        "published_at": datetime(2026, 6, 1, tzinfo=timezone.utc),
+        "content_hash": "hash-1",
+        "language": "en",
+        "summary": "A",
+        "raw_json": {"id": 1},
+        "relevance": 0.9,
+    }
+    disclosure_row = {
+        "asset_id": asset_id,
+        "market": "US",
+        "provider": "sec-submissions",
+        "provider_disclosure_id": "0000320193-26-000001",
+        "title": "10-Q Quarterly report",
+        "published_at": datetime(2026, 6, 1, tzinfo=timezone.utc),
+        "url": "https://sec.example.com/aapl.htm",
+        "raw_json": {"id": 1},
+    }
+
+    assert repo.upsert_news_items([news_row]) == 1
+    assert repo.upsert_news_items([{**news_row, "summary": "B"}]) == 1
+    assert repo.upsert_disclosures([disclosure_row]) == 1
+    assert repo.upsert_disclosures([{**disclosure_row, "title": "10-Q Updated"}]) == 1
+
+
+def test_sqlite_fetch_dashboard_items_includes_latest_research_views(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.toml"
+    sqlite_path = tmp_path / "data" / "vbinvest.sqlite3"
+    _write_config(config_path, mode="sqlite", sqlite_path=sqlite_path)
+    repo = build_database_from_local_config(config_path=config_path, environ={})
+
+    watchlist = repo.create_user_watchlist("user-1", "핵심", ["NVDA", "TSM"])
+    watchlist_assets = repo.fetch_watchlist_assets(watchlist["slug"])
+    assert watchlist_assets == [
+        {"asset_id": watchlist_assets[0]["asset_id"], "symbol": "NVDA", "display_name_ko": None, "exchange": None, "currency": None},
+        {"asset_id": watchlist_assets[1]["asset_id"], "symbol": "TSM", "display_name_ko": None, "exchange": None, "currency": None},
+    ]
+
+    nvda_asset_id = watchlist_assets[0]["asset_id"]
+    tsm_asset_id = watchlist_assets[1]["asset_id"]
+
+    nvda_prices = pd.DataFrame(
+        [
+            {"date": date(2026, 6, 1), "open": 100, "high": 105, "low": 99, "close": 102, "volume": 1000, "source": "yfinance"},
+            {"date": date(2026, 6, 2), "open": 102, "high": 106, "low": 101, "close": 105, "volume": 1200, "source": "yfinance"},
+        ]
+    )
+    tsm_prices = pd.DataFrame(
+        [
+            {"date": date(2026, 6, 1), "open": 45, "high": 47, "low": 44, "close": 46, "volume": 800, "source": "yfinance"},
+        ]
+    )
+    nvda_indicators = pd.DataFrame(
+        [
+            {"date": date(2026, 6, 1), "return_1d": 0.01, "ma5": 100.0, "ma20": 99.0, "ma50": 98.0, "ma120": 97.0, "rsi14": 50.0},
+            {"date": date(2026, 6, 2), "return_1d": 0.03, "ma5": 101.0, "ma20": 100.0, "ma50": 98.5, "ma120": 97.2, "rsi14": 52.0},
+        ]
+    )
+    tsm_indicators = pd.DataFrame(
+        [
+            {"date": date(2026, 6, 1), "return_1d": -0.01, "ma5": 45.0, "ma20": 44.5, "ma50": 44.0, "ma120": 43.0, "rsi14": 48.0},
+        ]
+    )
+
+    repo.upsert_prices(build_price_rows(nvda_asset_id, nvda_prices))
+    repo.upsert_prices(build_price_rows(tsm_asset_id, tsm_prices))
+    repo.upsert_indicators(build_indicator_rows(nvda_asset_id, nvda_indicators))
+    repo.upsert_indicators(build_indicator_rows(tsm_asset_id, tsm_indicators))
+
+    repo.upsert_research_views(
+        [
+            {
+                "target_type": "asset",
+                "target_slug": "NVDA",
+                "report_date": date(2026, 6, 1),
+                "horizon": "on_demand",
+                "opinion": "아웃퍼폼",
+                "thesis": "old thesis",
+                "rationale": ["old rationale"],
+                "bull": "old bull",
+                "base": "old base",
+                "bear": "old bear",
+                "risks": ["old risk"],
+                "triggers": ["old trigger"],
+                "sources": [{"kind": "news"}],
+                "confidence": 0.5,
+                "source_freshness_status": "fresh",
+                "access_tier": "free",
+            },
+            {
+                "target_type": "asset",
+                "target_slug": "NVDA",
+                "report_date": date(2026, 6, 2),
+                "horizon": "on_demand",
+                "opinion": "중립",
+                "thesis": "new thesis",
+                "rationale": ["new rationale"],
+                "bull": "new bull",
+                "base": "new base",
+                "bear": "new bear",
+                "risks": ["new risk"],
+                "triggers": ["new trigger"],
+                "sources": [{"kind": "disclosure"}],
+                "confidence": 0.8,
+                "source_freshness_status": "fresh",
+                "access_tier": "free",
+            },
+            {
+                "target_type": "asset",
+                "target_slug": "TSM",
+                "report_date": date(2026, 6, 1),
+                "horizon": "on_demand",
+                "opinion": "매수",
+                "thesis": "tsm thesis",
+                "rationale": ["tsm rationale"],
+                "bull": "tsm bull",
+                "base": "tsm base",
+                "bear": "tsm bear",
+                "risks": ["tsm risk"],
+                "triggers": ["tsm trigger"],
+                "sources": [{"kind": "manual"}],
+                "confidence": 0.9,
+                "source_freshness_status": "fresh",
+                "access_tier": "free",
+            },
+        ]
+    )
+
+    items = repo.fetch_dashboard_items(watchlist["slug"], days=10)
+    assert len(items) == 2
+    assert items[0]["asset"]["symbol"] == "NVDA"
+    assert items[0]["opinion"] == "중립"
+    assert items[0]["thesis"] == "new thesis"
+    assert items[0]["risks"] == ["new risk"]
+    assert items[0]["research_date"] == date(2026, 6, 2)
+    assert items[0]["history"].iloc[-1]["close"] == 105
+    assert items[1]["opinion"] == "매수"
+
+    views = repo.fetch_latest_research_views(watchlist["slug"])
+    assert set(views.keys()) == {"NVDA", "TSM"}
+    assert views["NVDA"]["opinion"] == "중립"
+    assert views["NVDA"]["risks"] == ["new risk"]
+    assert views["TSM"]["research_date"] == date(2026, 6, 1)
 
 
 def test_postgres_url_mode_preserves_existing_postgres_path(tmp_path: Path) -> None:

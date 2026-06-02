@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import json
 import shutil
 import sys
 from pathlib import Path
@@ -86,7 +87,16 @@ def frontend_index_response() -> HTMLResponse:
     index_file = frontend_index_file()
     if index_file is None:
         raise HTTPException(status_code=404, detail="frontend build not found")
-    return HTMLResponse(index_file.read_text(encoding="utf-8"))
+    html = index_file.read_text(encoding="utf-8")
+    session_token = os.environ.get("VBINVEST_LOCAL_SESSION_TOKEN", "")
+    if session_token:
+        script = (
+            "<script>"
+            f"window.__VBINVEST_LOCAL_SESSION_TOKEN__={json.dumps(session_token)};"
+            "</script>"
+        )
+        html = html.replace("</head>", f"{script}</head>", 1) if "</head>" in html else f"{script}{html}"
+    return HTMLResponse(html)
 
 
 class WatchlistCreate(BaseModel):

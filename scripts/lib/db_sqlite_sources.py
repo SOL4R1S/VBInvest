@@ -18,13 +18,13 @@ class SQLiteSourcesMixin:
                 source_id = params.get("source_id")
                 canonical_url = params.get("canonical_url")
                 if source_id:
-                    conflict_target = "provider, source_id"
+                    conflict_clause = "(provider, source_id) WHERE source_id IS NOT NULL"
                     conflict_where = "source_id"
                 elif canonical_url:
-                    conflict_target = "canonical_url"
+                    conflict_clause = "(canonical_url) WHERE canonical_url IS NOT NULL"
                     conflict_where = "canonical_url"
                 else:
-                    conflict_target = "provider, content_hash"
+                    conflict_clause = "(provider, content_hash) WHERE content_hash IS NOT NULL"
                     conflict_where = "content_hash"
                 conn.execute(
                     f"""
@@ -32,7 +32,7 @@ class SQLiteSourcesMixin:
                       provider, source, source_id, url, canonical_url, title, published_at,
                       content_hash, language, summary, raw_json
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ON CONFLICT ({conflict_target}) DO UPDATE SET
+                    ON CONFLICT {conflict_clause} DO UPDATE SET
                       source = excluded.source,
                       url = excluded.url,
                       canonical_url = excluded.canonical_url,
@@ -81,7 +81,7 @@ class SQLiteSourcesMixin:
                 INSERT INTO disclosures (
                   asset_id, market, provider, provider_disclosure_id, title, published_at, url, raw_json
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT (provider, provider_disclosure_id) DO UPDATE SET
+                ON CONFLICT (provider, provider_disclosure_id) WHERE provider_disclosure_id IS NOT NULL DO UPDATE SET
                   asset_id = excluded.asset_id,
                   market = excluded.market,
                   title = excluded.title,

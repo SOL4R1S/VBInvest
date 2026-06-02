@@ -347,6 +347,34 @@ def test_local_session_token_authenticates_without_jwt(monkeypatch):
     assert response.json()["provider"] == "local"
 
 
+def test_frontend_index_injects_local_session_token(monkeypatch, tmp_path):
+    out_dir = tmp_path / "frontend-out"
+    out_dir.mkdir()
+    (out_dir / "index.html").write_text("<html><head></head><body>VBinvest</body></html>", encoding="utf-8")
+    monkeypatch.setenv("VBINVEST_FRONTEND_OUT_DIR", str(out_dir))
+    monkeypatch.setenv("VBINVEST_LOCAL_SESSION_TOKEN", "qa-token")
+    client = client_with_db(monkeypatch, FakeAuthDB())
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert 'window.__VBINVEST_LOCAL_SESSION_TOKEN__="qa-token"' in response.text
+
+
+def test_frontend_index_omits_local_session_script_when_token_missing(monkeypatch, tmp_path):
+    out_dir = tmp_path / "frontend-out"
+    out_dir.mkdir()
+    (out_dir / "index.html").write_text("<html><head></head><body>VBinvest</body></html>", encoding="utf-8")
+    monkeypatch.setenv("VBINVEST_FRONTEND_OUT_DIR", str(out_dir))
+    monkeypatch.delenv("VBINVEST_LOCAL_SESSION_TOKEN", raising=False)
+    client = client_with_db(monkeypatch, FakeAuthDB())
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert "__VBINVEST_LOCAL_SESSION_TOKEN__" not in response.text
+
+
 def test_shutdown_requires_local_session_token(monkeypatch):
     client = client_with_db(monkeypatch, FakeAuthDB())
     monkeypatch.setenv("VBINVEST_LOCAL_SESSION_TOKEN", "qa-token")

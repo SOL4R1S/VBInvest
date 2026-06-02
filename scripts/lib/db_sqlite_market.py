@@ -3,6 +3,10 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
+import pandas as pd
+
+from scripts.lib.db_sqlite_values import json_loads_list
+
 
 class SQLiteMarketMixin:
     def upsert_prices(self, rows: list[dict[str, Any]]) -> int:
@@ -223,3 +227,116 @@ class SQLiteMarketMixin:
         if has_synthetic:
             return "synthetic"
         return "collected"
+
+    def fetch_latest_research_views(self, slug: str) -> dict[str, dict[str, Any]]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                WITH wl_assets AS (
+                  SELECT a.symbol
+                  FROM watchlists w
+                  JOIN watchlist_members wm ON wm.watchlist_id = w.watchlist_id
+                  JOIN assets a ON a.asset_id = wm.asset_id
+                  WHERE w.slug = ? AND w.archived_at IS NULL AND a.active = 1
+                ), latest AS (
+                  SELECT rv.*, row_number() OVER (PARTITION BY rv.target_slug ORDER BY rv.report_date DESC, rv.updated_at DESC) AS rn
+                  FROM research_views rv
+                  JOIN wl_assets wa ON wa.symbol = rv.target_slug
+                  WHERE rv.target_type = 'asset' AND rv.horizon = 'on_demand'
+                )
+                SELECT target_slug, opinion, thesis, rationale, bull, base, bear, risks, triggers, sources, report_date
+                FROM latest WHERE rn = 1
+                """,
+                (slug,),
+            ).fetchall()
+        views: dict[str, dict[str, Any]] = {}
+        for row in rows:
+            report_date = row["report_date"]
+            parsed_date = date.fromisoformat(report_date) if isinstance(report_date, str) else report_date
+            views[row["target_slug"]] = {
+                "opinion": row["opinion"],
+                "thesis": row["thesis"],
+                "rationale": json_loads_list(row["rationale"]),
+                "bull": row["bull"],
+                "base": row["base"],
+                "bear": row["bear"],
+                "risks": json_loads_list(row["risks"]),
+                "triggers": json_loads_list(row["triggers"]),
+                "sources": json_loads_list(row["sources"]),
+                "research_date": parsed_date,
+            }
+        return views
+
+    def fetch_dashboard_items(self, slug: str, *, days: int = 260) -> list[dict[str, Any]]:
+        assets = self.fetch_watchlist_assets(slug)
+        if not assets:
+            return []
+        views = self.fetch_latest_research_views(slug)
+        items: list[dict[str, Any]] = []
+        query = """
+        SELECT p.date, p.open, p.high, p.low, p.close, p.volume, p.source,
+               i.return_1d, i.return_1w, i.return_1m, i.return_3m, i.return_6m, i.return_ytd,
+               i.ma5, i.ma20, i.ma50, i.ma120, i.rsi14, i.vol20, i.drawdown_52w, i.high_52w
+        FROM daily_prices p
+        LEFT JOIN daily_indicators i ON i.asset_id = p.asset_id AND i.date = p.date
+        WHERE p.asset_id = ?
+        ORDER BY p.date DESC
+        LIMIT ?
+        """
+        with self.connect() as conn:
+            for asset in assets:
+                rows = conn.execute(query, (asset["asset_id"], days)).fetchall()
+                if not rows:
+                    continue
+                frame = pd.DataFrame(
+                    rows,
+                    columns=[
+                        "date",
+                        "open",
+                        "high",
+                        "low",
+                        "close",
+                        "volume",
+                        "source",
+                        "return_1d",
+                        "return_1w",
+                        "return_1m",
+                        "return_3m",
+                        "return_6m",
+                        "return_ytd",
+                        "ma5",
+                        "ma20",
+                        "ma50",
+                        "ma120",
+                        "rsi14",
+                        "vol20",
+                        "drawdown_52w",
+                        "high_52w",
+                    ],
+                ).sort_values("date").reset_index(drop=True)
+                for column in [
+                    "open",
+                    "high",
+                    "low",
+                    "close",
+                    "volume",
+                    "return_1d",
+                    "return_1w",
+                    "return_1m",
+                    "return_3m",
+                    "return_6m",
+                    "return_ytd",
+                    "ma5",
+                    "ma20",
+                    "ma50",
+                    "ma120",
+                    "rsi14",
+                    "vol20",
+                    "drawdown_52w",
+                    "high_52w",
+                ]:
+                    frame[column] = pd.to_numeric(frame[column], errors="coerce")
+                item = {"asset": asset, "history": frame}
+                item.update(views.get(asset["symbol"], {}))
+                items.append(item)
+        return items

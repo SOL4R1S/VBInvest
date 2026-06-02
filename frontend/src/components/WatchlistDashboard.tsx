@@ -14,7 +14,6 @@ import {
   type StartupRefreshView,
 } from "@/lib/startup-status";
 import {
-  DEFAULT_WATCHLISTS,
   fallbackAsset,
   fetchDashboardData,
   formatMa,
@@ -22,34 +21,44 @@ import {
   type AssetCard,
   type ChartPoint,
 } from "@/lib/dashboard-data";
+import {
+  addAssetToWatchlist,
+  createWatchlist as createWatchlistRequest,
+  deleteAssetFromWatchlist,
+  fetchWatchlists,
+  type Watchlist,
+} from "@/lib/watchlists";
 import { ChartShell } from "@/components/ChartShell";
 import { ResearchCard } from "@/components/ResearchCard";
 import { SetupWizard } from "@/components/SetupWizard";
 
-type Watchlist = {
-  readonly id: string;
-  readonly name: string;
-  readonly symbols: readonly string[];
-};
-
 export function WatchlistDashboard() {
-  const [watchlists, setWatchlists] = useState<readonly Watchlist[]>(DEFAULT_WATCHLISTS);
-  const [selectedWatchlist, setSelectedWatchlist] = useState(DEFAULT_WATCHLISTS[0]?.id ?? "semiconductor-core");
-  const [selectedSymbol, setSelectedSymbol] = useState(DEFAULT_WATCHLISTS[0]?.symbols[0] ?? "NVDA");
+  const [watchlists, setWatchlists] = useState<readonly Watchlist[]>([]);
+  const [selectedWatchlist, setSelectedWatchlist] = useState<Watchlist["id"] | null>(null);
+  const [selectedSymbol, setSelectedSymbol] = useState("NVDA");
   const [assetCards, setAssetCards] = useState<Record<string, AssetCard>>({});
   const [seriesBySymbol, setSeriesBySymbol] = useState<Record<string, ChartPoint[]>>({});
   const [newWatchlist, setNewWatchlist] = useState("");
   const [newSymbol, setNewSymbol] = useState("");
+  const [watchlistValidationMessage, setWatchlistValidationMessage] = useState("");
   const [symbolValidationMessage, setSymbolValidationMessage] = useState("");
   const [symbolValidationPending, setSymbolValidationPending] = useState(false);
   const [startupRefresh, setStartupRefresh] = useState<StartupRefreshView>(INITIAL_STARTUP_REFRESH);
   const [providerSummary, setProviderSummary] = useState<ProviderSummary | null>(null);
   const [collectionStatus, setCollectionStatus] = useState<readonly CollectionAssetStatus[]>([]);
+  const [watchlistLoadError, setWatchlistLoadError] = useState<string | null>(null);
+  const [watchlistsLoaded, setWatchlistsLoaded] = useState(false);
+  const [dashboardLoadError, setDashboardLoadError] = useState<string | null>(null);
   const [setupRequired, setSetupRequired] = useState(false);
   const [setupRevision, setSetupRevision] = useState(0);
 
-  const activeWatchlist = watchlists.find((item) => item.id === selectedWatchlist) ?? watchlists[0];
-  const currentSymbol = activeWatchlist?.symbols.includes(selectedSymbol) ? selectedSymbol : activeWatchlist?.symbols[0] ?? "NVDA";
+  const activeWatchlist = watchlists.find((item) => item.id === selectedWatchlist) ?? watchlists[0] ?? null;
+  const hasWatchlists = watchlists.length > 0;
+  const activeWatchlistHasSymbols = (activeWatchlist?.symbols.length ?? 0) > 0;
+  const canShowDashboard = watchlistsLoaded && hasWatchlists && activeWatchlistHasSymbols;
+  const currentSymbol = activeWatchlist?.symbols.includes(selectedSymbol)
+    ? selectedSymbol
+    : activeWatchlist?.symbols[0] ?? "";
   const asset = assetCards[currentSymbol] ?? fallbackAsset(currentSymbol);
   const points = useMemo(() => seriesBySymbol[currentSymbol] ?? [], [currentSymbol, seriesBySymbol]);
   const startupInProgress = startupRefresh.status === "checking" || startupRefresh.status === "running";
@@ -59,15 +68,16 @@ export function WatchlistDashboard() {
 
     async function loadDashboardData(slug: string) {
       const dashboard = await fetchDashboardData(slug);
-      if (cancelled || dashboard === null) {
+      if (cancelled) {
         return;
       }
+      if (dashboard === null) {
+        setDashboardLoadError("대시보드 데이터를 불러오지 못했습니다.");
+        return;
+      }
+      setDashboardLoadError(null);
       setAssetCards(dashboard.assets);
       setSeriesBySymbol(dashboard.series);
-      setWatchlists((items) =>
-        items.map((item) => (item.id === slug ? { ...item, symbols: dashboard.symbols } : item)),
-      );
-      setSelectedSymbol((symbol) => (dashboard.symbols.includes(symbol) ? symbol : dashboard.symbols[0] ?? symbol));
     }
 
     async function loadCollectionStatus(slug: string) {
@@ -78,6 +88,7 @@ export function WatchlistDashboard() {
     }
 
     async function refreshMarketData() {
+      setWatchlistsLoaded(false);
       try {
         const nextProviderSummary = await fetchProviderSummary();
         if (!cancelled) {
@@ -108,14 +119,41 @@ export function WatchlistDashboard() {
         }
       }
       try {
-        await loadDashboardData("semiconductor-core");
+        const nextWatchlists = await fetchWatchlists();
+        if (cancelled) {
+          return;
+        }
+        if (nextWatchlists.length === 0) {
+          setWatchlistsLoaded(true);
+          setWatchlistLoadError("저장된 관심 그룹이 없습니다.");
+          setWatchlists([]);
+          setSelectedWatchlist(null);
+          setSelectedSymbol("NVDA");
+          setCollectionStatus([]);
+          setAssetCards({});
+          setSeriesBySymbol({});
+          return;
+        }
+        setWatchlistsLoaded(true);
+        setWatchlistLoadError(null);
+        setWatchlists(nextWatchlists);
+        const nextSelected = selectedWatchlist !== null && nextWatchlists.some((item) => item.id === selectedWatchlist)
+          ? selectedWatchlist
+          : nextWatchlists[0]?.id ?? null;
+        setSelectedWatchlist(nextSelected);
+        const nextWatchlist = nextSelected === null ? null : nextWatchlists.find((item) => item.id === nextSelected);
+        const nextSymbol = nextWatchlist?.symbols.includes(selectedSymbol) ? selectedSymbol : nextWatchlist?.symbols[0] ?? "NVDA";
+        setSelectedSymbol(nextSymbol);
+        if (nextWatchlist !== undefined && nextWatchlist !== null) {
+          await loadDashboardData(nextWatchlist.slug);
+          await loadCollectionStatus(nextWatchlist.slug);
+        }
       } catch (error) {
-        logStartupWarning(error, "dashboard data refresh failed");
-      }
-      try {
-        await loadCollectionStatus("semiconductor-core");
-      } catch (error) {
-        logStartupWarning(error, "collection status refresh failed");
+        logStartupWarning(error, "watchlist load failed");
+        if (!cancelled) {
+          setWatchlistsLoaded(true);
+          setWatchlistLoadError("관심 그룹 목록을 불러오는 데 실패했습니다.");
+        }
       }
     }
 
@@ -132,22 +170,47 @@ export function WatchlistDashboard() {
     setSetupRevision((value) => value + 1);
   }
 
-  function createWatchlist() {
+  async function createWatchlist() {
     const trimmed = newWatchlist.trim();
     if (!trimmed) {
+      setWatchlistValidationMessage("그룹 이름은 비워둘 수 없습니다.");
       return;
     }
-    const id = `wl-${trimmed.toLowerCase().replace(/[^a-z0-9가-힣]+/g, "-")}`;
-    const next = { id, name: trimmed, symbols: [] };
-    setWatchlists((items) => [...items, next]);
-    setSelectedWatchlist(id);
-    setSelectedSymbol("NVDA");
-    setNewWatchlist("");
+    if (!watchlistsLoaded) {
+      setWatchlistValidationMessage("관심 그룹을 불러온 뒤 추가해 주세요.");
+      return;
+    }
+
+    setWatchlistValidationMessage("");
+    try {
+      const next = await createWatchlistRequest(trimmed);
+      if (next === null) {
+        setWatchlistValidationMessage("그룹 생성에 실패했습니다.");
+        return;
+      }
+      setWatchlists((items) => [...items, next]);
+      setSelectedWatchlist(next.id);
+      setSelectedSymbol(next.symbols[0] ?? "NVDA");
+      setNewWatchlist("");
+      setWatchlistValidationMessage("");
+    } catch (error) {
+      logStartupWarning(error, "watchlist create failed");
+      setWatchlistValidationMessage("그룹 생성에 실패했습니다.");
+    }
   }
 
   async function addSymbol() {
     const symbol = newSymbol.trim().toUpperCase();
     if (!symbol) {
+      setSymbolValidationMessage("종목 코드를 입력해 주세요.");
+      return;
+    }
+    if (selectedWatchlist === null) {
+      setSymbolValidationMessage("먼저 관심 그룹을 선택해 주세요.");
+      return;
+    }
+    if (!watchlistsLoaded) {
+      setSymbolValidationMessage("관심 그룹을 불러온 뒤 추가해 주세요.");
       return;
     }
     setSymbolValidationPending(true);
@@ -165,16 +228,40 @@ export function WatchlistDashboard() {
     } finally {
       setSymbolValidationPending(false);
     }
-    setWatchlists((items) =>
-      items.map((item) =>
-        item.id === selectedWatchlist && !item.symbols.includes(symbol)
-          ? { ...item, symbols: [...item.symbols, symbol] }
-          : item,
-      ),
-    );
+
+    const addResponse = await addAssetToWatchlist(selectedWatchlist, symbol);
+    if (addResponse === null) {
+      setSymbolValidationMessage("종목 추가에 실패했습니다.");
+      return;
+    } else {
+      setWatchlists((items) => items.map((item) => (item.id === addResponse.id ? addResponse : item)));
+    }
+
     setSelectedSymbol(symbol);
     setNewSymbol("");
     setSymbolValidationMessage("");
+  }
+
+  async function removeSymbol(symbol: string) {
+    if (selectedWatchlist === null) {
+      setSymbolValidationMessage("먼저 관심 그룹을 선택해 주세요.");
+      return;
+    }
+    setSymbolValidationMessage("");
+    try {
+      const next = await deleteAssetFromWatchlist(selectedWatchlist, symbol);
+      if (next === null) {
+        setSymbolValidationMessage("종목 제거에 실패했습니다.");
+        return;
+      }
+      setWatchlists((items) => items.map((item) => (item.id === next.id ? next : item)));
+      if (symbol === currentSymbol) {
+        setSelectedSymbol(next.symbols[0] ?? "NVDA");
+      }
+    } catch (error) {
+      logStartupWarning(error, "watchlist asset delete failed");
+      setSymbolValidationMessage("종목 제거에 실패했습니다.");
+    }
   }
 
   return (
@@ -190,6 +277,16 @@ export function WatchlistDashboard() {
       {startupRefresh.status === "failed" ? (
         <div className="startup-refresh-banner" role="status" aria-live="polite">
           시장 데이터 갱신 실패
+        </div>
+      ) : null}
+      {watchlistLoadError ? (
+        <div className="startup-refresh-banner" role="status" aria-live="polite">
+          {watchlistLoadError}
+        </div>
+      ) : null}
+      {dashboardLoadError ? (
+        <div className="startup-refresh-banner" role="status" aria-live="polite">
+          {dashboardLoadError}
         </div>
       ) : null}
 
@@ -227,33 +324,41 @@ export function WatchlistDashboard() {
       ) : null}
 
       <section className="control-panel" aria-label="watchlist controls">
-        <div className="panel-column">
-          <h2>관심 그룹</h2>
-          <div className="chips">
-            {watchlists.map((watchlist) => (
-              <button key={watchlist.id} type="button" className={watchlist.id === selectedWatchlist ? "chip active" : "chip"} onClick={() => {
-                setSelectedWatchlist(watchlist.id);
-                setSelectedSymbol(watchlist.symbols[0]);
-              }}>
-                {watchlist.name}
-              </button>
-            ))}
+        {watchlistsLoaded && hasWatchlists ? (
+          <div className="panel-column">
+            <h2>관심 그룹</h2>
+            <div className="chips">
+              {watchlists.map((watchlist) => (
+                <button
+                  key={watchlist.id}
+                  type="button"
+                  className={watchlist.id === selectedWatchlist ? "chip active" : "chip"}
+                  onClick={() => {
+                    setSelectedWatchlist(watchlist.id);
+                    setSelectedSymbol(watchlist.symbols[0] ?? "NVDA");
+                  }}
+                >
+                  {watchlist.name}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        ) : null}
 
         <div className="panel-column">
           <h2>그룹 추가</h2>
           <div className="inline-form">
             <input aria-label="새 그룹 이름" value={newWatchlist} onChange={(event) => setNewWatchlist(event.target.value)} placeholder="AI Memory" />
-            <button type="button" onClick={createWatchlist}>새 그룹</button>
+            <button type="button" onClick={() => void createWatchlist()} disabled={!watchlistsLoaded}>새 그룹</button>
           </div>
+          {watchlistValidationMessage ? <p className="research-status error">{watchlistValidationMessage}</p> : null}
         </div>
 
         <div className="panel-column">
           <h2>종목 추가</h2>
           <div className="inline-form">
             <input aria-label="새 종목 심볼" value={newSymbol} onChange={(event) => setNewSymbol(event.target.value)} placeholder="NVDA" />
-            <button type="button" onClick={() => void addSymbol()} disabled={symbolValidationPending}>
+            <button type="button" onClick={() => void addSymbol()} disabled={symbolValidationPending || !watchlistsLoaded}>
               {symbolValidationPending ? "확인 중" : "추가"}
             </button>
           </div>
@@ -261,49 +366,78 @@ export function WatchlistDashboard() {
         </div>
       </section>
 
-      <section className="content-grid">
-        <aside className="watchlist-card">
-          <div className="card-heading">
-            <h2>{activeWatchlist.name}</h2>
-            <span>{activeWatchlist.symbols.length}개 종목</span>
-          </div>
-          <div className="symbol-list">
-            {(activeWatchlist?.symbols ?? []).map((symbol) => {
-              const item = assetCards[symbol];
-              return (
-                <button key={symbol} type="button" className={symbol === currentSymbol ? "symbol-row active" : "symbol-row"} onClick={() => setSelectedSymbol(symbol)} data-testid={`symbol-${symbol}`}>
-                  <strong>{item?.displayNameKo ?? symbol}</strong>
-                  <span>{symbol}</span>
-                </button>
-              );
-            })}
-          </div>
-        </aside>
-
-        <section className="detail-card">
-          <div className="detail-header">
-            <div>
-              <h2>{asset.displayNameKo}</h2>
-              <p>{asset.symbol}</p>
-            </div>
-            <div className={`badge ${asset.opinion}`}>
-              {asset.opinion}
-            </div>
-          </div>
-
-          <div className="summary-grid">
-            <div><b>현재가</b><span>{asset.price.toLocaleString()}</span></div>
-            <div><b>1D</b><span>{asset.delta1d}</span></div>
-            <div><b>1M</b><span>{asset.delta1m}</span></div>
-            <div><b>RSI14</b><span>{formatNumber(asset.rsi14)}</span></div>
-            <div><b>MA5 / 20 / 50 / 120</b><span>{formatMa(asset)}</span></div>
-          </div>
-
-          <ChartShell symbol={asset.symbol} points={points} />
-
-          <ResearchCard symbol={asset.symbol} />
+      {watchlistsLoaded && !hasWatchlists ? (
+        <section className="startup-refresh-banner" role="status" aria-live="polite">
+          표시할 관심 그룹이 없습니다.
         </section>
-      </section>
+      ) : null}
+
+      {watchlistsLoaded && hasWatchlists && !activeWatchlistHasSymbols ? (
+        <section className="startup-refresh-banner" role="status" aria-live="polite">
+          선택한 관심 그룹에 종목이 없습니다.
+        </section>
+      ) : null}
+
+      {canShowDashboard ? (
+        <section className="content-grid">
+          <aside className="watchlist-card">
+            <div className="card-heading">
+              <h2>{activeWatchlist?.name}</h2>
+              <span>{activeWatchlist?.symbols.length ?? 0}개 종목</span>
+            </div>
+            <div className="symbol-list">
+              {(activeWatchlist?.symbols ?? []).map((symbol) => {
+                const item = assetCards[symbol];
+                return (
+                  <div
+                    key={symbol}
+                    className={symbol === currentSymbol ? "symbol-row active" : "symbol-row"}
+                  >
+                    <button type="button" onClick={() => setSelectedSymbol(symbol)} data-testid={`symbol-${symbol}`}>
+                      <strong>{item?.displayNameKo ?? symbol}</strong>
+                      <span>{symbol}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void removeSymbol(symbol);
+                      }}
+                      aria-label={`${symbol} 제거`}
+                    >
+                      제거
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </aside>
+
+          <section className="detail-card">
+            <div className="detail-header">
+              <div>
+                <h2>{asset.displayNameKo}</h2>
+                <p>{asset.symbol}</p>
+              </div>
+              <div className={`badge ${asset.opinion}`}>
+                {asset.opinion}
+              </div>
+            </div>
+
+            <div className="summary-grid">
+              <div><b>현재가</b><span>{asset.price.toLocaleString()}</span></div>
+              <div><b>1D</b><span>{asset.delta1d}</span></div>
+              <div><b>1M</b><span>{asset.delta1m}</span></div>
+              <div><b>RSI14</b><span>{formatNumber(asset.rsi14)}</span></div>
+              <div><b>MA5 / 20 / 50 / 120</b><span>{formatMa(asset)}</span></div>
+            </div>
+
+            <ChartShell symbol={asset.symbol} points={points} />
+
+            <ResearchCard symbol={asset.symbol} />
+          </section>
+        </section>
+      ) : null}
         </>
       )}
     </main>
