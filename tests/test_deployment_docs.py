@@ -171,6 +171,33 @@ def test_readme_documents_backup_uninstall_contribution_and_cost_responsibility(
         assert required.lower() in english_lower
 
 
+def test_readme_documents_screenshot_section_without_todo_placeholders():
+    korean = (ROOT / "README.md").read_text(encoding="utf-8")
+    english = (ROOT / "README.en.md").read_text(encoding="utf-8")
+    english_lower = english.lower()
+
+    for required in [
+        "## 스크린샷",
+        "실제 스크린샷은 아직 포함하지 않습니다",
+        "가짜 이미지는 사용하지 않습니다",
+    ]:
+        assert required in korean
+
+    for required in [
+        "## Screenshots",
+        "real screenshots are not included yet",
+        "no fake screenshots are bundled",
+    ]:
+        assert required.lower() in english_lower
+
+    for forbidden in [
+        "TODO: 실제 실행 화면 스크린샷이 준비되는 대로 추가합니다",
+        "TODO: screenshots are not committed yet",
+    ]:
+        assert forbidden not in korean
+        assert forbidden not in english
+
+
 def test_scheduler_templates_are_present_and_generic():
     daily_launchd = ROOT / "ops" / "launchd" / "vbinvest-daily.plist"
     weekly_launchd = ROOT / "ops" / "launchd" / "vbinvest-weekly.plist"
@@ -251,11 +278,12 @@ def test_readme_documents_secure_storage_and_ai_modes():
 def test_readme_documents_cover_screenshot_and_distribution_notes():
     korean = (ROOT / "README.md").read_text(encoding="utf-8")
     english = (ROOT / "README.en.md").read_text(encoding="utf-8")
+    english_lower = english.lower()
 
     for required in [
         "## 스크린샷",
-        "TODO",
-        "스크린샷이 준비되는 대로 추가",
+        "실제 스크린샷은 아직 포함하지 않습니다",
+        "가짜 이미지는 사용하지 않습니다",
         "개발 환경",
         "Python",
         "Node",
@@ -266,15 +294,15 @@ def test_readme_documents_cover_screenshot_and_distribution_notes():
 
     for required in [
         "## Screenshots",
-        "TODO",
-        "screenshots are not committed yet",
+        "Real screenshots are not included yet",
+        "no fake screenshots are bundled",
         "Developer environment",
         "Python",
         "Node",
         "packaged releases",
         "Node.js runtime is not required",
     ]:
-        assert required in english
+        assert required.lower() in english_lower
 
 
 def test_readme_documents_db_modes_and_data_responsibility():

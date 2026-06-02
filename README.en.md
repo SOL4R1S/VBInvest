@@ -127,8 +127,8 @@ Recommended setup:
 
 ## Screenshots
 
-TODO: screenshots are not committed yet.
-GitHub placeholder text is provided only; no fake screenshot is bundled.
+Real screenshots are not included yet.
+GitHub shows guidance text only; no fake screenshots are bundled.
 
 ## Optional Scheduled Runs
 

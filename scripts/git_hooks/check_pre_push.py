@@ -27,7 +27,7 @@ def validate_origin_url(origin_url: str) -> HookResult:
 
 def validate_branch_name(branch_name: str) -> HookResult:
     branch = branch_name.strip()
-    allowed_prefixes = ("feature/", "release/", "hotfix/")
+    allowed_prefixes = ("feature/", "release/", "hotfix/", "fix/", "feat/", "docs/", "ci/")
     if branch in {"main", "develop"} or branch.startswith(allowed_prefixes):
         return HookResult(ok=True, message="branch=ok")
     return HookResult(ok=False, message="branch must follow the VBinvest Git Flow policy")

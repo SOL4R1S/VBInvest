@@ -2,8 +2,11 @@ import ast
 from pathlib import Path
 
 
+ROOT = Path(__file__).resolve().parents[1]
+
+
 def test_vbinvestdb_has_no_duplicate_method_names():
-    source_path = Path("/Volumes/nv6000t/project/VBInvest/scripts/lib/db.py")
+    source_path = ROOT / "scripts" / "lib" / "db.py"
     module = ast.parse(source_path.read_text())
     duplicates: list[tuple[str, int, int]] = []
 
