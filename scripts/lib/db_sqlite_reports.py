@@ -57,7 +57,7 @@ class SQLiteReportsMixin:
                 SET status = 'canceled',
                     completed_at = ?,
                     error_message = 'canceled by user'
-                WHERE run_id = ? AND status = 'running'
+                WHERE run_id = ? AND status IN ('queued', 'running')
                 """,
                 (self._to_db_timestamp(datetime.now(timezone.utc)), run_id),
             )

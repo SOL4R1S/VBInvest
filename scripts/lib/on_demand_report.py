@@ -66,9 +66,9 @@ def generate_on_demand_research_for_asset(
             error_message=None,
         )
     except (AIProviderConfigError, AIProviderError, GuardrailError) as exc:
-        raise _record_failure(store, symbol, "AI report generation failed", exc) from exc
+        raise _record_failure(store, symbol, "AI report generation failed") from exc
     except ManualNoteError as exc:
-        raise _record_failure(store, symbol, "Obsidian export failed", exc) from exc
+        raise _record_failure(store, symbol, "Obsidian export failed") from exc
 
     result = dict(row)
     result["run_id"] = run_id
@@ -105,7 +105,6 @@ def _record_failure(
     store: OnDemandReportStore,
     symbol: str,
     user_message: str,
-    exc: Exception,
 ) -> OnDemandReportError:
     store.record_report_run(
         run_type="on-demand-research",
