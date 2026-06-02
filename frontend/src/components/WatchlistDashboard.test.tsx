@@ -285,17 +285,44 @@ describe("WatchlistDashboard", () => {
     render(<WatchlistDashboard />);
 
     await waitFor(() => {
-      expect(screen.getByText("초기 설정 필요")).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "초기 설정" })).toBeInTheDocument();
     });
+    expect(screen.getByRole("button", { name: "설정 완료" })).toBeDisabled();
     expect(fetchMock.mock.calls.map(([input]) => String(input))).not.toContain(
       "/api/startup/market-refresh?no_network=false&include_news=true",
     );
+    expect(fetchMock.mock.calls.map(([input]) => String(input))).not.toContain(
+      "/api/watchlists/semiconductor-core/dashboard?days=260",
+    );
     expect(screen.queryByText("시장 데이터 갱신 실패")).not.toBeInTheDocument();
-    await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith("/api/watchlists/semiconductor-core/dashboard?days=260");
+  });
+
+  it("shows a first-run setup error when the selected Obsidian vault is invalid", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      const url = String(input);
+      if (url.includes("/api/settings") && init?.method !== "POST") {
+        return jsonResponse({
+          first_run_completed: false,
+          provider_status: { opendart: { configured: false }, ai: { mode: "disabled" } },
+        });
+      }
+      if (url.includes("/api/settings/first-run")) {
+        return jsonResponse({ detail: "obsidian.vault_path: does not exist" }, 400);
+      }
+      return jsonResponse({ status: "ok", price_rows: 1, indicator_rows: 1, news_items: 0, disclosures: 0 });
     });
-    expect(screen.getByText("999.12")).toBeInTheDocument();
-    expect(screen.queryByText("예시 값")).not.toBeInTheDocument();
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<WatchlistDashboard />);
+
+    fireEvent.change(await screen.findByLabelText("Obsidian Vault Path"), { target: { value: "/missing-vault" } });
+    fireEvent.click(screen.getByRole("button", { name: "설정 완료" }));
+
+    expect(await screen.findByText("obsidian.vault_path: does not exist")).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/settings/first-run",
+      expect.objectContaining({ method: "POST" }),
+    );
   });
 
   it("shows provider-disabled partial refresh without treating it as a total failure", async () => {

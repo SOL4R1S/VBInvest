@@ -24,6 +24,7 @@ import {
 } from "@/lib/dashboard-data";
 import { ChartShell } from "@/components/ChartShell";
 import { ResearchCard } from "@/components/ResearchCard";
+import { SetupWizard } from "@/components/SetupWizard";
 
 type Watchlist = {
   readonly id: string;
@@ -44,6 +45,8 @@ export function WatchlistDashboard() {
   const [startupRefresh, setStartupRefresh] = useState<StartupRefreshView>(INITIAL_STARTUP_REFRESH);
   const [providerSummary, setProviderSummary] = useState<ProviderSummary | null>(null);
   const [collectionStatus, setCollectionStatus] = useState<readonly CollectionAssetStatus[]>([]);
+  const [setupRequired, setSetupRequired] = useState(false);
+  const [setupRevision, setSetupRevision] = useState(0);
 
   const activeWatchlist = watchlists.find((item) => item.id === selectedWatchlist) ?? watchlists[0];
   const currentSymbol = activeWatchlist?.symbols.includes(selectedSymbol) ? selectedSymbol : activeWatchlist?.symbols[0] ?? "NVDA";
@@ -79,11 +82,11 @@ export function WatchlistDashboard() {
         if (!cancelled) {
           setProviderSummary(nextProviderSummary);
           if (nextProviderSummary?.firstRunCompleted === false) {
+            setSetupRequired(true);
             setStartupRefresh({ ...INITIAL_STARTUP_REFRESH, status: "setup_required" });
-            await loadDashboardData("semiconductor-core");
-            await loadCollectionStatus("semiconductor-core");
             return;
           }
+          setSetupRequired(false);
         }
       } catch (error) {
         logStartupWarning(error, "settings status refresh failed");
@@ -120,7 +123,13 @@ export function WatchlistDashboard() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [setupRevision]);
+
+  function completeSetup() {
+    setSetupRequired(false);
+    setStartupRefresh(INITIAL_STARTUP_REFRESH);
+    setSetupRevision((value) => value + 1);
+  }
 
   function createWatchlist() {
     const trimmed = newWatchlist.trim();
@@ -169,6 +178,9 @@ export function WatchlistDashboard() {
 
   return (
     <main className="page">
+      {setupRequired ? <SetupWizard onCompleted={completeSetup} /> : null}
+      {setupRequired ? null : (
+        <>
       {startupRefresh.status === "checking" ? (
         <div className="startup-refresh-modal" role="status" aria-live="polite">
           주식 정보를 확인하는 중
@@ -290,6 +302,8 @@ export function WatchlistDashboard() {
           <ResearchCard symbol={asset.symbol} />
         </section>
       </section>
+        </>
+      )}
     </main>
   );
 }

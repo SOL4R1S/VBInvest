@@ -38,7 +38,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -78,7 +79,8 @@ button:disabled {
   transform: none;
 }
 
-input {
+input,
+select {
   min-height: 40px;
   min-width: 0;
   border: 1px solid var(--line);
@@ -88,7 +90,8 @@ input {
   color: var(--ink);
 }
 
-input:focus {
+input:focus,
+select:focus {
   border-color: var(--brand);
   outline: 3px solid rgb(159 232 112 / 28%);
 }
@@ -256,7 +259,8 @@ h3 {
 .control-panel,
 .watchlist-card,
 .detail-card,
-.research-card {
+.research-card,
+.setup-wizard {
   border: 1px solid var(--line);
   border-radius: 12px;
   background: var(--paper);
@@ -332,8 +336,65 @@ h3 {
 
 .watchlist-card,
 .detail-card,
-.research-card {
+.research-card,
+.setup-wizard {
   padding: 16px;
+}
+
+.setup-wizard {
+  display: grid;
+  gap: 18px;
+  margin: 48px auto 0;
+  max-width: 920px;
+}
+
+.setup-heading {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 14px;
+}
+
+.setup-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.setup-grid label {
+  display: grid;
+  gap: 6px;
+}
+
+.setup-grid label span {
+  color: var(--body);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.setup-wide,
+.setup-note {
+  grid-column: 1 / -1;
+}
+
+.setup-note {
+  margin: 0;
+  border: 1px solid color-mix(in srgb, var(--warning) 34%, var(--line));
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: var(--warning-soft);
+  color: var(--warning);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.setup-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.setup-actions button {
+  border-color: var(--brand);
+  background: var(--brand);
+  color: var(--paper-strong);
 }
 
 .detail-card {

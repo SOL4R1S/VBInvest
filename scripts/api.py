@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import sys
 from pathlib import Path
 
@@ -20,10 +21,18 @@ from scripts.lib.auth import AuthError, AuthUser, verify_bearer_token
 from scripts.lib.ai_provider import AIProviderConfigError
 from scripts.lib.config import (
     ConfigError,
+    DatabaseMode,
+    DatabaseSettings,
+    ExportMode,
+    LocalConfig,
+    ObsidianSettings,
+    ProviderSettings,
+    config_path_from_env,
     load_local_config,
     load_opendart_api_key,
     parse_report_run_summary,
     provider_status,
+    write_local_config,
 )
 from scripts.lib.db_factory import build_database_from_local_config
 from scripts.lib.db_repository import DBRepository
@@ -99,8 +108,104 @@ class PortfolioHoldingUpdate(BaseModel):
     note: str | None = Field(default=None, max_length=500)
 
 
+class FirstRunDatabasePayload(BaseModel):
+    mode: DatabaseMode = DatabaseMode.SQLITE
+    sqlite_path: str | None = Field(default=None, max_length=1000)
+    postgres_url: str = Field(default="", max_length=1000)
+
+
+class FirstRunObsidianPayload(BaseModel):
+    vault_path: str = Field(min_length=1, max_length=1000)
+    export_mode: ExportMode = ExportMode.DIRECT
+
+
+class FirstRunProviderPayload(BaseModel):
+    opendart_api_key: str = Field(default="", max_length=200)
+    ai_mode: str = Field(default="none", max_length=40)
+    ai_base_url: str = Field(default="", max_length=500)
+    ai_api_key: str = Field(default="", max_length=500)
+
+
+class FirstRunSetupPayload(BaseModel):
+    language: str = Field(default="ko", max_length=10)
+    data_directory: str = Field(min_length=1, max_length=1000)
+    database: FirstRunDatabasePayload = Field(default_factory=FirstRunDatabasePayload)
+    obsidian: FirstRunObsidianPayload
+    providers: FirstRunProviderPayload = Field(default_factory=FirstRunProviderPayload)
+
+
 def hosted_monetization_disabled() -> HTTPException:
     return HTTPException(status_code=status.HTTP_410_GONE, detail="hosted monetization is disabled in local mode")
+
+
+def check_postgres_url(postgres_url: str) -> bool:
+    try:
+        import psycopg
+    except ImportError:
+        return False
+    try:
+        with psycopg.connect(postgres_url, connect_timeout=3):
+            return True
+    except PostgresOperationalError:
+        return False
+
+
+def build_first_run_config(payload: FirstRunSetupPayload) -> LocalConfig:
+    data_dir = Path(payload.data_directory).expanduser()
+    if data_dir.exists() and not data_dir.is_dir():
+        raise ConfigError("data_directory", "must be a directory")
+
+    vault_path = Path(payload.obsidian.vault_path).expanduser()
+    if not vault_path.exists() or not vault_path.is_dir():
+        raise ConfigError("obsidian.vault_path", "does not exist")
+    if not os.access(vault_path, os.W_OK):
+        raise ConfigError("obsidian.vault_path", "must be writable")
+
+    data_dir.mkdir(parents=True, exist_ok=True)
+    if not os.access(data_dir, os.W_OK):
+        raise ConfigError("data_directory", "must be writable")
+
+    database = build_first_run_database(payload.database, data_dir)
+    providers = ProviderSettings(
+        opendart_api_key=payload.providers.opendart_api_key.strip(),
+        ai_base_url="" if payload.providers.ai_mode == "none" else payload.providers.ai_base_url.strip(),
+        ai_api_key="" if payload.providers.ai_mode == "none" else payload.providers.ai_api_key.strip(),
+    )
+    return LocalConfig(
+        first_run_completed=True,
+        language=payload.language or "ko",
+        database=database,
+        obsidian=ObsidianSettings(vault_path=vault_path, export_mode=payload.obsidian.export_mode),
+        providers=providers,
+    )
+
+
+def build_first_run_database(payload: FirstRunDatabasePayload, data_dir: Path) -> DatabaseSettings:
+    match payload.mode:
+        case DatabaseMode.SQLITE:
+            sqlite_path = Path(payload.sqlite_path).expanduser() if payload.sqlite_path else data_dir / "vbinvest.sqlite3"
+            if sqlite_path.exists() and sqlite_path.is_dir():
+                raise ConfigError("database.sqlite_path", "must be a file path")
+            return DatabaseSettings(mode=DatabaseMode.SQLITE, sqlite_path=sqlite_path, postgres_url="")
+        case DatabaseMode.POSTGRES_DOCKER:
+            if shutil.which("docker") is None:
+                raise ConfigError("database.mode", "Docker Desktop/Engine is required for postgres_docker mode")
+            return DatabaseSettings(
+                mode=DatabaseMode.POSTGRES_DOCKER,
+                sqlite_path=data_dir / "vbinvest.sqlite3",
+                postgres_url=payload.postgres_url or "postgresql://vbinvest@127.0.0.1:5432/vbinvest",
+            )
+        case DatabaseMode.POSTGRES_URL:
+            postgres_url = payload.postgres_url.strip()
+            if not postgres_url:
+                raise ConfigError("database.postgres_url", "is required for postgres_url mode")
+            if not check_postgres_url(postgres_url):
+                raise ConfigError("database.postgres_url", "connection failed")
+            return DatabaseSettings(
+                mode=DatabaseMode.POSTGRES_URL,
+                sqlite_path=data_dir / "vbinvest.sqlite3",
+                postgres_url=postgres_url,
+            )
 
 
 def auth_db() -> Any:
@@ -188,6 +293,19 @@ def settings():
         }
     except ConfigError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/settings/first-run")
+def save_first_run_settings(payload: FirstRunSetupPayload):
+    try:
+        config = build_first_run_config(payload)
+        write_local_config(config, config_path_from_env(os.environ))
+    except ConfigError as exc:
+        raise HTTPException(status_code=400, detail=f"{exc.field}: {exc.reason}") from exc
+    return {
+        **config.redacted(),
+        "provider_status": provider_status(config, os.environ),
+    }
 
 
 @app.get("/api/me")
