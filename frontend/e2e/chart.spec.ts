@@ -67,7 +67,11 @@ test("dashboard chart interactions preserve stable stroke width", async ({ page 
   await expect(chart).toBeVisible();
   await expect(chart).not.toHaveAttribute("data-range-from", "pending");
   await expect(chart).toHaveAttribute("data-pane-count", "2");
-  await expect(page.getByText("상단 가격 · 하단 거래량/RSI14")).toBeVisible();
+  const legend = page.locator(".legend");
+  await expect(legend).toBeVisible();
+  await expect(legend).toHaveAttribute("aria-label", /상단 가격 · 하단 거래량\/RSI14/);
+  await expect(page.getByTestId("legend-ma5")).toBeVisible();
+  await expect(page.getByTestId("legend-rsi14")).toBeVisible();
 
   const beforeRange = {
     from: await chart.getAttribute("data-range-from"),

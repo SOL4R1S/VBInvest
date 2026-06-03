@@ -32,13 +32,17 @@ def _market_frame(start: date, end: date) -> pd.DataFrame:
 
 
 class CaptureDB:
-    def __init__(self, latest_dates=None):
+    def __init__(self, latest_dates=None, price_date_ranges=None):
         self.latest_dates = latest_dates or {}
+        self.price_date_ranges = price_date_ranges or {}
         self.price_rows = []
         self.indicator_rows = []
 
     def fetch_latest_price_dates(self, asset_ids):
         return {asset_id: self.latest_dates[asset_id] for asset_id in asset_ids if asset_id in self.latest_dates}
+
+    def fetch_price_date_ranges(self, asset_ids):
+        return {asset_id: self.price_date_ranges[asset_id] for asset_id in asset_ids if asset_id in self.price_date_ranges}
 
     def upsert_prices(self, rows):
         self.price_rows.extend(rows)
@@ -256,9 +260,35 @@ def test_ingest_assets_first_write_requests_historical_backfill_window():
     )
 
     assert result.status == "ok"
-    assert calls == [("NVDA", date(2025, 9, 15), date(2026, 6, 2))]
-    assert len(db.price_rows) == 261
-    assert db.price_rows[0]["date"] == date(2025, 9, 15)
+    assert calls == [("NVDA", date(2021, 6, 3), date(2026, 6, 2))]
+    assert len(db.price_rows) == 1826
+    assert db.price_rows[0]["date"] == date(2021, 6, 3)
+    assert db.price_rows[-1]["date"] == date(2026, 6, 2)
+
+
+def test_ingest_assets_backfills_existing_short_history_before_incremental_skip():
+    db = CaptureDB(
+        latest_dates={1: date(2026, 6, 2)},
+        price_date_ranges={1: {"earliest_date": date(2025, 9, 15), "latest_date": date(2026, 6, 2)}},
+    )
+    calls = []
+
+    def fetch_history(symbol: str, *, start_date: date | None = None, end_date: date | None = None):
+        calls.append((symbol, start_date, end_date))
+        assert start_date is not None
+        assert end_date is not None
+        return _market_frame(start_date, end_date)
+
+    result = ingest_assets(
+        [{"asset_id": 1, "symbol": "NVDA", "exchange": "NASDAQ"}],
+        db=db,
+        options=IngestOptions(fetched_at=datetime(2026, 6, 2, 8, 0, tzinfo=timezone.utc)),
+        fetch_history=fetch_history,
+    )
+
+    assert result.status == "ok"
+    assert calls == [("NVDA", date(2021, 6, 3), date(2026, 6, 2))]
+    assert db.price_rows[0]["date"] == date(2021, 6, 3)
     assert db.price_rows[-1]["date"] == date(2026, 6, 2)
 
 
@@ -321,6 +351,6 @@ def test_ingest_assets_no_network_write_uses_windowed_synthetic_history():
     )
 
     assert result.status == "ok"
-    assert len(db.price_rows) == 261
-    assert db.price_rows[0]["date"] == date(2025, 9, 15)
+    assert len(db.price_rows) == 1826
+    assert db.price_rows[0]["date"] == date(2021, 6, 3)
     assert db.price_rows[-1]["date"] == date(2026, 6, 2)

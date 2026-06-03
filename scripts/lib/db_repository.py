@@ -14,7 +14,7 @@ class DBRepository(Protocol):
     def fetch_watchlist_collection_status(self, slug: str) -> list[dict[str, Any]]:
         ...
 
-    def fetch_dashboard_items(self, slug: str, *, days: int = 260) -> list[dict[str, Any]]:
+    def fetch_dashboard_items(self, slug: str, *, days: int = 1260) -> list[dict[str, Any]]:
         ...
 
     def fetch_profile_by_auth_user(self, auth_user_id: str) -> dict[str, Any] | None:
@@ -72,6 +72,9 @@ class DBRepository(Protocol):
         ...
 
     def fetch_latest_price_dates(self, asset_ids: list[int]) -> dict[int, date]:
+        ...
+
+    def fetch_price_date_ranges(self, asset_ids: list[int]) -> dict[int, dict[str, date]]:
         ...
 
     def upsert_research_views(self, rows: list[dict[str, Any]]) -> int:

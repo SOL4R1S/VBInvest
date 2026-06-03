@@ -57,7 +57,22 @@ class FakeAIResearchClient:
 
 def test_build_on_demand_research_view_uses_ai_provider_draft_with_source_packet():
     asset = {"symbol": "NVDA", "display_name_ko": "엔비디아"}
-    latest = {"date": "2026-05-29", "return_1m": 0.08, "rsi14": 58, "drawdown_52w": -0.1, "close": 120}
+    latest = {
+        "date": "2026-05-29",
+        "return_1d": 0.012,
+        "return_1w": 0.04,
+        "return_1m": 0.08,
+        "return_3m": 0.18,
+        "rsi14": 58,
+        "drawdown_52w": -0.1,
+        "close": 120,
+        "ma5": 118,
+        "ma20": 112,
+        "ma50": 106,
+        "ma120": 95,
+        "volume": 1234567,
+        "currency": "USD",
+    }
     packet = build_source_packet(
         asset,
         latest,
@@ -80,6 +95,36 @@ def test_build_on_demand_research_view_uses_ai_provider_draft_with_source_packet
     assert row["confidence"] == 0.68
     assert "투자 권유" not in row["thesis"]
     assert json.loads(row["sources"])[0]["kind"] == "db_price_indicator"
+    snapshot = json.loads(row["metrics_snapshot"])
+    assert snapshot["current_price"] == 120
+    assert snapshot["currency"] == "USD"
+    assert snapshot["rsi14"] == 58
+    assert snapshot["ma120"] == 95
+    target = json.loads(row["target_price_summary"])
+    assert target["status"] == "estimated"
+    assert target["target_price"] == 137.4
+    assert target["implied_upside"] == pytest.approx(0.145)
+    assert target["source_title"] == "VBinvest AI-estimated target price"
+    assert "외부 명시 목표가가 없어" in target["message"]
+
+
+def test_target_price_summary_extracts_explicit_source_target_price():
+    asset = {"symbol": "NVDA", "display_name_ko": "엔비디아"}
+    latest = {"date": "2026-05-29", "close": 120, "currency": "USD"}
+    packet = build_source_packet(
+        asset,
+        latest,
+        news=[{"title": "Broker lifts NVDA target to $150 after earnings", "url": "https://example.com/news", "published_at": "2026-05-29"}],
+        disclosures=[],
+    )
+
+    row = build_on_demand_research_view(asset, latest, packet, ai_credentials_present=False)
+
+    target = json.loads(row["target_price_summary"])
+    assert target["status"] == "found"
+    assert target["target_price"] == 150
+    assert target["implied_upside"] == 0.25
+    assert target["source_title"] == "Broker lifts NVDA target to $150 after earnings"
 
 
 def test_unsourced_claim_fails_validation():

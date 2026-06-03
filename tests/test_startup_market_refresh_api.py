@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -6,13 +6,23 @@ from psycopg import OperationalError
 
 from scripts import api
 from scripts import startup_market_refresh as ingest_module
+from scripts.lib import config as config_module
+from scripts.lib import keychain as keychain_module
 from scripts.lib import startup_market_refresh as refresh_module
+from scripts.lib.keychain import EmptySecretStore
+
+
+def disable_secure_storage(monkeypatch):
+    monkeypatch.setattr(config_module, "platform_secret_store", lambda _system_name=None: EmptySecretStore())
+    monkeypatch.setattr(keychain_module, "platform_secret_store", lambda _system_name=None: EmptySecretStore())
 
 
 class FakeStartupRefreshDB:
-    def __init__(self, *, locked: bool = False, last_success_at=None):
+    def __init__(self, *, locked: bool = False, last_success_at=None, latest_dates=None, price_ranges=None):
         self.locked = locked
         self.last_success_at = last_success_at
+        self.latest_dates = latest_dates or {}
+        self.price_ranges = price_ranges or {}
         self.report_runs = []
         self.lock_calls = []
         self.release_calls = []
@@ -45,6 +55,12 @@ class FakeStartupRefreshDB:
         if self.last_success_at is None:
             return None
         return {"run_id": "previous-success", "completed_at": self.last_success_at}
+
+    def fetch_latest_price_dates(self, asset_ids):
+        return {asset_id: self.latest_dates[asset_id] for asset_id in asset_ids if asset_id in self.latest_dates}
+
+    def fetch_price_date_ranges(self, asset_ids):
+        return {asset_id: self.price_ranges[asset_id] for asset_id in asset_ids if asset_id in self.price_ranges}
 
 
 class UnavailableStartupRefreshDB(FakeStartupRefreshDB):
@@ -87,6 +103,37 @@ def test_startup_market_refresh_dry_run_records_status(monkeypatch):
     assert body["failed"] == 0
     assert fake_db.report_runs[0]["run_type"] == "startup-market-refresh"
     assert fake_db.report_runs[0]["status"] == "ok"
+
+
+def test_startup_market_refresh_updates_ticker_catalog(monkeypatch):
+    fake_db = FakeStartupRefreshDB()
+    client = client_with_db(monkeypatch, fake_db)
+    calls = {"count": 0}
+
+    class CatalogResult:
+        status = "ok"
+        count = 3000
+        source = "kind"
+        reason = ""
+
+    def fake_refresh_catalog():
+        calls["count"] += 1
+        return CatalogResult()
+
+    monkeypatch.setattr(api, "refresh_ticker_catalog", fake_refresh_catalog)
+
+    response = client.post(
+        "/api/startup/market-refresh?watchlist=semiconductor-core&dry_run=true&no_network=true&limit=1",
+    )
+
+    assert response.status_code == 200
+    assert calls["count"] == 1
+    assert response.json()["ticker_catalog"] == {
+        "status": "ok",
+        "count": 3000,
+        "source": "kind",
+        "reason": "",
+    }
 
 
 def test_startup_refresh_dry_run_no_network_uses_fallback_when_db_unavailable(monkeypatch):
@@ -140,7 +187,13 @@ def test_startup_refresh_defaults_to_source_collection(monkeypatch):
 
 def test_startup_refresh_treats_same_trading_day_success_as_fresh(monkeypatch):
     recent = datetime.now(timezone.utc) - timedelta(hours=2)
-    fake_db = FakeStartupRefreshDB(last_success_at=recent)
+    today = datetime.now(timezone.utc).date()
+    complete_start = today - timedelta(days=365 * 5)
+    fake_db = FakeStartupRefreshDB(
+        last_success_at=recent,
+        latest_dates={1: today},
+        price_ranges={1: {"earliest_date": complete_start, "latest_date": today}},
+    )
     client = client_with_db(monkeypatch, fake_db)
 
     response = client.post(
@@ -149,12 +202,18 @@ def test_startup_refresh_treats_same_trading_day_success_as_fresh(monkeypatch):
 
     assert response.status_code == 200
     assert response.json()["status"] == "skipped"
-    assert response.json()["stale"] is True
+    assert response.json()["stale"] is False
 
 
 def test_startup_refresh_skips_when_recent_success_exists_unless_forced(monkeypatch):
     recent = datetime.now(timezone.utc) - timedelta(minutes=5)
-    fake_db = FakeStartupRefreshDB(last_success_at=recent)
+    today = datetime.now(timezone.utc).date()
+    complete_start = today - timedelta(days=365 * 5)
+    fake_db = FakeStartupRefreshDB(
+        last_success_at=recent,
+        latest_dates={1: today},
+        price_ranges={1: {"earliest_date": complete_start, "latest_date": today}},
+    )
     client = client_with_db(monkeypatch, fake_db)
 
     skipped = client.post(
@@ -166,7 +225,7 @@ def test_startup_refresh_skips_when_recent_success_exists_unless_forced(monkeypa
 
     assert skipped.status_code == 200
     assert skipped.json()["status"] == "skipped"
-    assert skipped.json()["stale"] is True
+    assert skipped.json()["stale"] is False
     assert skipped.json()["price_rows"] == 0
     assert forced.status_code == 200
     assert forced.json()["status"] == "ok"
@@ -176,12 +235,16 @@ def test_startup_refresh_skips_when_recent_success_exists_unless_forced(monkeypa
 
 def test_startup_refresh_skips_when_all_assets_are_fresh(monkeypatch):
     today = datetime.now(timezone.utc).date()
+    complete_start = today - timedelta(days=365 * 5)
 
     class FreshAssetsDB(FakeStartupRefreshDB):
         def fetch_latest_price_dates(self, asset_ids):
             return {asset_id: today for asset_id in asset_ids}
 
-    client = client_with_db(monkeypatch, FreshAssetsDB())
+    client = client_with_db(
+        monkeypatch,
+        FreshAssetsDB(price_ranges={1: {"earliest_date": complete_start, "latest_date": today}}),
+    )
 
     response = client.post(
         "/api/startup/market-refresh?watchlist=semiconductor-core&dry_run=true&no_network=true&limit=1",
@@ -198,6 +261,7 @@ def test_startup_refresh_skips_when_all_assets_are_fresh(monkeypatch):
 
 def test_startup_refresh_force_ignores_fresh_asset_skip(monkeypatch):
     today = datetime.now(timezone.utc).date()
+    complete_start = today - timedelta(days=365 * 5)
     captured: dict[str, list[dict[str, object]]] = {}
 
     class FreshAssetsDB(FakeStartupRefreshDB):
@@ -217,7 +281,10 @@ def test_startup_refresh_force_ignores_fresh_asset_skip(monkeypatch):
         )
 
     monkeypatch.setattr(refresh_module, "ingest_assets", fake_ingest_assets)
-    client = client_with_db(monkeypatch, FreshAssetsDB())
+    client = client_with_db(
+        monkeypatch,
+        FreshAssetsDB(price_ranges={1: {"earliest_date": complete_start, "latest_date": today}}),
+    )
 
     response = client.post(
         "/api/startup/market-refresh?watchlist=semiconductor-core&dry_run=true&no_network=true&limit=1&force=true",
@@ -227,6 +294,43 @@ def test_startup_refresh_force_ignores_fresh_asset_skip(monkeypatch):
     body = response.json()
     assert body["status"] == "ok"
     assert body["price_rows"] == 1
+    assert [asset["symbol"] for asset in captured["assets"]] == ["NVDA"]
+
+
+def test_startup_refresh_does_not_skip_existing_ticker_with_short_history(monkeypatch):
+    today = datetime.now(timezone.utc).date()
+    captured: dict[str, list[dict[str, object]]] = {}
+
+    class ShortHistoryDB(FakeStartupRefreshDB):
+        def fetch_latest_price_dates(self, asset_ids):
+            return {asset_id: today for asset_id in asset_ids}
+
+    def fake_ingest_assets(assets, db, options):
+        captured["assets"] = assets
+        return ingest_module.IngestResult(
+            status="ok",
+            failures=[],
+            price_rows=1826,
+            indicator_rows=1826,
+            news_items=0,
+            disclosures=0,
+            provider_disabled=[],
+        )
+
+    monkeypatch.setattr(refresh_module, "ingest_assets", fake_ingest_assets)
+    client = client_with_db(
+        monkeypatch,
+        ShortHistoryDB(price_ranges={1: {"earliest_date": date(2025, 9, 15), "latest_date": today}}),
+    )
+
+    response = client.post(
+        "/api/startup/market-refresh?watchlist=semiconductor-core&dry_run=true&no_network=true&limit=1",
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "ok"
+    assert body["price_rows"] == 1826
     assert [asset["symbol"] for asset in captured["assets"]] == ["NVDA"]
 
 
@@ -303,6 +407,7 @@ def test_api_refresh_passes_resolved_opendart_key(monkeypatch):
 
 
 def test_api_refresh_reads_opendart_key_without_validating_unrelated_provider_config(monkeypatch, tmp_path):
+    disable_secure_storage(monkeypatch)
     config_path = tmp_path / "config.toml"
     config_path.write_text(
         "\n".join(

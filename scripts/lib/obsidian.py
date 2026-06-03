@@ -35,6 +35,8 @@ def render_note(row: dict[str, Any]) -> str:
     risks = _json_list(row.get("risks"))
     triggers = _json_list(row.get("triggers"))
     sources = _json_list(row.get("sources"))
+    metrics = _json_dict(row.get("metrics_snapshot"))
+    target = _json_dict(row.get("target_price_summary"))
     lines = [
         "---",
         f"ticker: {symbol}",
@@ -45,12 +47,13 @@ def render_note(row: dict[str, Any]) -> str:
         "",
         GENERATED_MARKER,
         "",
-        f"# {symbol} Weekly Research",
+        f"# {symbol} On-Demand Research",
         "",
         "Backlink: [[VBinvest]]",
         "",
         f"Opinion: **{row.get('opinion')}**",
         "",
+        *_snapshot_lines(metrics, target),
         "## Thesis",
         str(row.get("thesis") or ""),
         "",
@@ -129,11 +132,73 @@ def _source_lines(sources: list[Any]) -> list[str]:
     return lines
 
 
+def _snapshot_lines(metrics: dict[str, Any], target: dict[str, Any]) -> list[str]:
+    if not metrics and not target:
+        return []
+    currency = _text(target.get("currency")) or _text(metrics.get("currency"))
+    lines = [
+        "## Price / Target Snapshot",
+        f"- Current price: {_number(metrics.get('current_price'))}{_currency_suffix(currency)} ({_text(metrics.get('date')) or 'date n/a'})",
+        f"- Target price: {_target_price_text(target, currency)}",
+        f"- Implied upside: {_percent(target.get('implied_upside'))}",
+        (
+            f"- Returns: 1D {_percent(metrics.get('return_1d'))} · "
+            f"1W {_percent(metrics.get('return_1w'))} · "
+            f"1M {_percent(metrics.get('return_1m'))} · "
+            f"3M {_percent(metrics.get('return_3m'))}"
+        ),
+        (
+            f"- Technicals: RSI14: {_number(metrics.get('rsi14'), decimals=1)} · "
+            f"MA5/20/50/120 {_number(metrics.get('ma5'))} / {_number(metrics.get('ma20'))} / "
+            f"{_number(metrics.get('ma50'))} / {_number(metrics.get('ma120'))}"
+        ),
+        f"- 52W: high {_number(metrics.get('high_52w'))} · drawdown {_percent(metrics.get('drawdown_52w'))}",
+        f"- Target source: {_text(target.get('source_title')) or _text(target.get('message')) or 'n/a'}",
+        "",
+    ]
+    return lines
+
+
 def _json_list(value: Any) -> list[Any]:
     if isinstance(value, str):
         loaded = json.loads(value)
         return loaded if isinstance(loaded, list) else []
     return value if isinstance(value, list) else []
+
+
+def _json_dict(value: Any) -> dict[str, Any]:
+    if isinstance(value, str) and value.strip():
+        loaded = json.loads(value)
+        return loaded if isinstance(loaded, dict) else {}
+    return value if isinstance(value, dict) else {}
+
+
+def _target_price_text(target: dict[str, Any], currency: str) -> str:
+    if target.get("status") not in {"found", "estimated"}:
+        return _text(target.get("message")) or "not found in collected sources"
+    return f"{_number(target.get('target_price'))}{_currency_suffix(currency)}"
+
+
+def _number(value: Any, *, decimals: int = 2) -> str:
+    if not isinstance(value, int | float) or isinstance(value, bool):
+        return "n/a"
+    if float(value).is_integer():
+        return f"{int(value):,}"
+    return f"{value:,.{decimals}f}"
+
+
+def _percent(value: Any) -> str:
+    if not isinstance(value, int | float) or isinstance(value, bool):
+        return "n/a"
+    return f"{value * 100:+.1f}%"
+
+
+def _currency_suffix(currency: str) -> str:
+    return f" {currency}" if currency else ""
+
+
+def _text(value: Any) -> str:
+    return value.strip() if isinstance(value, str) else ""
 
 
 def _date_text(value: Any) -> str:

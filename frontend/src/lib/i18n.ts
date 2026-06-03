@@ -67,6 +67,10 @@ export type LocalizedLabels = {
   };
   readonly startup: {
     readonly checkingText: string;
+    readonly progressLabel: string;
+    readonly elapsedLabel: string;
+    readonly remainingLabel: string;
+    readonly progressEstimateNotice: string;
     readonly failedBanner: string;
     readonly queued: string;
     readonly running: string;
@@ -76,6 +80,7 @@ export type LocalizedLabels = {
     readonly indicator: string;
     readonly news: string;
     readonly disclosure: string;
+    readonly tickerCatalog: string;
     readonly providerDisabled: string;
     readonly latest: string;
     readonly noProvider: string;
@@ -111,6 +116,8 @@ export type LocalizedLabels = {
     readonly symbolPlaceholder: string;
     readonly symbolAction: string;
     readonly symbolActionBusy: string;
+    readonly symbolSuggestionsLabel: string;
+    readonly symbolSuggestionAction: (symbol: string) => string;
     readonly removeAction: string;
     readonly symbolListItemRemove: string;
     readonly weeklyReportHeading: string;
@@ -129,6 +136,9 @@ export type LocalizedLabels = {
     readonly shutdownButton: string;
     readonly shutdownBusy: string;
     readonly shutdownDone: string;
+    readonly settingsAction: string;
+    readonly settingsSaveAction: string;
+    readonly settingsCancelAction: string;
   };
   readonly summary: {
     readonly price: string;
@@ -198,6 +208,7 @@ export type LocalizedLabels = {
     readonly selectWatchlist: string;
     readonly addAfterLoad: string;
     readonly invalidSymbol: string;
+    readonly symbolSuggestion: (label: string, suggestion: string) => string;
     readonly symbolLookup: string;
     readonly addSymbol: string;
     readonly removeSymbol: string;
@@ -360,6 +371,10 @@ export const translations = {
     },
     startup: {
       checkingText: "주식 정보를 확인하는 중",
+      progressLabel: "예상 진행률",
+      elapsedLabel: "경과",
+      remainingLabel: "예상 남은 시간",
+      progressEstimateNotice: "네트워크와 종목 수에 따라 실제 시간은 달라질 수 있습니다.",
       failedBanner: "시장 데이터 갱신 실패",
       queued: "대기",
       running: "진행",
@@ -369,6 +384,7 @@ export const translations = {
       indicator: "지표",
       news: "뉴스",
       disclosure: "공시",
+      tickerCatalog: "종목목록",
       providerDisabled: "비활성 소스",
       latest: "최신",
       noProvider: "provider 없음",
@@ -417,27 +433,32 @@ export const translations = {
       symbolHeading: "종목 추가",
       newSymbolLabel: "새 종목 심볼",
       symbolLabel: "새 종목 심볼",
-      symbolPlaceholder: "새 종목 심볼",
+      symbolPlaceholder: "종목명 또는 티커 검색",
       symbolAction: "추가",
       symbolActionBusy: "확인 중",
+      symbolSuggestionsLabel: "추천 종목",
+      symbolSuggestionAction: (symbol) => `${symbol} 추가`,
       removeAction: "제거",
       symbolListItemRemove: "제거",
-      weeklyReportHeading: "주간 사전 리포트",
-      weeklyReportCheckbox: "주간 사전 리포트",
-      weeklyReportCheckboxLabel: "주간 사전 리포트",
+      weeklyReportHeading: "예약 사전 생성",
+      weeklyReportCheckbox: "예약 사전 생성",
+      weeklyReportCheckboxLabel: "예약 사전 생성",
       weeklyReportDefault: "기본은 꺼짐(오프)이며 필요할 때만 사용합니다.",
       weeklyReportDefaultText: "기본은 꺼짐(오프)이며 필요할 때만 사용합니다.",
       weeklyReportManual: "리포트 발행은 수동 버튼으로 동일하게 실행할 수 있습니다.",
       weeklyReportManualText: "리포트 발행은 수동 버튼으로 동일하게 실행할 수 있습니다.",
-      weeklyReportOn: "주간 사전 리포트 켜짐",
-      weeklyReportOff: "주간 사전 리포트 꺼짐",
-      weeklyReportStateOn: "주간 사전 리포트 켜짐",
-      weeklyReportStateOff: "주간 사전 리포트 꺼짐",
+      weeklyReportOn: "예약 사전 생성 켜짐",
+      weeklyReportOff: "예약 사전 생성 꺼짐",
+      weeklyReportStateOn: "예약 사전 생성 켜짐",
+      weeklyReportStateOff: "예약 사전 생성 꺼짐",
       systemHeading: "시스템 제어",
       shutdownAction: "종료",
       shutdownButton: "종료",
       shutdownBusy: "종료 처리 중입니다.",
       shutdownDone: "종료 요청이 접수되었습니다.",
+      settingsAction: "설정",
+      settingsSaveAction: "설정 저장",
+      settingsCancelAction: "취소",
     },
     summary: {
       price: "현재가",
@@ -507,6 +528,7 @@ export const translations = {
       selectWatchlist: "먼저 관심 그룹을 선택해 주세요.",
       addAfterLoad: "관심 그룹을 불러온 뒤 추가해 주세요.",
       invalidSymbol: "실제 조회 가능한 티커만 추가할 수 있습니다.",
+      symbolSuggestion: (label, suggestion) => `${label}는 ${suggestion}를 사용하세요.`,
       symbolLookup: "티커 확인에 실패했습니다. 네트워크와 데이터 제공자를 확인해주세요.",
       addSymbol: "종목 추가에 실패했습니다.",
       removeSymbol: "종목 제거에 실패했습니다.",
@@ -527,6 +549,10 @@ export const translations = {
     },
     startup: {
       checkingText: "Checking market data",
+      progressLabel: "Estimated progress",
+      elapsedLabel: "Elapsed",
+      remainingLabel: "Estimated remaining",
+      progressEstimateNotice: "Actual time can vary by network and number of symbols.",
       failedBanner: "Market data refresh failed",
       queued: "Queued",
       running: "Running",
@@ -536,6 +562,7 @@ export const translations = {
       indicator: "Indicators",
       news: "News",
       disclosure: "Disclosures",
+      tickerCatalog: "Ticker catalog",
       providerDisabled: "Disabled sources",
       latest: "Latest",
       noProvider: "No provider",
@@ -584,27 +611,32 @@ export const translations = {
       symbolHeading: "Add symbol",
       newSymbolLabel: "New symbol",
       symbolLabel: "New symbol",
-      symbolPlaceholder: "New symbol",
+      symbolPlaceholder: "Search name or ticker",
       symbolAction: "Add",
       symbolActionBusy: "Checking",
+      symbolSuggestionsLabel: "Suggested tickers",
+      symbolSuggestionAction: (symbol) => `Add ${symbol}`,
       removeAction: "Remove",
       symbolListItemRemove: "Remove",
-      weeklyReportHeading: "Weekly precompute",
-      weeklyReportCheckbox: "Weekly precompute",
-      weeklyReportCheckboxLabel: "Weekly precompute",
+      weeklyReportHeading: "Scheduled precompute",
+      weeklyReportCheckbox: "Scheduled precompute",
+      weeklyReportCheckboxLabel: "Scheduled precompute",
       weeklyReportDefault: "Default is off; enable only when needed.",
       weeklyReportDefaultText: "Default is off; enable only when needed.",
       weeklyReportManual: "Manual report generation remains available.",
       weeklyReportManualText: "Manual report generation remains available.",
-      weeklyReportOn: "Weekly precompute enabled",
-      weeklyReportOff: "Weekly precompute disabled",
-      weeklyReportStateOn: "Weekly precompute enabled",
-      weeklyReportStateOff: "Weekly precompute disabled",
+      weeklyReportOn: "Scheduled precompute enabled",
+      weeklyReportOff: "Scheduled precompute disabled",
+      weeklyReportStateOn: "Scheduled precompute enabled",
+      weeklyReportStateOff: "Scheduled precompute disabled",
       systemHeading: "System control",
       shutdownAction: "Shutdown",
       shutdownButton: "Shutdown",
       shutdownBusy: "Processing shutdown.",
       shutdownDone: "Shutdown request accepted.",
+      settingsAction: "Settings",
+      settingsSaveAction: "Save settings",
+      settingsCancelAction: "Cancel",
     },
     summary: {
       price: "Price",
@@ -674,6 +706,7 @@ export const translations = {
       selectWatchlist: "Select a watchlist first.",
       addAfterLoad: "Add after watchlists finish loading.",
       invalidSymbol: "Only valid tickers can be added.",
+      symbolSuggestion: (label, suggestion) => `Use ${suggestion} for ${label}.`,
       symbolLookup: "Failed to validate ticker. Check network and data provider.",
       addSymbol: "Failed to add symbol.",
       removeSymbol: "Failed to remove symbol.",

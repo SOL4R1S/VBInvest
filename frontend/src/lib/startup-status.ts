@@ -17,6 +17,13 @@ export type StartupRefreshView = {
   readonly newsItems: number;
   readonly disclosures: number;
   readonly providerDisabled: readonly ProviderDisabled[];
+  readonly tickerCatalog: TickerCatalogStatus | null;
+};
+
+export type TickerCatalogStatus = {
+  readonly status: string;
+  readonly count: number;
+  readonly source: string;
 };
 
 export type ProviderSummary = {
@@ -50,6 +57,22 @@ export type CollectionStatusLabels = {
 export type RuntimeSettings = {
   readonly providerSummary: ProviderSummary | null;
   readonly language: "ko" | "en" | null;
+  readonly setupValues: RuntimeSetupValues | null;
+};
+
+export type RuntimeSetupValues = {
+  readonly dataDirectory: string;
+  readonly databaseMode: string;
+  readonly postgresUrl: string;
+  readonly vaultPath: string;
+  readonly exportMode: string;
+  readonly opendartKey: string;
+  readonly aiMode: string;
+  readonly aiApiType: string;
+  readonly aiProviderName: string;
+  readonly aiBaseUrl: string;
+  readonly aiModel: string;
+  readonly aiContextSize: number;
 };
 
 export type CollectionAssetStatus = {
@@ -76,6 +99,7 @@ export const INITIAL_STARTUP_REFRESH: StartupRefreshView = {
   newsItems: 0,
   disclosures: 0,
   providerDisabled: [],
+  tickerCatalog: null,
 };
 
 export async function fetchProviderSummary(): Promise<ProviderSummary | null> {
@@ -99,11 +123,11 @@ export async function fetchProviderSummary(): Promise<ProviderSummary | null> {
 export async function fetchRuntimeSettings(): Promise<RuntimeSettings> {
   const response = await fetch("/api/settings");
   if (!response.ok) {
-    return { providerSummary: null, language: null };
+    return { providerSummary: null, language: null, setupValues: null };
   }
   const payload: unknown = await response.json();
   if (!isRecord(payload)) {
-    return { providerSummary: null, language: null };
+    return { providerSummary: null, language: null, setupValues: null };
   }
 
   const providerStatus = isRecord(payload.provider_status) ? payload.provider_status : {};
@@ -117,6 +141,7 @@ export async function fetchRuntimeSettings(): Promise<RuntimeSettings> {
       aiMode: typeof ai.mode === "string" ? ai.mode : null,
     },
     language: parseLanguage(payload.language),
+    setupValues: parseRuntimeSetupValues(payload),
   };
 }
 
@@ -162,6 +187,18 @@ export function parseStartupRefresh(payload: unknown): StartupRefreshView {
     newsItems: numberValue(payload.news_items),
     disclosures: numberValue(payload.disclosures),
     providerDisabled,
+    tickerCatalog: parseTickerCatalogStatus(payload.ticker_catalog),
+  };
+}
+
+function parseTickerCatalogStatus(value: unknown): TickerCatalogStatus | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+  return {
+    status: typeof value.status === "string" ? value.status : "",
+    count: numberValue(value.count),
+    source: typeof value.source === "string" ? value.source : "",
   };
 }
 
@@ -340,6 +377,52 @@ function isProviderDisabled(value: unknown): value is ProviderDisabled {
 
 function parseLanguage(value: unknown): "ko" | "en" | null {
   return value === "ko" || value === "en" ? value : null;
+}
+
+function parseRuntimeSetupValues(payload: Record<string, unknown>): RuntimeSetupValues | null {
+  const database = isRecord(payload.database) ? payload.database : {};
+  const obsidian = isRecord(payload.obsidian) ? payload.obsidian : {};
+  const providers = isRecord(payload.providers) ? payload.providers : {};
+  const sqlitePath = stringOrNull(database.sqlite_path) ?? "";
+  const aiBaseUrl = stringOrNull(providers.ai_base_url) ?? "";
+  const aiProviderName = stringOrNull(providers.ai_provider_name) ?? "";
+  const aiModel = stringOrNull(providers.ai_model) ?? "";
+  const aiConfigured = aiProviderName !== "" || aiBaseUrl !== "" || aiModel !== "";
+  return {
+    dataDirectory: parentDirectory(sqlitePath) || "~/Library/Application Support/VBinvest",
+    databaseMode: stringOrNull(database.mode) ?? "sqlite",
+    postgresUrl: stringOrNull(database.postgres_url) ?? "",
+    vaultPath: stringOrNull(obsidian.vault_path) ?? "",
+    exportMode: stringOrNull(obsidian.export_mode) ?? "direct",
+    opendartKey: "",
+    aiMode: aiConfigured ? "openai_compatible" : "none",
+    aiApiType: isLocalBaseUrl(aiBaseUrl) ? "local" : "cloud",
+    aiProviderName: aiProviderName || "openai",
+    aiBaseUrl: aiBaseUrl || "https://api.openai.com/v1",
+    aiModel,
+    aiContextSize: numberValue(providers.ai_context_size) || 8192,
+  };
+}
+
+function parentDirectory(path: string): string {
+  const normalized = path.replaceAll("\\", "/");
+  const slash = normalized.lastIndexOf("/");
+  if (slash <= 0) {
+    return "";
+  }
+  return path.slice(0, slash);
+}
+
+function isLocalBaseUrl(value: string): boolean {
+  if (!value) {
+    return false;
+  }
+  try {
+    const url = new URL(value);
+    return url.hostname === "127.0.0.1" || url.hostname === "localhost" || url.hostname === "::1";
+  } catch {
+    return false;
+  }
 }
 
 function numberValue(value: unknown): number {

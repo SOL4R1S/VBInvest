@@ -6,13 +6,77 @@ import random
 import urllib.error
 import urllib.parse
 import urllib.request
+from difflib import SequenceMatcher
 from datetime import date, datetime, timedelta, timezone
 from io import StringIO
-from typing import Any
+from typing import Any, Callable, Final, TypedDict
 
 import pandas as pd
 
+from scripts.lib.ticker_catalog import search_korean_ticker_catalog
+
 YAHOO_CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?range={range}&interval={interval}"
+SUGGESTION_LIMIT: Final = 5
+QUOTE_TYPES_FOR_SUGGESTIONS: Final = {"EQUITY", "ETF", "MUTUALFUND", "INDEX"}
+REQUESTED_START_TOLERANCE_DAYS: Final = 7
+
+
+class TickerSuggestion(TypedDict):
+    symbol: str
+    name: str
+    exchange: str
+    quote_type: str
+
+
+class AliasSuggestion(TypedDict):
+    symbol: str
+    name: str
+    exchange: str
+    quote_type: str
+    search_query: str
+
+
+TickerSearchResult = dict[str, Any]
+TickerSuggestionSearcher = Callable[[str, int], list[TickerSearchResult]]
+
+
+LOCAL_TICKER_ALIASES: Final[dict[str, AliasSuggestion]] = {
+    "009530.KS": {
+        "symbol": "005930.KS",
+        "name": "삼성전자",
+        "exchange": "KSC",
+        "quote_type": "EQUITY",
+        "search_query": "Samsung Electronics",
+    },
+    "삼성전자": {
+        "symbol": "005930.KS",
+        "name": "삼성전자",
+        "exchange": "KSC",
+        "quote_type": "EQUITY",
+        "search_query": "Samsung Electronics",
+    },
+    "삼전": {
+        "symbol": "005930.KS",
+        "name": "삼성전자",
+        "exchange": "KSC",
+        "quote_type": "EQUITY",
+        "search_query": "Samsung Electronics",
+    },
+    "SAMSUNG": {
+        "symbol": "005930.KS",
+        "name": "삼성전자",
+        "exchange": "KSC",
+        "quote_type": "EQUITY",
+        "search_query": "Samsung Electronics",
+    },
+    "SAMSUNG ELECTRONICS": {
+        "symbol": "005930.KS",
+        "name": "Samsung Electronics Co., Ltd.",
+        "exchange": "KSC",
+        "quote_type": "EQUITY",
+        "search_query": "Samsung Electronics",
+    },
+}
 
 
 class PriceFetchError(RuntimeError):
@@ -205,24 +269,164 @@ def fetch_price_history(
         if filtered.empty:
             failures.append(f"{provider} failed: empty frame")
             continue
+        if not covers_requested_start(filtered, start_date=start_date):
+            failures.append(f"{provider} failed: missing requested start")
+            continue
         return filtered
     raise PriceFetchError(f"{symbol}: all price providers failed: {'; '.join(failures)}")
+
+
+def yfinance_search_quotes(query: str, limit: int) -> list[TickerSearchResult]:
+    try:
+        import yfinance as yf
+    except ImportError:
+        return []
+    try:
+        search = yf.Search(
+            query,
+            max_results=limit,
+            news_count=0,
+            lists_count=0,
+            include_research=False,
+            enable_fuzzy_query=True,
+            timeout=10,
+        )
+    except (AttributeError, KeyError, RuntimeError, TypeError, ValueError):
+        return []
+    quotes = getattr(search, "quotes", [])
+    if not isinstance(quotes, list):
+        return []
+    return [quote for quote in quotes if isinstance(quote, dict)]
+
+
+def search_ticker_suggestions(
+    query: str,
+    *,
+    searcher: TickerSuggestionSearcher = yfinance_search_quotes,
+    limit: int = SUGGESTION_LIMIT,
+) -> list[TickerSuggestion]:
+    normalized = query.strip().upper()
+    if not normalized:
+        return []
+    alias = LOCAL_TICKER_ALIASES.get(normalized) or LOCAL_TICKER_ALIASES.get(query.strip())
+    search_query = alias["search_query"] if alias is not None else query.strip()
+
+    suggestions: list[TickerSuggestion] = []
+    if alias is not None:
+        suggestions.append(_ticker_suggestion_from_alias(alias))
+    for catalog_suggestion in search_korean_ticker_catalog(normalized, limit=limit):
+        if any(item["symbol"] == catalog_suggestion["symbol"] for item in suggestions):
+            continue
+        suggestions.append(
+            {
+                "symbol": catalog_suggestion["symbol"],
+                "name": catalog_suggestion["name"],
+                "exchange": catalog_suggestion["exchange"],
+                "quote_type": catalog_suggestion["quote_type"],
+            }
+        )
+        if len(suggestions) >= limit:
+            return suggestions
+    for quote in searcher(search_query, limit):
+        suggestion = _ticker_suggestion_from_quote(quote)
+        if suggestion is None:
+            continue
+        if not _is_relevant_ticker_suggestion(normalized, suggestion):
+            continue
+        if any(item["symbol"] == suggestion["symbol"] for item in suggestions):
+            continue
+        suggestions.append(suggestion)
+        if len(suggestions) >= limit:
+            break
+    return suggestions
+
+
+def _ticker_suggestion_from_alias(alias: AliasSuggestion) -> TickerSuggestion:
+    return {
+        "symbol": alias["symbol"],
+        "name": alias["name"],
+        "exchange": alias["exchange"],
+        "quote_type": alias["quote_type"],
+    }
+
+
+def _ticker_suggestion_from_quote(quote: TickerSearchResult) -> TickerSuggestion | None:
+    symbol = _string_value(quote.get("symbol"))
+    if symbol is None:
+        return None
+    quote_type = (_string_value(quote.get("quoteType")) or "").upper()
+    if quote_type not in QUOTE_TYPES_FOR_SUGGESTIONS:
+        return None
+    name = _string_value(quote.get("shortname")) or _string_value(quote.get("longname")) or symbol
+    exchange = _string_value(quote.get("exchange")) or _string_value(quote.get("exchDisp")) or ""
+    return {
+        "symbol": symbol,
+        "name": name,
+        "exchange": exchange,
+        "quote_type": quote_type,
+    }
+
+
+def _string_value(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    stripped = value.strip()
+    return stripped or None
+
+
+def _search_key(value: str) -> str:
+    return "".join(character for character in value.upper() if character.isalnum())
+
+
+def _is_relevant_ticker_suggestion(query: str, suggestion: TickerSuggestion) -> bool:
+    query_key = _search_key(query)
+    if len(query_key) < 2:
+        return False
+    candidate_keys = [
+        _search_key(suggestion["symbol"]),
+        _search_key(suggestion["name"]),
+    ]
+    for candidate_key in candidate_keys:
+        if not candidate_key:
+            continue
+        if query_key in candidate_key or candidate_key in query_key:
+            return True
+        if SequenceMatcher(None, query_key, candidate_key).ratio() >= 0.62:
+            return True
+    return False
+
+
+def _invalid_ticker_result(
+    normalized: str,
+    reason: str,
+    *,
+    suggestion_searcher: TickerSuggestionSearcher,
+) -> dict[str, str | bool | list[TickerSuggestion]]:
+    result: dict[str, str | bool | list[TickerSuggestion]] = {"symbol": normalized, "valid": False, "reason": reason}
+    suggestions = search_ticker_suggestions(normalized, searcher=suggestion_searcher)
+    if not suggestions:
+        return result
+    result["suggestion"] = suggestions[0]["symbol"]
+    result["suggestion_label"] = suggestions[0]["name"]
+    result["suggestions"] = suggestions
+    return result
 
 
 def validate_ticker_symbol(
     symbol: str,
     *,
     history_fetcher=fetch_price_history,
-) -> dict[str, str | bool]:
+    suggestion_searcher: TickerSuggestionSearcher = yfinance_search_quotes,
+) -> dict[str, str | bool | list[TickerSuggestion]]:
     normalized = symbol.strip().upper()
     if not normalized:
         return {"symbol": normalized, "valid": False, "reason": "empty_symbol"}
     try:
         frame = history_fetcher(normalized)
     except PriceFetchError:
-        return {"symbol": normalized, "valid": False, "reason": "ticker_not_found"}
+        return _invalid_ticker_result(normalized, "ticker_not_found", suggestion_searcher=suggestion_searcher)
     if frame.empty:
-        return {"symbol": normalized, "valid": False, "reason": "ticker_not_found"}
+        return _invalid_ticker_result(normalized, "ticker_not_found", suggestion_searcher=suggestion_searcher)
     provider = str(frame["provider"].dropna().iloc[0]) if "provider" in frame and not frame["provider"].dropna().empty else "unknown"
     return {"symbol": normalized, "valid": True, "provider": provider}
 
@@ -242,6 +446,13 @@ def filter_price_history_window(
     if end_date is not None:
         result = result[result["date"] <= end_date]
     return result.sort_values("date").reset_index(drop=True)
+
+
+def covers_requested_start(frame: pd.DataFrame, *, start_date: date | None) -> bool:
+    if start_date is None or frame.empty:
+        return True
+    first_date = pd.to_datetime(frame["date"]).dt.date.min()
+    return first_date <= start_date + timedelta(days=REQUESTED_START_TOLERANCE_DAYS)
 
 
 def synthetic_history(symbol: str, *, days: int = 260, start_date: date | None = None) -> pd.DataFrame:

@@ -1,5 +1,7 @@
 import { DEFAULT_RESEARCH, normalizeOpinion, type Opinion } from "@/lib/research";
 
+export const DASHBOARD_HISTORY_DAYS = 1260;
+
 export type ChartPoint = {
   time: string;
   open: number;
@@ -7,11 +9,11 @@ export type ChartPoint = {
   low: number;
   close: number;
   volume: number;
-  ma5: number;
-  ma20: number;
-  ma50: number;
-  ma120: number;
-  rsi14: number;
+  ma5: number | null;
+  ma20: number | null;
+  ma50: number | null;
+  ma120: number | null;
+  rsi14: number | null;
 };
 
 export type AssetCard = {
@@ -36,7 +38,7 @@ export type DashboardModel = {
 type JsonObject = Record<string, unknown>;
 
 export async function fetchDashboardData(slug: string): Promise<DashboardModel | null> {
-  const response = await fetch(`/api/watchlists/${encodeURIComponent(slug)}/dashboard?days=260`);
+  const response = await fetch(`/api/watchlists/${encodeURIComponent(slug)}/dashboard?days=${DASHBOARD_HISTORY_DAYS}`);
   if (!response.ok) {
     return null;
   }
@@ -128,11 +130,11 @@ function parseChartPoint(value: unknown): ChartPoint | null {
     low,
     close,
     volume: numberField(value, "volume") ?? 0,
-    ma5: numberField(value, "ma5") ?? close,
-    ma20: numberField(value, "ma20") ?? close,
-    ma50: numberField(value, "ma50") ?? close,
-    ma120: numberField(value, "ma120") ?? close,
-    rsi14: numberField(value, "rsi14") ?? 50,
+    ma5: numberField(value, "ma5"),
+    ma20: numberField(value, "ma20"),
+    ma50: numberField(value, "ma50"),
+    ma120: numberField(value, "ma120"),
+    rsi14: numberField(value, "rsi14"),
   };
 }
 

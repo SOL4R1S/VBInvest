@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Protocol
 
 from scripts.startup_market_refresh import (
@@ -10,7 +10,7 @@ from scripts.startup_market_refresh import (
     ingest_assets,
 )
 from scripts.lib.config import serialize_report_run_summary
-from scripts.lib.price_refresh_window import fetch_latest_price_dates
+from scripts.lib.price_refresh_window import INITIAL_BACKFILL_DAYS, fetch_latest_price_dates, fetch_price_date_ranges
 from scripts.lib.market_calendar import KST, completed_trade_date
 
 try:
@@ -95,7 +95,8 @@ def run_startup_market_refresh(
         return (0, 0, asset_count, 0)
 
     last_success_at = _latest_success_at(effective_store, watchlist)
-    if not force and _are_all_assets_fresh(effective_store, assets):
+    history_complete = _are_all_assets_fresh(effective_store, assets)
+    if not force and history_complete:
         report_run_id = _record_report_run(
             effective_store,
             status="skipped",
@@ -129,7 +130,7 @@ def run_startup_market_refresh(
             report_run_id=report_run_id,
             last_success_at=last_success_at,
         )
-    if not force and _is_recent_success(last_success_at, assets):
+    if not force and history_complete and _is_recent_success(last_success_at, assets):
         report_run_id = _record_report_run(
             effective_store,
             status="skipped",
@@ -290,9 +291,13 @@ def _are_all_assets_fresh(store: StartupRefreshStore | None, assets: list[dict])
     if not latest_dates:
         return False
     now = datetime.now(timezone.utc)
+    price_ranges = fetch_price_date_ranges(store, [int(asset["asset_id"]) for asset in assets_with_id])
+    backfill_start = now.date() - timedelta(days=INITIAL_BACKFILL_DAYS)
     return all(
         latest_dates.get(int(asset["asset_id"])) is not None
         and latest_dates[int(asset["asset_id"])] >= _trade_date_for_asset(asset, now)
+        and price_ranges.get(int(asset["asset_id"])) is not None
+        and price_ranges[int(asset["asset_id"])].earliest_date <= backfill_start
         for asset in assets_with_id
     )
 

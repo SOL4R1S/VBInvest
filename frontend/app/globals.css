@@ -119,6 +119,43 @@ select:focus {
   font-weight: 900;
 }
 
+.startup-refresh-modal {
+  display: grid;
+  gap: 10px;
+  width: min(440px, calc(100vw - 32px));
+}
+
+.startup-refresh-progress {
+  width: 100%;
+  height: 10px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #efe8d9;
+}
+
+.startup-refresh-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--brand), #77b255);
+  transition: width 350ms ease;
+}
+
+.startup-refresh-progress-copy {
+  display: grid;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.startup-refresh-modal small {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
 .startup-refresh-banner {
   position: static;
   transform: none;
@@ -218,6 +255,63 @@ select:focus {
   border-radius: 12px;
   padding: 14px 16px;
   background: var(--canvas-soft);
+}
+
+.hero-actions {
+  display: grid;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: min(100%, 280px);
+}
+
+.hero-action-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.hero-action-button {
+  min-width: 104px;
+  min-height: 42px;
+  border-radius: 8px;
+  padding: 10px 16px;
+  border-color: var(--line);
+  background: var(--paper-strong);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.hero-action-button.shutdown {
+  border-color: color-mix(in srgb, var(--negative) 32%, var(--line));
+  color: var(--negative);
+}
+
+.hero-action-button.shutdown:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--negative) 8%, var(--paper-strong));
+}
+
+.hero-action-status {
+  max-width: 280px;
+  margin: 0;
+  color: var(--body);
+  font-size: 12px;
+  text-align: right;
+}
+
+.hero-action-status.success {
+  color: var(--positive);
+}
+
+.hero-action-status.error {
+  color: var(--negative);
+}
+
+.hero-actions label {
+  justify-self: end;
 }
 
 .eyebrow {
@@ -328,6 +422,48 @@ h3 {
   color: var(--paper-strong);
 }
 
+.ticker-suggestions {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.ticker-suggestion {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  max-width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 9px;
+  background: var(--paper-strong);
+  color: var(--ink);
+}
+
+.ticker-suggestion:hover {
+  border-color: color-mix(in srgb, var(--brand) 42%, var(--line));
+  background: var(--canvas-soft);
+}
+
+.ticker-suggestion-symbol {
+  font-weight: 700;
+}
+
+.ticker-suggestion-name {
+  overflow: hidden;
+  color: var(--body);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ticker-suggestion-exchange {
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .scheduler-toggle-row {
   display: flex;
   align-items: center;
@@ -409,6 +545,7 @@ h3 {
 
 .setup-actions {
   display: flex;
+  gap: 8px;
   justify-content: flex-end;
 }
 
@@ -416,6 +553,29 @@ h3 {
   border-color: var(--brand);
   background: var(--brand);
   color: var(--paper-strong);
+}
+
+.settings-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+  background: rgb(19 30 22 / 28%);
+}
+
+.settings-modal {
+  overflow: auto;
+  width: min(980px, calc(100vw - 32px));
+  max-height: calc(100vh - 44px);
+  border-radius: 14px;
+}
+
+.settings-modal .setup-wizard {
+  margin: 0;
+  max-width: none;
+  background: var(--paper-strong);
 }
 
 .detail-card {
@@ -547,8 +707,26 @@ h3 {
 }
 
 .legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  align-items: center;
   color: var(--muted);
   font-size: 13px;
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.legend-swatch {
+  width: 18px;
+  height: 3px;
+  border-radius: 999px;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 8%);
 }
 
 .research-card {
