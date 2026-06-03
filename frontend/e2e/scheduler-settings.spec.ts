@@ -10,7 +10,7 @@ async function writeEvidence(name: string, content: string | Buffer) {
   await writeFile(path.join(evidenceDir, name), content);
 }
 
-test("weekly precompute setting toggles through scheduler settings API", async ({ page }) => {
+test("scheduled precompute setting toggles through scheduler settings API", async ({ page }) => {
   const patchBodies: readonly string[] = [];
   const mutablePatchBodies: string[] = [];
 
@@ -57,11 +57,11 @@ test("weekly precompute setting toggles through scheduler settings API", async (
   });
 
   await page.goto("/");
-  const toggle = page.getByRole("checkbox", { name: "주간 사전 리포트" });
+  const toggle = page.getByRole("checkbox", { name: "예약 사전 생성" });
   await expect(toggle).not.toBeChecked();
   await toggle.click();
   await expect(toggle).toBeChecked();
-  await expect(page.getByText("주간 사전 리포트 켜짐")).toBeVisible();
+  await expect(page.getByText("예약 사전 생성 켜짐")).toBeVisible();
 
   await writeEvidence("task14-scheduler-toggle.png", await page.screenshot({ fullPage: true }));
   await writeEvidence(

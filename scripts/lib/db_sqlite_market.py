@@ -142,6 +142,30 @@ class SQLiteMarketMixin:
                 result[int(row["asset_id"])] = parsed
         return result
 
+    def fetch_price_date_ranges(self, asset_ids: list[int]) -> dict[int, dict[str, date]]:
+        if not asset_ids:
+            return {}
+        placeholders = ",".join(["?"] * len(asset_ids))
+        with self.connect() as conn:
+            rows = conn.execute(
+                f"""
+                SELECT asset_id, min(date) AS earliest_date, max(date) AS latest_date
+                FROM daily_prices
+                WHERE asset_id IN ({placeholders})
+                GROUP BY asset_id
+                """,
+                asset_ids,
+            ).fetchall()
+        result: dict[int, dict[str, date]] = {}
+        for row in rows:
+            earliest = row["earliest_date"]
+            latest = row["latest_date"]
+            parsed_earliest = date.fromisoformat(earliest) if isinstance(earliest, str) else earliest
+            parsed_latest = date.fromisoformat(latest) if isinstance(latest, str) else latest
+            if parsed_earliest is not None and parsed_latest is not None:
+                result[int(row["asset_id"])] = {"earliest_date": parsed_earliest, "latest_date": parsed_latest}
+        return result
+
     def fetch_watchlist_collection_status(self, slug: str) -> list[dict[str, Any]]:
         with self.connect() as conn:
             rows = conn.execute(
@@ -267,7 +291,7 @@ class SQLiteMarketMixin:
             }
         return views
 
-    def fetch_dashboard_items(self, slug: str, *, days: int = 260) -> list[dict[str, Any]]:
+    def fetch_dashboard_items(self, slug: str, *, days: int = 1260) -> list[dict[str, Any]]:
         assets = self.fetch_watchlist_assets(slug)
         if not assets:
             return []
@@ -341,7 +365,7 @@ class SQLiteMarketMixin:
                 items.append(item)
         return items
 
-    def fetch_asset_dashboard_item(self, symbol: str, *, days: int = 260) -> dict[str, Any] | None:
+    def fetch_asset_dashboard_item(self, symbol: str, *, days: int = 1260) -> dict[str, Any] | None:
         with self.connect() as conn:
             asset = conn.execute(
                 """

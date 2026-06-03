@@ -8,6 +8,7 @@ from scripts.lib.prices import (
     fetch_stooq_history,
     normalize_yfinance_history,
     parse_yahoo_chart,
+    search_ticker_suggestions,
     synthetic_history,
     validate_ticker_symbol,
 )
@@ -160,6 +161,43 @@ def test_fetch_price_history_falls_back_when_provider_has_no_rows_in_window():
     assert frame.loc[0, "provider"] == "yfinance"
 
 
+def test_fetch_price_history_falls_back_when_provider_does_not_cover_requested_start():
+    calls = []
+
+    def yahoo(symbol: str):
+        calls.append(("yahoo", symbol))
+        return pd.DataFrame(
+            [
+                _price_row(date(2025, 9, 15), provider="yahoo-chart"),
+                _price_row(date(2026, 6, 2), provider="yahoo-chart"),
+            ]
+        )
+
+    def yfinance_fetch(symbol: str, *, start_date: date | None = None, end_date: date | None = None):
+        calls.append(("yfinance", symbol, start_date, end_date))
+        return pd.DataFrame(
+            [
+                _price_row(date(2021, 6, 3), provider="yfinance"),
+                _price_row(date(2026, 6, 2), provider="yfinance"),
+            ]
+        )
+
+    frame = fetch_price_history(
+        "NVDA",
+        start_date=date(2021, 6, 3),
+        end_date=date(2026, 6, 2),
+        yahoo_fetcher=yahoo,
+        yfinance_fetcher=yfinance_fetch,
+    )
+
+    assert calls == [
+        ("yahoo", "NVDA"),
+        ("yfinance", "NVDA", date(2021, 6, 3), date(2026, 6, 2)),
+    ]
+    assert list(frame["date"]) == [date(2021, 6, 3), date(2026, 6, 2)]
+    assert frame.loc[0, "provider"] == "yfinance"
+
+
 def test_normalize_yfinance_history_maps_sdk_frame_to_db_columns():
     raw = pd.DataFrame(
         {
@@ -235,6 +273,130 @@ def test_validate_ticker_symbol_rejects_missing_provider_rows():
     result = validate_ticker_symbol("notreal", history_fetcher=fetcher)
 
     assert result == {"symbol": "NOTREAL", "valid": False, "reason": "ticker_not_found"}
+
+
+def test_validate_ticker_symbol_suggests_samsung_electronics_for_common_typo():
+    def fetcher(symbol: str):
+        assert symbol == "009530.KS"
+        raise PriceFetchError("009530.KS: all price providers failed")
+
+    result = validate_ticker_symbol("009530.KS", history_fetcher=fetcher, suggestion_searcher=lambda query, limit: [])
+
+    assert result == {
+        "symbol": "009530.KS",
+        "valid": False,
+        "reason": "ticker_not_found",
+        "suggestion": "005930.KS",
+        "suggestion_label": "삼성전자",
+        "suggestions": [
+            {
+                "symbol": "005930.KS",
+                "name": "삼성전자",
+                "exchange": "KSC",
+                "quote_type": "EQUITY",
+            }
+        ],
+    }
+
+
+def test_search_ticker_suggestions_uses_yfinance_quote_results():
+    def searcher(query: str, limit: int):
+        assert query == "Samsung Electronics"
+        assert limit == 5
+        return [
+            {
+                "symbol": "005930.KS",
+                "shortname": "SamsungElec",
+                "longname": "Samsung Electronics Co., Ltd.",
+                "exchange": "KSC",
+                "quoteType": "EQUITY",
+            },
+            {
+                "symbol": "SSNLF",
+                "shortname": "SAMSUNG ELECTRONICS CO",
+                "longname": "Samsung Electronics Co., Ltd.",
+                "exchange": "PNK",
+                "quoteType": "EQUITY",
+            },
+        ]
+
+    suggestions = search_ticker_suggestions("Samsung Electronics", searcher=searcher, limit=5)
+
+    assert suggestions == [
+        {
+            "symbol": "005930.KS",
+            "name": "Samsung Electronics Co., Ltd.",
+            "exchange": "KSC",
+            "quote_type": "EQUITY",
+        },
+        {
+            "symbol": "SSNLF",
+            "name": "SAMSUNG ELECTRONICS CO",
+            "exchange": "PNK",
+            "quote_type": "EQUITY",
+        },
+    ]
+
+
+def test_validate_ticker_symbol_suggests_results_for_company_name_search():
+    def fetcher(symbol: str):
+        assert symbol == "SAMSUNG ELECTRONICS"
+        raise PriceFetchError("SAMSUNG ELECTRONICS: all price providers failed")
+
+    def searcher(query: str, limit: int):
+        assert query == "Samsung Electronics"
+        assert limit == 5
+        return [
+            {
+                "symbol": "005930.KS",
+                "shortname": "SamsungElec",
+                "longname": "Samsung Electronics Co., Ltd.",
+                "exchange": "KSC",
+                "quoteType": "EQUITY",
+            }
+        ]
+
+    result = validate_ticker_symbol("Samsung Electronics", history_fetcher=fetcher, suggestion_searcher=searcher)
+
+    assert result == {
+        "symbol": "SAMSUNG ELECTRONICS",
+        "valid": False,
+        "reason": "ticker_not_found",
+        "suggestion": "005930.KS",
+        "suggestion_label": "Samsung Electronics Co., Ltd.",
+        "suggestions": [
+            {
+                "symbol": "005930.KS",
+                "name": "Samsung Electronics Co., Ltd.",
+                "exchange": "KSC",
+                "quote_type": "EQUITY",
+            }
+        ],
+    }
+
+
+def test_validate_ticker_symbol_suggests_korean_alias_search():
+    def fetcher(symbol: str):
+        assert symbol == "삼성전자"
+        raise PriceFetchError("삼성전자: all price providers failed")
+
+    def searcher(query: str, limit: int):
+        assert query == "Samsung Electronics"
+        assert limit == 5
+        return []
+
+    result = validate_ticker_symbol("삼성전자", history_fetcher=fetcher, suggestion_searcher=searcher)
+
+    assert result["suggestion"] == "005930.KS"
+    assert result["suggestion_label"] == "삼성전자"
+    assert result["suggestions"][:1] == [
+        {
+            "symbol": "005930.KS",
+            "name": "삼성전자",
+            "exchange": "KSC",
+            "quote_type": "EQUITY",
+        }
+    ]
 
 
 def test_fetch_stooq_history_wraps_malformed_provider_response(monkeypatch):

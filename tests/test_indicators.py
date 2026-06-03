@@ -45,6 +45,14 @@ def test_return_1d_uses_previous_close():
     assert math.isclose(result.loc[10, "return_1d"], expected, rel_tol=1e-12)
 
 
+def test_ma120_requires_full_warmup_window():
+    result = add_indicators(sample_prices())
+
+    assert result.loc[:118, "ma120"].isna().all()
+    expected = result.loc[:119, "close"].mean()
+    assert math.isclose(result.loc[119, "ma120"], expected, rel_tol=1e-12)
+
+
 def test_rsi14_is_bounded_after_warmup():
     result = add_indicators(sample_prices())
     rsi = result["rsi14"].dropna()

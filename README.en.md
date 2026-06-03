@@ -12,6 +12,7 @@ VBinvest is not a hosted SaaS. You run it locally on your own machine, and data/
 - [OpenDART setup](#opendart-setup)
 - [AI API and models](#ai-api-and-models)
 - [Data and reports](#data-and-reports)
+- [Feature status and tested environment](#feature-status-and-tested-environment)
 - [Obsidian export](#obsidian-export)
 - [Screenshots](#screenshots)
 - [Optional Scheduled Runs](#optional-scheduled-runs)
@@ -40,6 +41,10 @@ chmod +x VBinvest.command
 ```
 
 `chmod +x VBinvest.command` marks the launcher as executable.
+`VBinvest.command` runs the server in the background by default and closes the Terminal window used to launch it.
+Logs are written to `~/Library/Logs/VBinvest/launcher.log`.
+To keep the Terminal window open, run `VBINVEST_KEEP_TERMINAL=1 ./VBinvest.command`; for foreground debugging, run `VBINVEST_FOREGROUND=1 ./VBinvest.command`.
+You can close the app with the in-app `Shutdown` button; closing the browser tab also sends a best-effort local shutdown request.
 
 ### Windows Users
 
@@ -113,6 +118,30 @@ When the program starts, it updates price, indicators, news, SEC filings, and Op
 - Missing required inputs are tracked as `source_gap`.
 - `Generate Report` creates a Markdown note in Obsidian and a DB record.
 
+## Feature status and tested environment
+
+Current major features include:
+
+- Local-first launch: macOS/Windows launchers, automatic free-port selection, macOS background launch, in-app shutdown button
+- First-run setup: SQLite/PostgreSQL, Obsidian Vault, OpenDART, AI API/Local LLM settings
+- Market data: startup backfill and incremental refresh for tracked symbols, yfinance-backed price collection, five-year initial backfill, recent 1260 trading-day dashboard query
+- Indicators/charts: RSI14, MA5/20/50/120, candle/line mode toggle, separate indicator panel, moving-average color legend, wheel zoom, and drag pan
+- Symbol management: watchlist groups, ticker validation, name/ticker autocomplete search, startup ticker catalog refresh
+- Reports: on-demand report generation, DB-backed prices/indicators/news/disclosures, Obsidian Markdown export
+- UX: market refresh progress, elapsed time, and estimated remaining time
+
+### Local LLM test notes
+
+The following result is from one user environment. Local model behavior can vary by model size, context length, Ollama version, and memory pressure.
+
+| Item | Result |
+| --- | --- |
+| Test machine | Mac mini M4, 24GB RAM |
+| Runtime | Ollama local OpenAI-compatible endpoint |
+| Verified working | `gemma4:e4b-it-q4_K_M` |
+| Verified failing | `qwen3.5:2b`, `hf.co/NidAll/supergemma4-e4b-abilterated-Q4_K_M-GGUF:Q4_K_M` |
+| Result | With `gemma4:e4b-it-q4_K_M`, on-demand report generation and Obsidian Markdown export completed successfully. The failing models may fail because of local response-format, context, or compatibility issues; switching to another model is recommended. |
+
 ## Obsidian export
 
 Generated reports are exported as Markdown to the configured Obsidian folder.
@@ -151,7 +180,7 @@ crontab ops/cron/vbinvest-daily.cron
 crontab ops/cron/vbinvest-weekly.cron
 ```
 
-Weekly precompute remains disabled by default.
+Scheduled precompute remains disabled by default. Reports are generated on demand from the ticker screen when you press the report button.
 
 Uninstall scheduler:
 

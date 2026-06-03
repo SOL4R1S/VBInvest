@@ -43,6 +43,15 @@ export async function shutdownSystem(): Promise<SystemShutdownResult> {
   };
 }
 
+export function sendShutdownBeacon(): boolean {
+  const token = localSessionToken();
+  if (!token || typeof navigator === "undefined" || typeof navigator.sendBeacon !== "function") {
+    return false;
+  }
+  const payload = new Blob([JSON.stringify({ token })], { type: "application/json" });
+  return navigator.sendBeacon("/api/system/shutdown-beacon", payload);
+}
+
 function authHeaders(): Record<string, string> {
   const token = localSessionToken();
   if (!token) {

@@ -1,5 +1,6 @@
 import json
 import io
+import math
 import socket
 import urllib.error
 
@@ -168,6 +169,49 @@ def test_local_keyless_request_omits_authorization_header():
     assert "response_format" not in payload
 
 
+def test_local_loopback_provider_uses_longer_timeout_and_output_budget_by_default():
+    opener = CapturingUrlopen(
+        {
+            "choices": [
+                {
+                    "message": {
+                        "content": json.dumps(
+                            {
+                                "opinion": "중립",
+                                "thesis": "로컬 모델 기본 예산을 확인합니다.",
+                                "rationale": ["근거"],
+                                "bull": "강세",
+                                "base": "기준",
+                                "bear": "약세",
+                                "risks": ["리스크"],
+                                "triggers": ["트리거"],
+                                "confidence": 0.5,
+                            },
+                            ensure_ascii=False,
+                        )
+                    }
+                }
+            ]
+        }
+    )
+    config = AIProviderConfig.from_env(
+        {
+            "AI_PROVIDER_BASE_URL": "http://127.0.0.1:11434/v1",
+            "AI_PROVIDER_MODEL": "gemma4:e4b-it-q4_K_M",
+            "AI_PROVIDER_NAME": "custom",
+        }
+    )
+    assert config is not None
+    client = OpenAICompatibleResearchClient(config, urlopen=opener)
+
+    client.generate_research({}, {}, {})
+
+    assert opener.timeout == 90
+    assert opener.request is not None
+    payload = _extract_request_payload(opener.request)
+    assert payload["max_tokens"] == 2048
+
+
 def test_cloud_ai_provider_requires_api_key():
     with pytest.raises(AIProviderConfigError, match="AI provider API key is required for non-local providers"):
         AIProviderConfig.from_env(
@@ -313,6 +357,49 @@ def test_generate_research_rejects_non_serializable_payload():
         )
 
 
+def test_generate_research_serializes_non_finite_numbers_as_null():
+    opener = CapturingUrlopen(
+        {
+            "choices": [
+                {
+                    "message": {
+                        "content": json.dumps(
+                            {
+                                "opinion": "중립",
+                                "thesis": "비정상 숫자 정규화 확인",
+                                "rationale": ["근거"],
+                                "bull": "강세",
+                                "base": "기준",
+                                "bear": "약세",
+                                "risks": ["리스크"],
+                                "triggers": ["트리거"],
+                                "confidence": 0.5,
+                            },
+                            ensure_ascii=False,
+                        )
+                    }
+                }
+            ]
+        }
+    )
+    config = AIProviderConfig(
+        name="ollama",
+        api_key="",
+        base_url="http://127.0.0.1:11434/v1",
+        model="gemma4:e4b-it-q4_K_M",
+    )
+    client = OpenAICompatibleResearchClient(config, urlopen=opener)
+
+    client.generate_research({"symbol": "SNDK"}, {"return_6m": math.nan, "vol20": math.inf}, {"sources": []})
+
+    request_body = _extract_request_payload(opener.request)
+    user_content = json.loads(request_body["messages"][1]["content"])
+    assert user_content["latest"]["return_6m"] is None
+    assert user_content["latest"]["vol20"] is None
+    assert "NaN" not in request_body["messages"][1]["content"]
+    assert "Infinity" not in request_body["messages"][1]["content"]
+
+
 def test_generate_research_includes_prompt_payload_without_altering_source_text():
     opener = CapturingUrlopen(
         {
@@ -374,6 +461,66 @@ def test_generate_research_rejects_invalid_response_json():
         client.generate_research({}, {}, {})
 
 
+def test_generate_research_extracts_json_object_from_local_model_wrapped_text():
+    opener = CapturingUrlopen(
+        {
+            "choices": [
+                {
+                    "message": {
+                        "content": (
+                            "아래는 요청한 JSON입니다.\n"
+                            "```json\n"
+                            '{"opinion":"중립","thesis":"로컬 모델 래핑 응답을 처리합니다.",'
+                            '"rationale":"근거","bull":"강세","base":"기준","bear":"약세",'
+                            '"risks":"리스크","triggers":"트리거","confidence":"0.5"}'
+                            "\n```"
+                        )
+                    }
+                }
+            ]
+        }
+    )
+    config = AIProviderConfig(
+        name="ollama",
+        api_key="",
+        base_url="http://127.0.0.1:11434/v1",
+        model="gemma4:e4b-it-q4_K_M",
+    )
+    client = OpenAICompatibleResearchClient(config, urlopen=opener)
+
+    draft = client.generate_research({}, {}, {})
+
+    assert draft["opinion"] == "중립"
+    assert draft["rationale"] == ["근거"]
+    assert draft["confidence"] == 0.5
+
+
+def test_generate_research_rejects_reasoning_only_response_with_actionable_error():
+    opener = CapturingUrlopen(
+        {
+            "choices": [
+                {
+                    "message": {
+                        "content": "",
+                        "reasoning": "Thinking Process: 반복 추론만 생성하고 JSON 본문을 만들지 못했습니다.",
+                    },
+                    "finish_reason": "length",
+                }
+            ]
+        }
+    )
+    config = AIProviderConfig(
+        name="ollama",
+        api_key="",
+        base_url="http://127.0.0.1:11434/v1",
+        model="qwen3.5:2b",
+    )
+    client = OpenAICompatibleResearchClient(config, urlopen=opener)
+
+    with pytest.raises(AIProviderError, match="reasoning-only output without JSON content"):
+        client.generate_research({}, {}, {})
+
+
 def test_generate_research_rejects_schema_mismatch_before_research_view():
     opener = CapturingUrlopen(
         {
@@ -406,6 +553,198 @@ def test_generate_research_rejects_schema_mismatch_before_research_view():
 
     with pytest.raises(AIProviderError, match="schema"):
         client.generate_research({}, {}, {})
+
+
+def test_generate_research_normalizes_common_local_model_scalar_fields():
+    opener = CapturingUrlopen(
+        {
+            "choices": [
+                {
+                    "message": {
+                        "content": json.dumps(
+                            {
+                                "opinion": "매수",
+                                "thesis": "로컬 모델이 흔히 반환하는 스칼라 필드를 정규화합니다.",
+                                "rationale": "기술적 지표와 공개 소스를 함께 반영했습니다.",
+                                "bull": "강세 시나리오",
+                                "base": "기준 시나리오",
+                                "bear": "약세 시나리오",
+                                "risks": "과매수와 변동성",
+                                "triggers": "실적 발표와 수요 전망",
+                                "confidence": "높음",
+                            },
+                            ensure_ascii=False,
+                        )
+                    }
+                }
+            ]
+        }
+    )
+    config = AIProviderConfig(
+        name="ollama",
+        api_key="",
+        base_url="http://127.0.0.1:11434/v1",
+        model="gemma4:e4b-it-q4_K_M",
+    )
+    client = OpenAICompatibleResearchClient(config, urlopen=opener)
+
+    draft = client.generate_research({}, {}, {})
+
+    assert draft["rationale"] == ["기술적 지표와 공개 소스를 함께 반영했습니다."]
+    assert draft["risks"] == ["과매수와 변동성"]
+    assert draft["triggers"] == ["실적 발표와 수요 전망"]
+    assert draft["confidence"] == 0.7
+
+
+def test_generate_research_backfills_missing_scenario_fields_for_local_model():
+    opener = CapturingUrlopen(
+        {
+            "choices": [
+                {
+                    "message": {
+                        "content": json.dumps(
+                            {
+                                "opinion": "중립",
+                                "thesis": "로컬 모델이 시나리오 일부를 생략했습니다.",
+                                "rationale": ["근거"],
+                                "risks": ["리스크"],
+                                "triggers": ["트리거"],
+                                "confidence": 0.45,
+                            },
+                            ensure_ascii=False,
+                        )
+                    }
+                }
+            ]
+        }
+    )
+    config = AIProviderConfig(
+        name="ollama",
+        api_key="",
+        base_url="http://127.0.0.1:11434/v1",
+        model="gemma4:e4b-it-q4_K_M",
+    )
+    client = OpenAICompatibleResearchClient(config, urlopen=opener)
+
+    draft = client.generate_research({}, {}, {})
+
+    assert draft["bull"] != ""
+    assert draft["base"] != ""
+    assert draft["bear"] != ""
+
+
+def test_generate_research_normalizes_local_model_scenario_arrays_and_missing_confidence():
+    opener = CapturingUrlopen(
+        {
+            "choices": [
+                {
+                    "message": {
+                        "content": json.dumps(
+                            {
+                                "opinion": "매수",
+                                "thesis": "로컬 모델이 시나리오 배열과 confidence 누락을 반환했습니다.",
+                                "rationale": ["근거"],
+                                "bull": ["강세 A", "강세 B"],
+                                "base": ["기준 A"],
+                                "bear": ["약세 A"],
+                                "risks": ["리스크"],
+                                "triggers": ["트리거"],
+                            },
+                            ensure_ascii=False,
+                        )
+                    }
+                }
+            ]
+        }
+    )
+    config = AIProviderConfig(
+        name="ollama",
+        api_key="",
+        base_url="http://127.0.0.1:11434/v1",
+        model="gemma4:e4b-it-q4_K_M",
+    )
+    client = OpenAICompatibleResearchClient(config, urlopen=opener)
+
+    draft = client.generate_research({}, {}, {})
+
+    assert draft["bull"] == "강세 A / 강세 B"
+    assert draft["base"] == "기준 A"
+    assert draft["bear"] == "약세 A"
+    assert draft["confidence"] == 0.5
+
+
+def test_generate_research_backfills_missing_local_model_lists_without_relaxing_cloud_schema():
+    opener = CapturingUrlopen(
+        {
+            "choices": [
+                {
+                    "message": {
+                        "content": json.dumps(
+                            {
+                                "opinion": "중립",
+                                "thesis": "로컬 모델이 목록 일부를 생략했습니다.",
+                                "bull": "강세",
+                                "base": "기준",
+                                "bear": "약세",
+                                "confidence": 0.4,
+                            },
+                            ensure_ascii=False,
+                        )
+                    }
+                }
+            ]
+        }
+    )
+    config = AIProviderConfig(
+        name="ollama",
+        api_key="",
+        base_url="http://127.0.0.1:11434/v1",
+        model="gemma4:e4b-it-q4_K_M",
+    )
+    client = OpenAICompatibleResearchClient(config, urlopen=opener)
+
+    draft = client.generate_research({}, {}, {})
+
+    assert draft["rationale"] != []
+    assert draft["risks"] != []
+    assert draft["triggers"] != []
+
+
+def test_generate_research_derives_missing_local_risks_and_triggers_from_scenarios():
+    opener = CapturingUrlopen(
+        {
+            "choices": [
+                {
+                    "message": {
+                        "content": json.dumps(
+                            {
+                                "opinion": "매수",
+                                "thesis": "로컬 모델이 리스크와 트리거 목록을 생략했습니다.",
+                                "rationale": ["메모리 공급 부족 전망", "가격 모멘텀 개선"],
+                                "bull": ["메모리 공급 부족 장기화", "애널리스트 목표가 상향"],
+                                "base": "기준",
+                                "bear": ["IT 수요 둔화", "단기 차익 실현"],
+                                "confidence": 0.6,
+                            },
+                            ensure_ascii=False,
+                        )
+                    }
+                }
+            ]
+        }
+    )
+    config = AIProviderConfig(
+        name="ollama",
+        api_key="",
+        base_url="http://127.0.0.1:11434/v1",
+        model="gemma4:e4b-it-q4_K_M",
+    )
+    client = OpenAICompatibleResearchClient(config, urlopen=opener)
+
+    draft = client.generate_research({}, {}, {})
+
+    assert draft["risks"] == ["IT 수요 둔화", "단기 차익 실현"]
+    assert draft["triggers"] == ["메모리 공급 부족 장기화", "애널리스트 목표가 상향"]
 
 
 def test_generate_research_falls_back_when_structured_output_is_unsupported():

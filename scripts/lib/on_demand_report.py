@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, Mapping, Protocol
 
 from scripts.lib.ai_provider import AIProviderConfigError, AIProviderError, build_research_ai_client_from_env
+from scripts.lib.config import ConfigError, ProviderSettings, load_local_config
 from scripts.lib.obsidian import ManualNoteError, note_path, render_note, write_generated_note
 from scripts.lib.research import GuardrailError, build_on_demand_research_view, build_source_packet
 
@@ -27,7 +28,7 @@ class OnDemandReportStore(Protocol):
     def fetch_profile_by_auth_user(self, auth_user_id: str) -> dict[str, Any] | None:
         ...
 
-    def fetch_asset_dashboard_item(self, symbol: str, *, days: int = 260) -> dict[str, Any] | None:
+    def fetch_asset_dashboard_item(self, symbol: str, *, days: int = 1260) -> dict[str, Any] | None:
         ...
 
     def upsert_research_views(self, rows: list[dict[str, Any]]) -> int:
@@ -66,7 +67,7 @@ def generate_on_demand_research_for_asset(
             error_message=None,
         )
     except (AIProviderConfigError, AIProviderError, GuardrailError) as exc:
-        raise _record_failure(store, symbol, "AI report generation failed") from exc
+        raise _record_failure(store, symbol, _safe_ai_error_message(exc)) from exc
     except ManualNoteError as exc:
         raise _record_failure(store, symbol, "Obsidian export failed") from exc
 
@@ -82,7 +83,7 @@ def _build_research_row(item: dict[str, Any], environ: Mapping[str, str]) -> dic
     history = item["history"]
     latest = history.iloc[-1].to_dict()
     packet = build_source_packet(item["asset"], latest, news=item.get("news", []), disclosures=item.get("disclosures", []))
-    ai_client = build_research_ai_client_from_env(environ)
+    ai_client = build_research_ai_client_from_env(_ai_environ(environ))
     return build_on_demand_research_view(
         item["asset"],
         latest,
@@ -98,7 +99,39 @@ def _write_obsidian(row: dict[str, Any], vault_path: str | Path | None) -> OnDem
         return OnDemandReportPaths(obsidian_path=None, report_path=None, report_url=None)
     path = note_path(vault_path, row["target_slug"], row["report_date"])
     write_generated_note(path, render_note(row))
-    return OnDemandReportPaths(obsidian_path=str(path), report_path=str(path), report_url=f"/api/research/{row['target_slug']}/latest")
+    return OnDemandReportPaths(obsidian_path=str(path), report_path=str(path), report_url=None)
+
+
+def _ai_environ(environ: Mapping[str, str]) -> dict[str, str]:
+    merged = dict(environ)
+    if "VBINVEST_CONFIG_PATH" not in environ:
+        return merged
+    try:
+        config = load_local_config(environ=environ)
+    except ConfigError as exc:
+        raise AIProviderConfigError(str(exc)) from exc
+    _merge_provider_settings(merged, config.providers)
+    return merged
+
+
+def _merge_provider_settings(environ: dict[str, str], providers: ProviderSettings) -> None:
+    if providers.ai_provider_name and not environ.get("AI_PROVIDER_NAME"):
+        environ["AI_PROVIDER_NAME"] = providers.ai_provider_name
+    if providers.ai_base_url and not environ.get("AI_PROVIDER_BASE_URL"):
+        environ["AI_PROVIDER_BASE_URL"] = providers.ai_base_url
+    if providers.ai_model and not environ.get("AI_PROVIDER_MODEL"):
+        environ["AI_PROVIDER_MODEL"] = providers.ai_model
+    if providers.ai_api_key and not _has_ai_api_key(environ):
+        environ["AI_API_KEY"] = providers.ai_api_key
+
+
+def _has_ai_api_key(environ: Mapping[str, str]) -> bool:
+    return any(environ.get(key, "").strip() for key in ("AI_API_KEY", "AI_PROVIDER_API_KEY", "OPENAI_API_KEY", "DEEPSEEK_API_KEY"))
+
+
+def _safe_ai_error_message(exc: AIProviderConfigError | AIProviderError | GuardrailError) -> str:
+    message = str(exc).strip()
+    return message or "AI report generation failed"
 
 
 def _record_failure(

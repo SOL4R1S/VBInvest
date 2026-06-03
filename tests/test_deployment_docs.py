@@ -122,7 +122,7 @@ def test_readme_documents_optional_schedulers_and_uninstall():
         "선택적 예약 실행",
         "macOS launchd",
         "Linux cron",
-        "주간 사전 계산은 기본 비활성화",
+        "예약 사전 생성은 기본 비활성화",
         "launchctl unload -w",
         "crontab -l | sed",
     ]:
@@ -132,7 +132,7 @@ def test_readme_documents_optional_schedulers_and_uninstall():
         "Optional Scheduled Runs",
         "macOS launchd",
         "Linux cron",
-        "Weekly precompute remains disabled by default",
+        "Scheduled precompute remains disabled by default",
         "launchctl unload -w",
         "crontab -l | sed",
     ]:

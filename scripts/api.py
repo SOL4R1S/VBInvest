@@ -44,8 +44,9 @@ from scripts.lib.local_scheduler import LocalScheduler
 from scripts.lib.db_repository import DBRepository
 from scripts.lib.disclosures import check_opendart_api_key
 from scripts.lib.on_demand_report import OnDemandReportError
-from scripts.lib.prices import validate_ticker_symbol
+from scripts.lib.prices import search_ticker_suggestions, validate_ticker_symbol
 from scripts.lib.startup_market_refresh import run_startup_market_refresh
+from scripts.lib.ticker_catalog import refresh_ticker_catalog
 from scripts.lib.version import load_version_metadata
 
 try:
@@ -164,6 +165,10 @@ class SchedulerSettingsPayload(BaseModel):
     weekly_precompute_enabled: StrictBool | None = None
     watchlist: str | None = Field(default=None, max_length=1000)
     include_news: StrictBool | None = None
+
+
+class ShutdownBeaconPayload(BaseModel):
+    token: str = Field(default="", max_length=200)
 
 
 def hosted_monetization_disabled() -> HTTPException:
@@ -428,6 +433,7 @@ def startup_market_refresh(
     force: bool = False,
     limit: int = 0,
 ):
+    ticker_catalog = refresh_ticker_catalog()
     try:
         result = run_startup_market_refresh(
             db(),
@@ -459,6 +465,12 @@ def startup_market_refresh(
         "failures": result.failures,
         "report_run_id": result.report_run_id,
         "last_success_at": result.last_success_at,
+        "ticker_catalog": {
+            "status": ticker_catalog.status,
+            "count": ticker_catalog.count,
+            "source": ticker_catalog.source,
+            "reason": ticker_catalog.reason,
+        },
     }
 
 
@@ -521,6 +533,16 @@ def system_shutdown(user: AuthUser = Depends(current_user)):
     return {"status": "shutting_down"}
 
 
+@app.post("/api/system/shutdown-beacon")
+def system_shutdown_beacon(payload: ShutdownBeaconPayload):
+    if os.environ.get("VBINVEST_LOCAL_SHUTDOWN_ENABLED") != "1" or LOCAL_SHUTDOWN_CALLBACK is None:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="local launcher shutdown is not available")
+    if not payload.token or payload.token != os.environ.get("VBINVEST_LOCAL_SESSION_TOKEN", ""):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid local session token")
+    LOCAL_SHUTDOWN_CALLBACK()
+    return {"status": "shutting_down"}
+
+
 @app.get("/api/watchlists")
 def list_watchlists(user: AuthUser = Depends(current_user)):
     return {"watchlists": auth_db().list_user_watchlists(user.auth_user_id)}
@@ -530,8 +552,14 @@ def list_watchlists(user: AuthUser = Depends(current_user)):
 def validate_ticker(symbol: str):
     result = validate_ticker_symbol(symbol)
     if not result["valid"]:
-        raise HTTPException(status_code=404, detail="ticker not found")
+        raise HTTPException(status_code=404, detail=result)
     return result
+
+
+@app.get("/api/tickers/search")
+def search_tickers(query: str, limit: int = 8):
+    safe_limit = max(1, min(limit, 20))
+    return {"query": query, "suggestions": search_ticker_suggestions(query, limit=safe_limit)}
 
 
 @app.post("/api/watchlists", status_code=status.HTTP_201_CREATED)
@@ -587,7 +615,7 @@ def watchlist_collection_status(slug: str):
 
 
 @app.get("/api/watchlists/{slug}/dashboard")
-def dashboard_data(slug: str, days: int = 260):
+def dashboard_data(slug: str, days: int = 1260):
     items = db().fetch_dashboard_items(slug, days=days)
     if not items:
         raise HTTPException(status_code=404, detail="dashboard data not found")
@@ -705,7 +733,7 @@ async def mock_payment_webhook():
 
 
 @app.get("/dashboard/{slug}", response_class=HTMLResponse)
-def dashboard_html(slug: str, days: int = 260):
+def dashboard_html(slug: str, days: int = 1260):
     items = db().fetch_dashboard_items(slug, days=days)
     if not items:
         raise HTTPException(status_code=404, detail="dashboard data not found")

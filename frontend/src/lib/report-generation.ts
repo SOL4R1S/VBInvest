@@ -65,6 +65,15 @@ function safeReportErrorMessage(status: number, payload: unknown): string {
   if (status === 503 && detail.includes("AI provider API key")) {
     return "AI API 설정이 필요합니다. 설정에서 provider 키 또는 로컬 모델을 확인해주세요.";
   }
+  if (status === 503 && detail.includes("reasoning-only output without JSON content")) {
+    return "로컬 AI가 JSON 리포트를 생성하지 못했습니다. Ollama 설정에서 non-reasoning/instruct 모델을 선택하거나 다른 모델로 바꿔주세요.";
+  }
+  if (status === 503 && detail.includes("AI provider stopped before JSON content was produced")) {
+    return "로컬 AI가 리포트 JSON을 완성하기 전에 멈췄습니다. 더 작은 모델을 선택하거나 출력 토큰 제한을 늘려주세요.";
+  }
+  if (status === 503 && detail.includes("AI provider request timed out")) {
+    return "로컬 AI 응답 시간이 초과되었습니다. 모델이 실행 중인지 확인하거나 더 가벼운 모델로 바꿔주세요.";
+  }
   return "리포트 발행에 실패했습니다. 설정과 백엔드 연결을 확인해주세요.";
 }
 

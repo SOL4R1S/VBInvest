@@ -38,6 +38,15 @@ def test_launchers_delegate_to_shared_launcher_and_handle_secrets():
 
     assert 'save_secret "AI_API_KEY"' in mac_text
     assert 'save_secret "OPENDART_API_KEY"' in mac_text
+    assert "VBINVEST_FOREGROUND" in mac_text
+    assert "nohup" in mac_text
+    assert "disown" in mac_text
+    assert "Library/Logs/VBinvest" in mac_text
+    assert "VBINVEST_KEEP_TERMINAL" in mac_text
+    assert "osascript" in mac_text
+    assert "TERMINAL_WINDOW_ID" in mac_text
+    assert "close (first window whose id is $TERMINAL_WINDOW_ID)" in mac_text
+    assert "miniaturized of front window" not in mac_text
     assert "-m scripts.save_secret AI_API_KEY" in windows_text
     assert "-m scripts.save_secret OPENDART_API_KEY" in windows_text
     assert 'Save-LauncherSecret "AI_API_KEY"' in windows_ps1_text

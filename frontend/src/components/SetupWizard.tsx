@@ -3,12 +3,18 @@
 import { useState } from "react";
 
 import { isLanguage, labelsFor, persistLanguage, type Language, type LocalizedLabels } from "@/lib/i18n";
+import type { RuntimeSetupValues } from "@/lib/startup-status";
 
 type SetupWizardProps = {
   readonly onCompleted: () => void;
+  readonly onCancel?: () => void;
   readonly language: Language;
   readonly labels: LocalizedLabels["setup"];
   readonly onLanguageChange: (language: Language) => void;
+  readonly initialValues?: RuntimeSetupValues | null;
+  readonly submitLabel?: string;
+  readonly submittingLabel?: string;
+  readonly cancelLabel?: string;
 };
 
 type SetupError = {
@@ -17,21 +23,31 @@ type SetupError = {
 
 const DEFAULT_DATA_DIRECTORY = "~/Library/Application Support/VBinvest";
 
-export function SetupWizard({ onCompleted, language, labels: initialLabels, onLanguageChange }: SetupWizardProps) {
+export function SetupWizard({
+  onCompleted,
+  onCancel,
+  language,
+  labels: initialLabels,
+  onLanguageChange,
+  initialValues = null,
+  submitLabel,
+  submittingLabel,
+  cancelLabel,
+}: SetupWizardProps) {
   const [selectedLanguage, setSelectedLanguage] = useState(language);
   const labels = selectedLanguage === language ? initialLabels : labelsFor(selectedLanguage).setup;
-  const [dataDirectory, setDataDirectory] = useState(DEFAULT_DATA_DIRECTORY);
-  const [databaseMode, setDatabaseMode] = useState("sqlite");
-  const [postgresUrl, setPostgresUrl] = useState("");
-  const [vaultPath, setVaultPath] = useState("");
-  const [exportMode, setExportMode] = useState("direct");
-  const [opendartKey, setOpendartKey] = useState("");
-  const [aiMode, setAiMode] = useState("none");
-  const [aiApiType, setAiApiType] = useState("cloud");
-  const [aiProviderName, setAiProviderName] = useState("openai");
-  const [aiBaseUrl, setAiBaseUrl] = useState("https://api.openai.com/v1");
-  const [aiModel, setAiModel] = useState("");
-  const [aiContextSize, setAiContextSize] = useState(8192);
+  const [dataDirectory, setDataDirectory] = useState(initialValues?.dataDirectory ?? DEFAULT_DATA_DIRECTORY);
+  const [databaseMode, setDatabaseMode] = useState(initialValues?.databaseMode ?? "sqlite");
+  const [postgresUrl, setPostgresUrl] = useState(initialValues?.postgresUrl ?? "");
+  const [vaultPath, setVaultPath] = useState(initialValues?.vaultPath ?? "");
+  const [exportMode, setExportMode] = useState(initialValues?.exportMode ?? "direct");
+  const [opendartKey, setOpendartKey] = useState(initialValues?.opendartKey ?? "");
+  const [aiMode, setAiMode] = useState(initialValues?.aiMode ?? "none");
+  const [aiApiType, setAiApiType] = useState(initialValues?.aiApiType ?? "cloud");
+  const [aiProviderName, setAiProviderName] = useState(initialValues?.aiProviderName ?? "openai");
+  const [aiBaseUrl, setAiBaseUrl] = useState(initialValues?.aiBaseUrl ?? "https://api.openai.com/v1");
+  const [aiModel, setAiModel] = useState(initialValues?.aiModel ?? "");
+  const [aiContextSize, setAiContextSize] = useState(initialValues?.aiContextSize ?? 8192);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<SetupError | null>(null);
 
@@ -53,7 +69,7 @@ export function SetupWizard({ onCompleted, language, labels: initialLabels, onLa
     try {
       const response = await fetch("/api/settings/first-run", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({
           language: selectedLanguage,
           data_directory: dataDirectory,
@@ -257,8 +273,13 @@ export function SetupWizard({ onCompleted, language, labels: initialLabels, onLa
 
       <div className="setup-actions">
         <button type="button" onClick={() => void submitSetup()} disabled={!vaultPath.trim() || submitting}>
-          {submitting ? labels.completeButtonSaving : labels.completeButton}
+          {submitting ? submittingLabel ?? labels.completeButtonSaving : submitLabel ?? labels.completeButton}
         </button>
+        {onCancel ? (
+          <button type="button" onClick={onCancel} disabled={submitting}>
+            {cancelLabel ?? "Cancel"}
+          </button>
+        ) : null}
       </div>
     </section>
   );
@@ -285,4 +306,25 @@ function readDetail(payload: unknown): string {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function authHeaders(): Record<string, string> {
+  const token = localSessionToken();
+  if (!token) {
+    return {};
+  }
+  return { Authorization: `Bearer ${token}` };
+}
+
+function localSessionToken(): string {
+  if (typeof window === "undefined") {
+    return "";
+  }
+  return window.__VBINVEST_LOCAL_SESSION_TOKEN__ ?? "";
+}
+
+declare global {
+  interface Window {
+    __VBINVEST_LOCAL_SESSION_TOKEN__?: string;
+  }
 }

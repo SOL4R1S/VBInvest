@@ -646,6 +646,23 @@ class VBinvestDB:
             rows = cur.fetchall()
         return {int(asset_id): latest_date for asset_id, latest_date in rows if latest_date is not None}
 
+    def fetch_price_date_ranges(self, asset_ids: list[int]) -> dict[int, dict[str, datetime.date]]:
+        if not asset_ids:
+            return {}
+        placeholders = ",".join(["%s"] * len(asset_ids))
+        sql = (
+            "SELECT asset_id, min(date) AS earliest_date, max(date) AS latest_date "
+            f"FROM daily_prices WHERE asset_id IN ({placeholders}) GROUP BY asset_id"
+        )
+        with self.connect() as conn, conn.cursor() as cur:
+            cur.execute(sql, asset_ids)
+            rows = cur.fetchall()
+        return {
+            int(asset_id): {"earliest_date": earliest_date, "latest_date": latest_date}
+            for asset_id, earliest_date, latest_date in rows
+            if earliest_date is not None and latest_date is not None
+        }
+
     def fetch_watchlist_collection_status(self, slug: str) -> list[dict[str, Any]]:
         query = """
         WITH wl_assets AS (
@@ -713,7 +730,7 @@ class VBinvestDB:
             )
         return result
 
-    def fetch_dashboard_items(self, slug: str, *, days: int = 260) -> list[dict[str, Any]]:
+    def fetch_dashboard_items(self, slug: str, *, days: int = 1260) -> list[dict[str, Any]]:
         assets = self.fetch_watchlist_assets(slug)
         if not assets:
             return []
@@ -946,7 +963,7 @@ class VBinvestDB:
             obsidian_vault_path=obsidian_vault_path,
         )
 
-    def fetch_asset_dashboard_item(self, symbol: str, *, days: int = 260) -> dict[str, Any] | None:
+    def fetch_asset_dashboard_item(self, symbol: str, *, days: int = 1260) -> dict[str, Any] | None:
         query = """
         SELECT asset_id, symbol, display_name_ko, exchange, currency
         FROM assets

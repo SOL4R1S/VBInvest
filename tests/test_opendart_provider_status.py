@@ -6,10 +6,19 @@ import pytest
 from fastapi.testclient import TestClient
 
 from scripts import api
+from scripts.lib import config as config_module
+from scripts.lib import keychain as keychain_module
 from scripts.lib.disclosures import classify_opendart_status
+from scripts.lib.keychain import EmptySecretStore
+
+
+def disable_secure_storage(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(config_module, "platform_secret_store", lambda _system_name=None: EmptySecretStore())
+    monkeypatch.setattr(keychain_module, "platform_secret_store", lambda _system_name=None: EmptySecretStore())
 
 
 def test_opendart_status_endpoint_reports_missing_key(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    disable_secure_storage(monkeypatch)
     monkeypatch.setenv("VBINVEST_CONFIG_PATH", str(tmp_path / "missing.toml"))
 
     response = TestClient(api.app).get("/api/providers/opendart/status")
@@ -24,6 +33,7 @@ def test_opendart_status_endpoint_prefers_env_key_over_config(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
+    disable_secure_storage(monkeypatch)
     config_path = tmp_path / "config.toml"
     config_path.write_text("[providers]\nopendart_api_key = \"config-secret\"\n", encoding="utf-8")
     monkeypatch.setenv("VBINVEST_CONFIG_PATH", str(config_path))

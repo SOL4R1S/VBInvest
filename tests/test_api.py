@@ -142,9 +142,9 @@ class FakeDashboardDB:
             },
         ]
 
-    def fetch_dashboard_items(self, slug: str, *, days: int = 260):
+    def fetch_dashboard_items(self, slug: str, *, days: int = 1260):
         assert slug == "semiconductor-core"
-        assert days == 260
+        assert days == 1260
         return [
             {
                 "asset": {
@@ -371,7 +371,7 @@ def test_generate_research_response_includes_report_job_metadata(monkeypatch):
 def test_watchlist_dashboard_api_includes_serialized_history(monkeypatch):
     client = client_with_db(monkeypatch, FakeDashboardDB())
 
-    response = client.get("/api/watchlists/semiconductor-core/dashboard?days=260")
+    response = client.get("/api/watchlists/semiconductor-core/dashboard?days=1260")
 
     assert response.status_code == 200
     payload = response.json()

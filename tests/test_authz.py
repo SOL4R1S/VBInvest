@@ -251,7 +251,70 @@ def test_ticker_validation_endpoint_reports_invalid_symbol(monkeypatch):
     response = client.get("/api/tickers/validate", params={"symbol": "notreal"})
 
     assert response.status_code == 404
-    assert response.json()["detail"] == "ticker not found"
+    assert response.json()["detail"] == {"symbol": "NOTREAL", "valid": False, "reason": "ticker_not_found"}
+
+
+def test_ticker_validation_endpoint_returns_suggestion_for_common_typo(monkeypatch):
+    client = client_with_db(monkeypatch, FakeAuthDB())
+
+    monkeypatch.setattr(
+        api,
+        "validate_ticker_symbol",
+        lambda symbol: {
+            "symbol": symbol.strip().upper(),
+            "valid": False,
+            "reason": "ticker_not_found",
+            "suggestion": "005930.KS",
+            "suggestion_label": "삼성전자",
+            "suggestions": [
+                {
+                    "symbol": "005930.KS",
+                    "name": "삼성전자",
+                    "exchange": "KSC",
+                    "quote_type": "EQUITY",
+                }
+            ],
+        },
+    )
+    response = client.get("/api/tickers/validate", params={"symbol": "009530.KS"})
+
+    assert response.status_code == 404
+    assert response.json()["detail"]["suggestion"] == "005930.KS"
+    assert response.json()["detail"]["suggestions"][0]["name"] == "삼성전자"
+
+
+def test_ticker_validation_endpoint_returns_name_search_suggestions(monkeypatch):
+    client = client_with_db(monkeypatch, FakeAuthDB())
+
+    monkeypatch.setattr(
+        api,
+        "validate_ticker_symbol",
+        lambda symbol: {
+            "symbol": symbol.strip().upper(),
+            "valid": False,
+            "reason": "ticker_not_found",
+            "suggestion": "005930.KS",
+            "suggestion_label": "SamsungElec",
+            "suggestions": [
+                {
+                    "symbol": "005930.KS",
+                    "name": "SamsungElec",
+                    "exchange": "KSC",
+                    "quote_type": "EQUITY",
+                },
+                {
+                    "symbol": "SSNLF",
+                    "name": "SAMSUNG ELECTRONICS CO",
+                    "exchange": "PNK",
+                    "quote_type": "EQUITY",
+                },
+            ],
+        },
+    )
+    response = client.get("/api/tickers/validate", params={"symbol": "Samsung Electronics"})
+
+    assert response.status_code == 404
+    assert response.json()["detail"]["suggestions"][1]["symbol"] == "SSNLF"
 
 
 def test_ticker_validation_endpoint_returns_provider_for_valid_symbol(monkeypatch):
@@ -266,6 +329,29 @@ def test_ticker_validation_endpoint_returns_provider_for_valid_symbol(monkeypatc
 
     assert response.status_code == 200
     assert response.json() == {"symbol": "NVDA", "valid": True, "provider": "yfinance"}
+
+
+def test_ticker_search_endpoint_returns_autocomplete_suggestions(monkeypatch):
+    client = client_with_db(monkeypatch, FakeAuthDB())
+
+    monkeypatch.setattr(
+        api,
+        "search_ticker_suggestions",
+        lambda query, limit: [
+            {"symbol": "005930.KS", "name": "삼성전자", "exchange": "KSC", "quote_type": "EQUITY"},
+            {"symbol": "009150.KS", "name": "삼성전기", "exchange": "KSC", "quote_type": "EQUITY"},
+        ],
+    )
+    response = client.get("/api/tickers/search", params={"query": "삼", "limit": 5})
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "query": "삼",
+        "suggestions": [
+            {"symbol": "005930.KS", "name": "삼성전자", "exchange": "KSC", "quote_type": "EQUITY"},
+            {"symbol": "009150.KS", "name": "삼성전기", "exchange": "KSC", "quote_type": "EQUITY"},
+        ],
+    }
 
 
 def test_portfolio_holding_crud_is_user_owned(monkeypatch):
@@ -444,3 +530,33 @@ def test_shutdown_invokes_local_callback_when_enabled(monkeypatch):
     assert response.status_code == 200
     assert response.json() == {"status": "shutting_down"}
     assert called["count"] == 1
+
+
+def test_shutdown_beacon_accepts_local_session_token_body(monkeypatch):
+    client = client_with_db(monkeypatch, FakeAuthDB())
+    monkeypatch.setenv("VBINVEST_LOCAL_SESSION_TOKEN", "qa-token")
+    monkeypatch.setenv("VBINVEST_LOCAL_SHUTDOWN_ENABLED", "1")
+
+    called = {"count": 0}
+
+    def fake_shutdown() -> None:
+        called["count"] += 1
+
+    monkeypatch.setattr(api, "LOCAL_SHUTDOWN_CALLBACK", fake_shutdown)
+
+    response = client.post("/api/system/shutdown-beacon", json={"token": "qa-token"})
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "shutting_down"}
+    assert called["count"] == 1
+
+
+def test_shutdown_beacon_rejects_wrong_token(monkeypatch):
+    client = client_with_db(monkeypatch, FakeAuthDB())
+    monkeypatch.setenv("VBINVEST_LOCAL_SESSION_TOKEN", "qa-token")
+    monkeypatch.setenv("VBINVEST_LOCAL_SHUTDOWN_ENABLED", "1")
+    monkeypatch.setattr(api, "LOCAL_SHUTDOWN_CALLBACK", lambda: None)
+
+    response = client.post("/api/system/shutdown-beacon", json={"token": "wrong"})
+
+    assert response.status_code == 401

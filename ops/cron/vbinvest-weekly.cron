@@ -1,5 +1,5 @@
-# Optional local weekly scheduler tick: Sunday 20:00 Asia/Seoul.
-# Weekly precompute remains disabled by default; enable it in Vbinvest settings before installing this template.
+# Optional local scheduled precompute tick: Sunday 20:00 Asia/Seoul.
+# Scheduled precompute remains disabled by default; enable it in Vbinvest settings before installing this template.
 # Replace /path/to/VBinvest before installing with: crontab ops/cron/vbinvest-weekly.cron
 SHELL=/bin/zsh
 PATH=/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin
