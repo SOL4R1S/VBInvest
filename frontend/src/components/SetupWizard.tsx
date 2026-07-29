@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 
+import { authHeaders } from "@/lib/auth";
+import { isRecord } from "@/lib/guards";
 import { isLanguage, labelsFor, persistLanguage, type Language, type LocalizedLabels } from "@/lib/i18n";
 import type { RuntimeSetupValues } from "@/lib/startup-status";
 
@@ -302,29 +304,4 @@ function readDetail(payload: unknown): string {
   }
   const detail = payload.detail;
   return typeof detail === "string" ? detail : "";
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function authHeaders(): Record<string, string> {
-  const token = localSessionToken();
-  if (!token) {
-    return {};
-  }
-  return { Authorization: `Bearer ${token}` };
-}
-
-function localSessionToken(): string {
-  if (typeof window === "undefined") {
-    return "";
-  }
-  return window.__VBINVEST_LOCAL_SESSION_TOKEN__ ?? "";
-}
-
-declare global {
-  interface Window {
-    __VBINVEST_LOCAL_SESSION_TOKEN__?: string;
-  }
 }

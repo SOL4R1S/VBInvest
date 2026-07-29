@@ -1,3 +1,6 @@
+import { authFetchInit, authHeaders } from "@/lib/auth";
+import { isRecord, stringField } from "@/lib/guards";
+
 export type Watchlist = {
   readonly id: string;
   readonly slug: string;
@@ -9,18 +12,7 @@ export const DEFAULT_WATCHLISTS: readonly Watchlist[] = [
   { id: "semiconductor-core", slug: "semiconductor-core", name: "Semiconductor Core", symbols: ["NVDA", "005930.KS", "000660.KS"] },
 ];
 
-type JsonObject = Record<string, unknown>;
-
-function isRecord(value: unknown): value is JsonObject {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function stringField(value: JsonObject, key: string): string | null {
-  const candidate = value[key];
-  return typeof candidate === "string" ? candidate : null;
-}
-
-function symbolsField(value: JsonObject): readonly string[] {
+function symbolsField(value: Record<string, unknown>): readonly string[] {
   const candidate = value["symbols"];
   if (!Array.isArray(candidate)) {
     return [];
@@ -70,7 +62,9 @@ function parseWatchlistPayload(payload: unknown): readonly Watchlist[] | null {
 
 export async function fetchWatchlists(fallbackToDemo = false): Promise<readonly Watchlist[]> {
   const init = authFetchInit();
-  const response = init === undefined ? await fetch("/api/watchlists") : await fetch("/api/watchlists", init);
+  const response = Object.keys(init).length === 0
+    ? await fetch("/api/watchlists")
+    : await fetch("/api/watchlists", init);
   if (!response.ok) {
     return fallbackToDemo ? DEFAULT_WATCHLISTS : [];
   }
@@ -128,33 +122,4 @@ export async function deleteAssetFromWatchlist(watchlistId: string, symbol: stri
     return null;
   }
   return parsed.length > 0 ? parsed[0] : null;
-}
-
-function authHeaders(base: Record<string, string> = {}): Record<string, string> {
-  const token = localSessionToken();
-  if (!token) {
-    return base;
-  }
-  return { ...base, Authorization: `Bearer ${token}` };
-}
-
-function authFetchInit(): RequestInit | undefined {
-  const token = localSessionToken();
-  if (!token) {
-    return undefined;
-  }
-  return { headers: { Authorization: `Bearer ${token}` } };
-}
-
-function localSessionToken(): string {
-  if (typeof window === "undefined") {
-    return "";
-  }
-  return window.__VBINVEST_LOCAL_SESSION_TOKEN__ ?? "";
-}
-
-declare global {
-  interface Window {
-    __VBINVEST_LOCAL_SESSION_TOKEN__?: string;
-  }
 }

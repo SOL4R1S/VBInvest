@@ -1,3 +1,5 @@
+import { authHeaders, localSessionToken } from "@/lib/auth";
+
 export type SystemShutdownResult =
   | {
       readonly ok: true;
@@ -50,25 +52,4 @@ export function sendShutdownBeacon(): boolean {
   }
   const payload = new Blob([JSON.stringify({ token })], { type: "application/json" });
   return navigator.sendBeacon("/api/system/shutdown-beacon", payload);
-}
-
-function authHeaders(): Record<string, string> {
-  const token = localSessionToken();
-  if (!token) {
-    return {};
-  }
-  return { Authorization: `Bearer ${token}` };
-}
-
-function localSessionToken(): string {
-  if (typeof window === "undefined") {
-    return "";
-  }
-  return window.__VBINVEST_LOCAL_SESSION_TOKEN__ ?? "";
-}
-
-declare global {
-  interface Window {
-    __VBINVEST_LOCAL_SESSION_TOKEN__?: string;
-  }
 }

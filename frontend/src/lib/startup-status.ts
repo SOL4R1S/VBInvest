@@ -1,3 +1,6 @@
+import { authHeaders } from "@/lib/auth";
+import { isRecord, numberValue, stringOrNull } from "@/lib/guards";
+
 export type StartupRefreshStatus = "checking" | "running" | "setup_required" | "ready" | "partial" | "skipped" | "failed";
 
 export type ProviderDisabled = {
@@ -103,7 +106,7 @@ export const INITIAL_STARTUP_REFRESH: StartupRefreshView = {
 };
 
 export async function fetchProviderSummary(): Promise<ProviderSummary | null> {
-  const response = await fetch("/api/settings");
+  const response = await fetch("/api/settings", { headers: authHeaders() });
   if (!response.ok) {
     return null;
   }
@@ -121,7 +124,7 @@ export async function fetchProviderSummary(): Promise<ProviderSummary | null> {
 }
 
 export async function fetchRuntimeSettings(): Promise<RuntimeSettings> {
-  const response = await fetch("/api/settings");
+  const response = await fetch("/api/settings", { headers: authHeaders() });
   if (!response.ok) {
     return { providerSummary: null, language: null, setupValues: null };
   }
@@ -146,7 +149,9 @@ export async function fetchRuntimeSettings(): Promise<RuntimeSettings> {
 }
 
 export async function fetchCollectionStatus(slug: string): Promise<readonly CollectionAssetStatus[]> {
-  const response = await fetch(`/api/watchlists/${encodeURIComponent(slug)}/collection-status`);
+  const response = await fetch(`/api/watchlists/${encodeURIComponent(slug)}/collection-status`, {
+    headers: authHeaders(),
+  });
   if (!response.ok) {
     return [];
   }
@@ -423,16 +428,4 @@ function isLocalBaseUrl(value: string): boolean {
   } catch {
     return false;
   }
-}
-
-function numberValue(value: unknown): number {
-  return typeof value === "number" && Number.isFinite(value) ? value : 0;
-}
-
-function stringOrNull(value: unknown): string | null {
-  return typeof value === "string" && value.length > 0 ? value : null;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
