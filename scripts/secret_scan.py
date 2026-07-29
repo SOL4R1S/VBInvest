@@ -5,8 +5,16 @@ import sys
 from pathlib import Path
 
 
-SECRET_ASSIGNMENT = re.compile(r"^(?P<key>[A-Z0-9_]*(?:PASSWORD|SECRET|SERVICE_ROLE|CLIENT_SECRET)[A-Z0-9_]*)=(?P<value>.+)$")
-DEFAULT_PATHS = [Path("README.md"), Path("docs"), Path("postgres/.env.example"), Path("frontend/.env.example")]
+SECRET_ASSIGNMENT = re.compile(
+    r"^(?P<key>[A-Z0-9_]*(?:PASSWORD|SECRET|SERVICE_ROLE|CLIENT_SECRET|API_KEY|TOKEN|ACCESS_KEY|PRIVATE_KEY)[A-Z0-9_]*)=(?P<value>.+)$"
+)
+DEFAULT_PATHS = [
+    Path("README.md"),
+    Path("docs"),
+    Path(".env.example"),
+    Path("postgres/.env.example"),
+    Path("frontend/.env.example"),
+]
 
 
 def scan_text(text: str, label: str) -> list[str]:
