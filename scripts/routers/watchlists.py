@@ -6,7 +6,6 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from scripts.lib.dashboard import render_dashboard_html
 from scripts.lib.dashboard_payload import serialize_dashboard_items
-from scripts.lib.prices import search_ticker_suggestions, validate_ticker_symbol
 
 from scripts.routers.deps import (
     WatchlistAssetChange,
@@ -62,7 +61,8 @@ def remove_watchlist_asset(watchlist_id: str, symbol: str, user=Depends(current_
 
 @router.get("/api/tickers/validate")
 def validate_ticker(symbol: str):
-    result = validate_ticker_symbol(symbol)
+    from scripts import api
+    result = api.validate_ticker_symbol(symbol)
     if not result["valid"]:
         raise HTTPException(status_code=404, detail=result)
     return result
@@ -70,8 +70,9 @@ def validate_ticker(symbol: str):
 
 @router.get("/api/tickers/search")
 def search_tickers(query: str, limit: int = 8):
+    from scripts import api
     safe_limit = max(1, min(limit, 20))
-    return {"query": query, "suggestions": search_ticker_suggestions(query, limit=safe_limit)}
+    return {"query": query, "suggestions": api.search_ticker_suggestions(query, limit=safe_limit)}
 
 
 @router.get("/api/watchlists/{slug}/assets")

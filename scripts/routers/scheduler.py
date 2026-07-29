@@ -4,9 +4,8 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from scripts.lib.config import ConfigError, load_opendart_api_key
+from scripts.lib.config import ConfigError
 from scripts.lib.startup_market_refresh import run_startup_market_refresh
-from scripts.lib.ticker_catalog import refresh_ticker_catalog
 
 from scripts.routers.deps import (
     SchedulerSettingsPayload,
@@ -27,7 +26,8 @@ def startup_market_refresh(
     force: bool = False,
     limit: int = 0,
 ):
-    ticker_catalog = refresh_ticker_catalog()
+    from scripts import api
+    ticker_catalog = api.refresh_ticker_catalog()
     try:
         result = run_startup_market_refresh(
             db(),
@@ -37,7 +37,7 @@ def startup_market_refresh(
             include_news=include_news,
             limit=limit,
             force=force,
-            dart_api_key=load_opendart_api_key(),
+            dart_api_key=api.load_opendart_api_key(),
         )
     except (ConfigError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -107,13 +107,14 @@ def run_scheduler_tick(
     user=Depends(current_user),
 ):
     try:
+        from scripts import api
         return local_scheduler().tick(
             dry_run=dry_run,
             no_network=no_network,
             include_news=include_news,
             limit=limit,
             force=force,
-            dart_api_key=load_opendart_api_key(),
+            dart_api_key=api.load_opendart_api_key(),
         )
     except (ConfigError, ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

@@ -53,10 +53,9 @@ def db() -> DBRepository:
 
 
 def auth_db() -> Any:
-    backend = db()
-    if hasattr(backend, "fetch_profile_by_auth_user"):
-        return backend
-    return ApiStore(backend)
+    """Delegate to api.auth_db so tests can monkeypatch api.auth_db."""
+    from scripts import api
+    return api.auth_db()
 
 
 def current_user(authorization: str | None = Header(default=None)) -> AuthUser:

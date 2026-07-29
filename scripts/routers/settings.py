@@ -13,12 +13,10 @@ from scripts.lib.config import (
     ConfigError,
     config_path_from_env,
     load_local_config,
-    load_opendart_api_key,
     parse_report_run_summary,
     provider_status,
     write_local_config,
 )
-from scripts.lib.disclosures import check_opendart_api_key
 
 from scripts.routers.deps import (
     FirstRunSetupPayload,
@@ -115,7 +113,8 @@ def opendart_provider_status(check: bool = False):
         return {"status": "missing_key", "source": source, "configured": False}
     if not check:
         return {"status": "enabled", "source": source, "configured": True}
-    result = check_opendart_api_key(load_opendart_api_key())
+    from scripts import api
+    result = api.check_opendart_api_key(api.load_opendart_api_key())
     return {
         "status": result.status,
         "source": source,

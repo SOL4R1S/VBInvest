@@ -17,10 +17,13 @@ if __package__ is None or __package__ == "":
 
 from fastapi import FastAPI
 
+from scripts.lib.api_store import ApiStore
 from scripts.lib.config import load_opendart_api_key  # noqa: F401 — re-exported for tests
 from scripts.lib.db_factory import build_database_from_local_config
 from scripts.lib.db_repository import DBRepository
 from scripts.lib.disclosures import check_opendart_api_key  # noqa: F401 — re-exported for tests
+from scripts.lib.prices import search_ticker_suggestions, validate_ticker_symbol  # noqa: F401 — re-exported for tests
+from scripts.lib.ticker_catalog import refresh_ticker_catalog  # noqa: F401 — re-exported for tests
 from scripts.lib.version import load_version_metadata
 from scripts.routers import frontend, portfolio, research, scheduler, settings, watchlists
 
@@ -40,6 +43,14 @@ LOCAL_SHUTDOWN_CALLBACK: ShutdownCallback | None = None
 def db() -> DBRepository:
     """Module-level db accessor — tests monkeypatch this via api.db."""
     return build_database_from_local_config(environ=os.environ)
+
+
+def auth_db():
+    """Auth-aware DB wrapper — tests monkeypatch this via api.auth_db."""
+    backend = db()
+    if hasattr(backend, "fetch_profile_by_auth_user"):
+        return backend
+    return ApiStore(backend)
 
 
 def frontend_out_dir() -> Path:
