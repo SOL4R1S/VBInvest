@@ -33,6 +33,7 @@ from scripts.lib.db_research import ResearchMixin
 from scripts.lib.db_entitlement import EntitlementMixin
 
 
+@dataclass(frozen=True, slots=True)
 class DatabaseConfig:
     host: str = "host.docker.internal"
     port: int = 5432

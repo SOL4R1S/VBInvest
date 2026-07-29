@@ -14,13 +14,51 @@ from scripts.routers.deps import (
     ShutdownBeaconPayload,
     current_user,
     db,
-    frontend_asset_file,
-    frontend_index_response,
 )
 
 router = APIRouter()
 
 VERSION_METADATA = load_version_metadata()
+
+
+def _frontend_out_dir():
+    """Delegate to api.frontend_out_dir so tests can monkeypatch it."""
+    from scripts import api
+    return api.frontend_out_dir()
+
+
+def _frontend_index_file():
+    index_file = _frontend_out_dir() / "index.html"
+    if index_file.is_file():
+        return index_file
+    return None
+
+
+def _frontend_asset_file(asset_path: str):
+    root = _frontend_out_dir().resolve()
+    candidate = (root / asset_path).resolve()
+    if candidate != root and root not in candidate.parents:
+        return None
+    if candidate.is_file():
+        return candidate
+    return None
+
+
+def _frontend_index_response():
+    import json as _json
+    index_file = _frontend_index_file()
+    if index_file is None:
+        raise HTTPException(status_code=404, detail="frontend build not found")
+    html = index_file.read_text(encoding="utf-8")
+    session_token = os.environ.get("VBINVEST_LOCAL_SESSION_TOKEN", "")
+    if session_token:
+        script = (
+            "<script>"
+            f"window.__VBINVEST_LOCAL_SESSION_TOKEN__={_json.dumps(session_token)};"
+            "</script>"
+        )
+        html = html.replace("</head>", f"{script}</head>", 1) if "</head>" in html else f"{script}{html}"
+    return HTMLResponse(html)
 
 
 @router.get("/health")
@@ -35,12 +73,12 @@ def health():
 
 @router.get("/", response_class=HTMLResponse)
 def frontend_root():
-    return frontend_index_response()
+    return _frontend_index_response()
 
 
 @router.get("/_next/{asset_path:path}")
 def frontend_next_asset(asset_path: str):
-    asset_file = frontend_asset_file(f"_next/{asset_path}")
+    asset_file = _frontend_asset_file(f"_next/{asset_path}")
     if asset_file is None:
         raise HTTPException(status_code=404, detail="frontend asset not found")
     return FileResponse(asset_file)
@@ -80,7 +118,7 @@ def dashboard_html(slug: str, days: int = 1260):
 def frontend_asset_or_route(asset_path: str):
     if asset_path.startswith("api/") or asset_path == "health" or asset_path.startswith("dashboard/"):
         raise HTTPException(status_code=404, detail="not found")
-    asset_file = frontend_asset_file(asset_path)
+    asset_file = _frontend_asset_file(asset_path)
     if asset_file is not None:
         return FileResponse(asset_file)
-    return frontend_index_response()
+    return _frontend_index_response()

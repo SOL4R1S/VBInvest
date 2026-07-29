@@ -47,7 +47,9 @@ ShutdownCallback = Callable[[], None]
 # ---------------------------------------------------------------------------
 
 def db() -> DBRepository:
-    return build_database_from_local_config(environ=os.environ)
+    """Delegate to api.db so tests can monkeypatch api.db."""
+    from scripts import api
+    return api.db()
 
 
 def auth_db() -> Any:

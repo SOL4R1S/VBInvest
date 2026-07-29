@@ -56,8 +56,11 @@ def build_price_rows(asset_id: int, frame: pd.DataFrame, fetched_at: datetime | 
                 "high": none_if_na(record.get("high")),
                 "low": none_if_na(record.get("low")),
                 "close": none_if_na(record.get("close")),
+                "adj_close": none_if_na(record.get("adj_close")),
                 "volume": none_if_na(record.get("volume")),
+                "source": provider,
                 "provider": provider,
+                "currency": none_if_na(record.get("currency")),
                 "fetched_at": fetched,
             }
         )
