@@ -54,7 +54,7 @@ def test_ci_workflow_runs_git_hook_parity_and_launcher_package_smoke() -> None:
     assert "make package-smoke" in workflow
 
 
-def test_ci_workflow_sets_migration_smoke_as_allowed_failure() -> None:
+def test_ci_workflow_sets_migration_smoke_as_blocking() -> None:
     workflow = read_workflow("ci.yml")
     match = re.search(
         r"^  migration-smoke:\n(?:    .*\n)*?(?=^  [a-zA-Z0-9-]+:|\Z)",
@@ -65,7 +65,7 @@ def test_ci_workflow_sets_migration_smoke_as_allowed_failure() -> None:
     assert match is not None, "migration-smoke job should exist"
     migration_job = match.group(0)
 
-    assert "continue-on-error: true" in migration_job
+    assert "continue-on-error" not in migration_job
     assert "image: postgres:16" in migration_job
 
 
