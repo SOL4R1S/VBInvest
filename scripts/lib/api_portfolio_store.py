@@ -195,9 +195,17 @@ def create_portfolio_transaction(
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
-                transaction_id, holding[0], holding[1], holding[2],
-                transaction_type, quantity, price_per_unit, fee,
-                holding[5], transaction_date, note,
+                transaction_id,
+                holding[0],
+                holding[1],
+                holding[2],
+                transaction_type,
+                quantity,
+                price_per_unit,
+                fee,
+                holding[5],
+                transaction_date,
+                note,
             ),
         )
 
@@ -278,9 +286,7 @@ def fetch_portfolio_returns(db: VBinvestDB, auth_user_id: str, *, days: int = 36
     snapshots = fetch_portfolio_snapshots(db, auth_user_id, days=days)
     previous_snapshot = snapshots[0] if snapshots else None
 
-    summary, holding_returns = compute_portfolio_returns(
-        holdings, latest_prices, previous_snapshot=previous_snapshot
-    )
+    summary, holding_returns = compute_portfolio_returns(holdings, latest_prices, previous_snapshot=previous_snapshot)
     return {
         "summary": summary.as_dict(),
         "holdings": [h.as_dict() for h in holding_returns],
@@ -320,9 +326,15 @@ def upsert_portfolio_snapshot(
               holdings_json = EXCLUDED.holdings_json
             """,
             (
-                snapshot_id, profile[0], snapshot_date,
-                total_cost, total_value, total_return, total_return_pct,
-                daily_return_pct, holdings_json,
+                snapshot_id,
+                profile[0],
+                snapshot_date,
+                total_cost,
+                total_value,
+                total_return,
+                total_return_pct,
+                daily_return_pct,
+                holdings_json,
             ),
         )
 

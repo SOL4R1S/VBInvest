@@ -195,8 +195,15 @@ class ApiStore:
         note: str | None,
     ) -> dict[str, Any]:
         return api_portfolio_store.create_portfolio_transaction(
-            self.db, auth_user_id, holding_id, transaction_type,
-            quantity, price_per_unit, fee, transaction_date, note,
+            self.db,
+            auth_user_id,
+            holding_id,
+            transaction_type,
+            quantity,
+            price_per_unit,
+            fee,
+            transaction_date,
+            note,
         )
 
     def fetch_portfolio_returns(self, auth_user_id: str, *, days: int = 365) -> dict[str, Any]:
@@ -214,9 +221,15 @@ class ApiStore:
         holdings_json: str,
     ) -> None:
         api_portfolio_store.upsert_portfolio_snapshot(
-            self.db, auth_user_id, snapshot_date,
-            total_cost, total_value, total_return, total_return_pct,
-            daily_return_pct, holdings_json,
+            self.db,
+            auth_user_id,
+            snapshot_date,
+            total_cost,
+            total_value,
+            total_return,
+            total_return_pct,
+            daily_return_pct,
+            holdings_json,
         )
 
     def fetch_portfolio_snapshots(self, auth_user_id: str, *, days: int = 365) -> list[dict[str, Any]]:

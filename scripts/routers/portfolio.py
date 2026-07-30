@@ -1,12 +1,13 @@
-"""Portfolio holdings CRUD routes."""
+"""Portfolio holdings, transactions, returns routes."""
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from scripts.routers.deps import (
     PortfolioHoldingCreate,
     PortfolioHoldingUpdate,
+    PortfolioTransactionCreate,
     auth_db,
     current_user,
 )
@@ -56,3 +57,53 @@ def delete_portfolio_holding(holding_id: str, user=Depends(current_user)):
     deleted = auth_db().delete_user_portfolio_holding(user.auth_user_id, holding_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="holding not found")
+
+
+# -- transactions ---------------------------------------------------------------
+
+
+@router.get("/api/portfolio/transactions")
+def list_portfolio_transactions(
+    holding_id: str | None = Query(default=None, max_length=64),
+    limit: int = Query(default=100, ge=1, le=500),
+    user=Depends(current_user),
+):
+    return {
+        "transactions": auth_db().list_portfolio_transactions(user.auth_user_id, holding_id=holding_id, limit=limit)
+    }
+
+
+@router.post("/api/portfolio/transactions", status_code=status.HTTP_201_CREATED)
+def create_portfolio_transaction(payload: PortfolioTransactionCreate, user=Depends(current_user)):
+    try:
+        return auth_db().create_portfolio_transaction(
+            user.auth_user_id,
+            payload.holding_id,
+            payload.transaction_type,
+            payload.quantity,
+            payload.price_per_unit,
+            payload.fee,
+            payload.transaction_date,
+            payload.note,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+# -- returns & snapshots --------------------------------------------------------
+
+
+@router.get("/api/portfolio/returns")
+def fetch_portfolio_returns(
+    days: int = Query(default=365, ge=1, le=3650),
+    user=Depends(current_user),
+):
+    return auth_db().fetch_portfolio_returns(user.auth_user_id, days=days)
+
+
+@router.get("/api/portfolio/snapshots")
+def fetch_portfolio_snapshots(
+    days: int = Query(default=365, ge=1, le=3650),
+    user=Depends(current_user),
+):
+    return {"snapshots": auth_db().fetch_portfolio_snapshots(user.auth_user_id, days=days)}

@@ -52,9 +52,7 @@ class SQLitePortfolioMixin(DBMixinBase):
     ) -> dict[str, Any]:
         holding_id = str(uuid.uuid4())
         with self.connect() as conn:
-            profile = conn.execute(
-                "SELECT profile_id FROM profiles WHERE auth_user_id = ?", (auth_user_id,)
-            ).fetchone()
+            profile = conn.execute("SELECT profile_id FROM profiles WHERE auth_user_id = ?", (auth_user_id,)).fetchone()
             asset = conn.execute(
                 "SELECT asset_id, currency FROM assets WHERE symbol = ? AND active = 1", (symbol,)
             ).fetchone()
@@ -215,9 +213,17 @@ class SQLitePortfolioMixin(DBMixinBase):
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    transaction_id, holding_id, holding["profile_id"], holding["asset_id"],
-                    transaction_type, quantity, price_per_unit, fee,
-                    holding["currency"], transaction_date, note,
+                    transaction_id,
+                    holding_id,
+                    holding["profile_id"],
+                    holding["asset_id"],
+                    transaction_type,
+                    quantity,
+                    price_per_unit,
+                    fee,
+                    holding["currency"],
+                    transaction_date,
+                    note,
                 ),
             )
 
@@ -301,9 +307,7 @@ class SQLitePortfolioMixin(DBMixinBase):
     ) -> None:
         snapshot_id = str(uuid.uuid4())
         with self.connect() as conn:
-            profile = conn.execute(
-                "SELECT profile_id FROM profiles WHERE auth_user_id = ?", (auth_user_id,)
-            ).fetchone()
+            profile = conn.execute("SELECT profile_id FROM profiles WHERE auth_user_id = ?", (auth_user_id,)).fetchone()
             if profile is None:
                 raise LookupError("profile not found")
             conn.execute(
@@ -321,9 +325,15 @@ class SQLitePortfolioMixin(DBMixinBase):
                   holdings_json = excluded.holdings_json
                 """,
                 (
-                    snapshot_id, profile["profile_id"], snapshot_date,
-                    total_cost, total_value, total_return, total_return_pct,
-                    daily_return_pct, holdings_json,
+                    snapshot_id,
+                    profile["profile_id"],
+                    snapshot_date,
+                    total_cost,
+                    total_value,
+                    total_return,
+                    total_return_pct,
+                    daily_return_pct,
+                    holdings_json,
                 ),
             )
 
