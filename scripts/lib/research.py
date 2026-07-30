@@ -6,7 +6,16 @@ from datetime import date, datetime
 from typing import Any, Protocol
 
 APPROVED_OPINIONS = {"매수", "아웃퍼폼", "중립", "언더퍼폼", "매도"}
-FORBIDDEN_RESEARCH_PHRASES = ("수익을 보장", "보장합니다", "guaranteed return", "risk-free")
+FORBIDDEN_RESEARCH_PHRASES = (
+    "수익을 보장",
+    "보장합니다",
+    "guaranteed return",
+    "risk-free",
+    "반드시 오른다",
+    "100% 수익",
+    "손실 불가능",
+    "무조건 매수",
+)
 
 
 class GuardrailError(ValueError):
@@ -100,9 +109,18 @@ def opinion_from_metrics(latest: dict[str, Any]) -> str:
 def validate_research_view(row: dict[str, Any]) -> None:
     if row.get("opinion") not in APPROVED_OPINIONS:
         raise GuardrailError(f"unapproved opinion: {row.get('opinion')}")
-    thesis = str(row.get("thesis") or "").lower()
-    if any(phrase in thesis for phrase in FORBIDDEN_RESEARCH_PHRASES):
-        raise GuardrailError("forbidden investment promise")
+    # Check forbidden phrases across all text fields, not just thesis
+    for field in ("thesis", "bull", "base", "bear"):
+        text = str(row.get(field) or "").lower()
+        if any(phrase in text for phrase in FORBIDDEN_RESEARCH_PHRASES):
+            raise GuardrailError(f"forbidden investment promise in {field}")
+    # Also check risks/triggers arrays if they are strings
+    for field in ("risks", "triggers"):
+        raw = row.get(field)
+        if isinstance(raw, str):
+            text = raw.lower()
+            if any(phrase in text for phrase in FORBIDDEN_RESEARCH_PHRASES):
+                raise GuardrailError(f"forbidden investment promise in {field}")
     sources = _json_loads(row.get("sources"))
     has_source_gap = any(source.get("kind") == "source_gap" for source in sources if isinstance(source, dict))
     if not sources and not has_source_gap:
@@ -112,6 +130,8 @@ def validate_research_view(row: dict[str, Any]) -> None:
 def _fallback_view(
     asset: dict[str, Any], latest: dict[str, Any], packet: dict[str, Any], provider: str
 ) -> dict[str, Any]:
+    from scripts.lib.ai_prompt_templates import resolve_sector_template
+
     symbol = asset["symbol"]
     name = asset.get("display_name_ko") or symbol
     opinion = opinion_from_metrics(latest)
@@ -126,6 +146,7 @@ def _fallback_view(
         f"{name} ({symbol})는 확인된 DB 가격·지표와 최근 소스 상태를 기준으로 `{opinion}`로 분류합니다. "
         "이는 투자 권유가 아니라 사용자가 요청한 리서치용 의견입니다."
     )
+    template = resolve_sector_template(asset)
     return {
         "target_type": "asset",
         "target_slug": symbol,
@@ -134,15 +155,11 @@ def _fallback_view(
         "opinion": opinion,
         "thesis": thesis,
         "rationale": json.dumps(rationale, ensure_ascii=False),
-        "bull": "AI 서버/메모리/스토리지/장비 수요와 실적 가이던스가 동시에 개선되면 업사이드가 커질 수 있습니다.",
-        "base": "현재 확인된 가격·지표 흐름과 공개 소스의 신선도를 기준으로 섹터 내 상대 모멘텀을 점검합니다.",
-        "bear": "수요 둔화, 재고 조정, 과도한 밸류에이션, 금리·환율 변수는 하방 리스크입니다.",
-        "risks": json.dumps(
-            ["실적/가이던스 하향", "AI 투자 사이클 둔화", "환율·금리 변동", "지정학/수출규제"], ensure_ascii=False
-        ),
-        "triggers": json.dumps(
-            ["실적 발표", "메모리 가격", "CAPEX 코멘트", "AI 서버 주문", "장비 발주"], ensure_ascii=False
-        ),
+        "bull": template.fallback_bull,
+        "base": template.fallback_base,
+        "bear": template.fallback_bear,
+        "risks": json.dumps(template.fallback_risks, ensure_ascii=False),
+        "triggers": json.dumps(template.fallback_triggers, ensure_ascii=False),
         "sources": json.dumps(packet["sources"], ensure_ascii=False, default=str),
         "metrics_snapshot": json.dumps(_metrics_snapshot(asset, latest), ensure_ascii=False, default=str),
         "target_price_summary": json.dumps(
@@ -164,6 +181,9 @@ def _ai_view(
     ai_client: ResearchAIClient,
 ) -> dict[str, Any]:
     draft = ai_client.generate_research(asset, latest, packet)
+    confidence = _confidence(draft.get("confidence"))
+    # Citation validation: penalize low citation coverage
+    confidence = _validate_citations(draft, packet["sources"], confidence)
     return {
         "target_type": "asset",
         "target_slug": asset["symbol"],
@@ -186,10 +206,50 @@ def _ai_view(
         ),
         "model_provider": str(draft.get("model_provider") or provider),
         "model_name": str(draft.get("model_name") or "openai-compatible"),
-        "confidence": _confidence(draft.get("confidence")),
+        "confidence": confidence,
         "source_freshness_status": "source_gap" if packet["source_gap"] else "fresh",
         "access_tier": "free",
     }
+
+
+_CITATION_PATTERN = re.compile(r"\[source:(\d+)\]")
+
+
+def _validate_citations(draft: dict[str, Any], sources: list[dict[str, Any]], confidence: float) -> float:
+    """Validate citation coverage in AI-generated research.
+
+    Extracts [source:N] references from rationale/bull/base/bear.
+    If >50% of claims lack citations, penalize confidence to 0.3.
+    Out-of-range citation indices are ignored (not counted as valid).
+    """
+    source_count = len(sources)
+    text_fields: list[str] = []
+    for field in ("thesis", "bull", "base", "bear"):
+        val = draft.get(field)
+        if isinstance(val, str) and val.strip():
+            text_fields.append(val)
+    rationale = draft.get("rationale")
+    if isinstance(rationale, list):
+        text_fields.extend(str(item) for item in rationale if isinstance(item, str))
+
+    if not text_fields:
+        return confidence
+
+    cited_count = 0
+    total_claims = 0
+    for text in text_fields:
+        # Each sentence/line is a "claim"
+        claims = [s.strip() for s in text.replace("\n", ". ").split(".") if s.strip()]
+        for claim in claims:
+            total_claims += 1
+            refs = _CITATION_PATTERN.findall(claim)
+            valid_refs = [int(r) for r in refs if int(r) < source_count]
+            if valid_refs:
+                cited_count += 1
+
+    if total_claims > 0 and cited_count / total_claims < 0.5:
+        return min(confidence, 0.3)
+    return confidence
 
 
 def _source_rows(kind: str, symbol: str, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
