@@ -1,4 +1,4 @@
-"""Tests for scripts.routers.frontend — health, system, and static serving."""
+"""Tests for scripts.routers.frontend — health and static serving."""
 
 from fastapi.testclient import TestClient
 
@@ -8,20 +8,11 @@ from scripts.api import app
 
 def test_health_endpoint():
     client = TestClient(app)
-    resp = client.get("/api/health")
+    resp = client.get("/health")
     assert resp.status_code == 200
     body = resp.json()
     assert body["status"] == "ok"
     assert "version" in body
-
-
-def test_system_info(monkeypatch):
-    monkeypatch.setattr(api, "db", lambda: None)
-    client = TestClient(app)
-    resp = client.get("/api/system/info")
-    assert resp.status_code == 200
-    body = resp.json()
-    assert "platform" in body
 
 
 def test_frontend_serves_index(monkeypatch, tmp_path):

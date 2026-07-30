@@ -21,12 +21,18 @@ class FakeResearchDB:
 
     def generate_research_for_asset(self, auth_user_id, symbol, obsidian_vault_path=None):
         row = {
+            "target_slug": symbol,
+            "opinion": "매수",
+            "thesis": f"AI thesis for {symbol}",
+            "bull": "strong growth",
+            "base": "moderate growth",
+            "bear": "regulatory risk",
+            "sources": [{"title": "source1", "url": "https://example.com"}],
             "run_id": f"run-{self._run_counter}",
-            "symbol": symbol,
-            "status": "completed",
-            "title": f"Research: {symbol}",
-            "summary": "AI-generated summary",
-            "created_at": "2026-01-01T00:00:00Z",
+            "report_date": "2026-01-01",
+            "report_path": None,
+            "obsidian_path": None,
+            "report_url": None,
         }
         self._run_counter += 1
         self.research_rows[symbol] = row
@@ -68,8 +74,10 @@ def test_generate_research(monkeypatch):
     resp = client.post("/api/research/NVDA/generate", headers=_auth_headers())
     assert resp.status_code == 201
     body = resp.json()
-    assert body["symbol"] == "NVDA"
-    assert body["status"] == "completed"
+    assert body["target_slug"] == "NVDA"
+    assert body["opinion"] == "매수"
+    assert body["thesis"] == "AI thesis for NVDA"
+    assert body["run_id"] == "run-1"
 
 
 def test_latest_research_after_generate(monkeypatch):
@@ -77,7 +85,7 @@ def test_latest_research_after_generate(monkeypatch):
     client.post("/api/research/AAPL/generate", headers=_auth_headers())
     resp = client.get("/api/research/AAPL/latest", headers=_auth_headers())
     assert resp.status_code == 200
-    assert resp.json()["symbol"] == "AAPL"
+    assert resp.json()["target_slug"] == "AAPL"
 
 
 def test_cancel_research_job_not_found(monkeypatch):
@@ -97,7 +105,7 @@ def test_cancel_research_generation(monkeypatch):
 def test_ad_unlock_disabled(monkeypatch):
     client, _ = _client_with_fake(monkeypatch)
     resp = client.post("/api/research/NVDA/ad-unlock", headers=_auth_headers())
-    assert resp.status_code == 501
+    assert resp.status_code == 410
 
 
 def test_research_requires_auth(monkeypatch):
