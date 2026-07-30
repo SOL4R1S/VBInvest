@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
-from typing import Any, Mapping, Protocol, TypedDict, cast
+from collections.abc import Mapping
+from typing import Any, Protocol, TypedDict, cast
 
 from scripts.lib.config import serialize_report_run_summary
 from scripts.lib.db import VBinvestDB
