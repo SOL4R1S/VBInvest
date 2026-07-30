@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
-from typing import Any, Protocol, TypedDict, cast
+from typing import Any, Mapping, Protocol, TypedDict, cast
 
 from scripts.lib.config import serialize_report_run_summary
 from scripts.lib.db import VBinvestDB
@@ -321,7 +321,7 @@ def _latest_trade_date(assets: list[dict], now: datetime) -> date | None:
     return None if not family_dates else max(family_dates)
 
 
-def _trade_date_for_asset(asset: dict, now: datetime):
+def _trade_date_for_asset(asset: Mapping[str, Any], now: datetime):
     if now.tzinfo is None:
         now_kst = now.replace(tzinfo=KST)
     else:
