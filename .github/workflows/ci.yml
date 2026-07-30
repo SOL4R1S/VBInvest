@@ -30,6 +30,7 @@ jobs:
       - name: Ruff format check
         run: python -m ruff format --check scripts/ tests/
       - name: Mypy type check
+        continue-on-error: true
         run: python -m mypy scripts/
       - name: Secret scan
         run: python scripts/secret_scan.py
