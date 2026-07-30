@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import json
 import math
-from typing import TypeAlias, cast
+from typing import TypeAlias, TypeGuard, cast
 
 JsonValue: TypeAlias = str | int | float | bool | None | list["JsonValue"] | dict[str, "JsonValue"]
 
@@ -167,7 +167,7 @@ def _backfill_scenario_fields(draft: dict[str, JsonValue]) -> None:
     for key, fallback in defaults.items():
         value = draft.get(key)
         if _is_string_list(value):
-            draft[key] = " / ".join(value)  # type: ignore[arg-type]
+            draft[key] = " / ".join(value)
             continue
         if not isinstance(value, str) or not value.strip():
             draft[key] = fallback
@@ -181,7 +181,7 @@ def _backfill_list_fields(draft: dict[str, JsonValue]) -> None:
     }
     for key, fallback in defaults.items():
         if key not in draft:
-            draft[key] = fallback  # type: ignore[assignment]
+            draft[key] = cast(JsonValue, fallback)
 
 
 def _scenario_list(value: JsonValue) -> list[str]:
@@ -207,5 +207,5 @@ def _normalize_confidence(value: str) -> JsonValue:
         return value
 
 
-def _is_string_list(value: JsonValue) -> bool:
+def _is_string_list(value: JsonValue) -> TypeGuard[list[str]]:
     return isinstance(value, list) and all(isinstance(item, str) for item in value)

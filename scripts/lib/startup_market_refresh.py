@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
-from typing import Any, Protocol
+from typing import Any, Protocol, TypedDict, cast
 
 from scripts.lib.config import serialize_report_run_summary
+from scripts.lib.db import VBinvestDB
 from scripts.lib.market_calendar import KST, completed_trade_date
 from scripts.lib.price_refresh_window import INITIAL_BACKFILL_DAYS, fetch_latest_price_dates, fetch_price_date_ranges
 from scripts.startup_market_refresh import (
@@ -165,7 +166,7 @@ def run_startup_market_refresh(
     write_store = None if dry_run else effective_store
     result = ingest_assets(
         assets,
-        write_store,  # type: ignore[arg-type]
+        cast(VBinvestDB | None, write_store),
         IngestOptions(
             no_network=no_network,
             synthetic=no_network,
@@ -278,23 +279,23 @@ def _ensure_assets_for_store(store: StartupRefreshStore | None, assets: list[dic
 def _are_all_assets_fresh(store: StartupRefreshStore | None, assets: list[dict]) -> bool:
     if store is None:
         return False
-    assets_with_id = [_parse_asset_with_asset_id(asset) for asset in assets]
-    if any(asset is None for asset in assets_with_id):
+    parsed = [_parse_asset_with_asset_id(asset) for asset in assets]
+    if any(asset is None for asset in parsed):
         return False
-    assets_with_id = [asset for asset in assets_with_id if asset is not None]
+    assets_with_id: list[_AssetWithId] = [asset for asset in parsed if asset is not None]
     if not assets_with_id:
         return False
-    latest_dates = fetch_latest_price_dates(store, [int(asset["asset_id"]) for asset in assets_with_id])  # type: ignore[index]
+    latest_dates = fetch_latest_price_dates(store, [asset["asset_id"] for asset in assets_with_id])
     if not latest_dates:
         return False
     now = datetime.now(UTC)
-    price_ranges = fetch_price_date_ranges(store, [int(asset["asset_id"]) for asset in assets_with_id])  # type: ignore[index]
+    price_ranges = fetch_price_date_ranges(store, [asset["asset_id"] for asset in assets_with_id])
     backfill_start = now.date() - timedelta(days=INITIAL_BACKFILL_DAYS)
     return all(
-        latest_dates.get(int(asset["asset_id"])) is not None  # type: ignore[index]
-        and latest_dates[int(asset["asset_id"])] >= _trade_date_for_asset(asset, now)  # type: ignore[index,arg-type]
-        and price_ranges.get(int(asset["asset_id"])) is not None  # type: ignore[index]
-        and price_ranges[int(asset["asset_id"])].earliest_date <= backfill_start  # type: ignore[index]
+        latest_dates.get(asset["asset_id"]) is not None
+        and latest_dates[asset["asset_id"]] >= _trade_date_for_asset(asset, now)
+        and price_ranges.get(asset["asset_id"]) is not None
+        and price_ranges[asset["asset_id"]].earliest_date <= backfill_start
         for asset in assets_with_id
     )
 
@@ -368,20 +369,28 @@ def _asset_identity(asset: dict) -> tuple[str, int | str] | None:
         return ("symbol", symbol.upper())
 
 
-def _parse_asset_with_asset_id(asset: dict) -> dict | None:
+class _AssetWithId(TypedDict):
+    asset_id: int
+    symbol: str | None
+    display_name_ko: str | None
+    exchange: str | None
+    currency: str | None
+
+
+def _parse_asset_with_asset_id(asset: dict) -> _AssetWithId | None:
     if not isinstance(asset, dict):
         return None
     try:
         asset_id = int(asset["asset_id"])
     except (KeyError, TypeError, ValueError):
         return None
-    return {
-        "asset_id": asset_id,
-        "symbol": asset.get("symbol"),
-        "display_name_ko": asset.get("display_name_ko"),
-        "exchange": asset.get("exchange"),
-        "currency": asset.get("currency"),
-    }
+    return _AssetWithId(
+        asset_id=asset_id,
+        symbol=asset.get("symbol"),
+        display_name_ko=asset.get("display_name_ko"),
+        exchange=asset.get("exchange"),
+        currency=asset.get("currency"),
+    )
 
 
 def _record_report_run(

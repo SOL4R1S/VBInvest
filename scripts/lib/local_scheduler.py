@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 
 from scripts.lib.config import parse_report_run_summary
 from scripts.lib.local_scheduler_models import (
@@ -12,7 +12,7 @@ from scripts.lib.local_scheduler_models import (
     SchedulerJobSummary,
     SchedulerSettings,
 )
-from scripts.lib.startup_market_refresh import run_startup_market_refresh
+from scripts.lib.startup_market_refresh import StartupRefreshStore, run_startup_market_refresh
 
 
 class LocalScheduler:
@@ -120,7 +120,7 @@ class LocalScheduler:
             }
         try:
             result = run_startup_market_refresh(
-                self._store,  # type: ignore[arg-type]
+                cast(StartupRefreshStore, self._store),
                 watchlist=settings.watchlist,
                 dry_run=dry_run,
                 no_network=no_network,
@@ -196,7 +196,7 @@ class LocalScheduler:
             scope_slug=row.get("scope_slug") if isinstance(row.get("scope_slug"), str) else scope_slug,
             news_items=_coerce_int(summary.get("news_items"), 0),
             disclosures=_coerce_int(summary.get("disclosures"), 0),
-            provider_disabled=summary.get("provider_disabled")  # type: ignore[arg-type]
+            provider_disabled=cast(list[dict[str, Any]], summary.get("provider_disabled"))
             if isinstance(summary.get("provider_disabled"), list)
             else None,
             reason=row.get("error_message") if isinstance(row.get("error_message"), str) else None,
