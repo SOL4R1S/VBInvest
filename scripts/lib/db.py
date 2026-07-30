@@ -90,3 +90,7 @@ class VBinvestDB(MarketDataMixin, UserMixin, IngestMixin, ResearchMixin, Entitle
 
     def connect(self):
         return self._psycopg.connect(self.config.dsn(mask_password=False))
+
+
+# Re-exports for backward compatibility (tests and external code import these from scripts.lib.db)
+from scripts.lib.db_base import _profile_slug, build_indicator_rows, build_price_rows, json_dumps  # noqa: E402, F401
