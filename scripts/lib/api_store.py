@@ -4,7 +4,7 @@ import json
 import uuid
 from typing import Any
 
-from scripts.lib import api_portfolio_store
+from scripts.lib import api_notification_store, api_portfolio_store
 from scripts.lib.db import VBinvestDB
 
 
@@ -234,6 +234,30 @@ class ApiStore:
 
     def fetch_portfolio_snapshots(self, auth_user_id: str, *, days: int = 365) -> list[dict[str, Any]]:
         return api_portfolio_store.fetch_portfolio_snapshots(self.db, auth_user_id, days=days)
+
+    # Notifications — delegate to api_notification_store (PG-compatible)
+    def list_notifications(
+        self, auth_user_id: str, *, unread_only: bool = False, limit: int = 20
+    ) -> list[dict[str, Any]]:
+        return api_notification_store.list_notifications(self.db, auth_user_id, unread_only=unread_only, limit=limit)
+
+    def create_notification(
+        self,
+        auth_user_id: str,
+        notification_type: str,
+        title: str,
+        body: str,
+        metadata: str | None = None,
+    ) -> dict[str, Any]:
+        return api_notification_store.create_notification(
+            self.db, auth_user_id, notification_type, title, body, metadata
+        )
+
+    def mark_notification_read(self, auth_user_id: str, notification_id: str) -> bool:
+        return api_notification_store.mark_notification_read(self.db, auth_user_id, notification_id)
+
+    def mark_all_notifications_read(self, auth_user_id: str) -> int:
+        return api_notification_store.mark_all_notifications_read(self.db, auth_user_id)
 
     def fetch_latest_research_for_asset(self, symbol: str) -> dict[str, Any] | None:
         query = """

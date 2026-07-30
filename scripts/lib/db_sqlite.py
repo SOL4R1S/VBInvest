@@ -5,6 +5,7 @@ from pathlib import Path
 
 from scripts.lib.db_sqlite_identity import SQLiteIdentityMixin
 from scripts.lib.db_sqlite_market import SQLiteMarketMixin
+from scripts.lib.db_sqlite_notifications import SQLiteNotificationsMixin
 from scripts.lib.db_sqlite_portfolio import SQLitePortfolioMixin
 from scripts.lib.db_sqlite_reports import SQLiteReportsMixin
 from scripts.lib.db_sqlite_schema import SQLITE_SCHEMA
@@ -18,6 +19,7 @@ class SQLiteVBinvestDB(
     SQLiteSourcesMixin,
     SQLiteReportsMixin,
     SQLitePortfolioMixin,
+    SQLiteNotificationsMixin,
     SQLiteValueMixin,
 ):
     def __init__(self, sqlite_path: Path):

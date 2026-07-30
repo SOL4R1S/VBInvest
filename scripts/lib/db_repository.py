@@ -141,3 +141,25 @@ class DBRepository(Protocol):
         *,
         days: int = 365,
     ) -> list[dict[str, Any]]: ...
+
+    # Notifications
+    def list_notifications(
+        self,
+        auth_user_id: str,
+        *,
+        unread_only: bool = False,
+        limit: int = 20,
+    ) -> list[dict[str, Any]]: ...
+
+    def create_notification(
+        self,
+        auth_user_id: str,
+        notification_type: str,
+        title: str,
+        body: str,
+        metadata: str | None = None,
+    ) -> dict[str, Any]: ...
+
+    def mark_notification_read(self, auth_user_id: str, notification_id: str) -> bool: ...
+
+    def mark_all_notifications_read(self, auth_user_id: str) -> int: ...
