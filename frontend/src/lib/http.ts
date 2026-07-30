@@ -71,3 +71,15 @@ export async function apiDelete<T>(
   const payload = await readJsonPayload(response);
   return parse(payload);
 }
+
+/**
+ * Low-level fetch wrapper that attaches auth headers automatically.
+ * Returns the raw Response so callers can implement custom error handling
+ * (e.g. reading error bodies, status-specific fallbacks).
+ */
+export async function apiFetch(url: string, init?: RequestInit): Promise<Response> {
+  return fetch(url, {
+    ...init,
+    headers: authHeaders(init?.headers as Record<string, string> | undefined),
+  });
+}

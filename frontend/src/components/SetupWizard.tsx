@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 
-import { authHeaders } from "@/lib/auth";
 import { isRecord } from "@/lib/guards";
+import { apiFetch } from "@/lib/http";
 import { isLanguage, labelsFor, persistLanguage, type Language, type LocalizedLabels } from "@/lib/i18n";
 import type { RuntimeSetupValues } from "@/lib/startup-status";
 
@@ -69,9 +69,9 @@ export function SetupWizard({
     setSubmitting(true);
     setError(null);
     try {
-      const response = await fetch("/api/settings/first-run", {
+      const response = await apiFetch("/api/settings/first-run", {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeaders() },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           language: selectedLanguage,
           data_directory: dataDirectory,

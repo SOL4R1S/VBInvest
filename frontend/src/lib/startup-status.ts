@@ -1,4 +1,4 @@
-import { authHeaders } from "@/lib/auth";
+import { apiGet } from "@/lib/http";
 import { isRecord, numberValue, stringOrNull } from "@/lib/guards";
 
 export type StartupRefreshStatus = "checking" | "running" | "setup_required" | "ready" | "partial" | "skipped" | "failed";
@@ -106,11 +106,10 @@ export const INITIAL_STARTUP_REFRESH: StartupRefreshView = {
 };
 
 export async function fetchProviderSummary(): Promise<ProviderSummary | null> {
-  const response = await fetch("/api/settings", { headers: authHeaders() });
-  if (!response.ok) {
-    return null;
-  }
-  const payload: unknown = await response.json();
+  return apiGet("/api/settings", parseProviderSummary);
+}
+
+function parseProviderSummary(payload: unknown): ProviderSummary | null {
   if (!isRecord(payload) || !isRecord(payload.provider_status)) {
     return null;
   }
@@ -124,19 +123,17 @@ export async function fetchProviderSummary(): Promise<ProviderSummary | null> {
 }
 
 export async function fetchRuntimeSettings(): Promise<RuntimeSettings> {
-  const response = await fetch("/api/settings", { headers: authHeaders() });
-  if (!response.ok) {
-    return { providerSummary: null, language: null, setupValues: null };
-  }
-  const payload: unknown = await response.json();
-  if (!isRecord(payload)) {
-    return { providerSummary: null, language: null, setupValues: null };
-  }
+  const parsed = await apiGet("/api/settings", parseRuntimeSettings);
+  return parsed ?? { providerSummary: null, language: null, setupValues: null };
+}
 
+function parseRuntimeSettings(payload: unknown): RuntimeSettings | null {
+  if (!isRecord(payload)) {
+    return null;
+  }
   const providerStatus = isRecord(payload.provider_status) ? payload.provider_status : {};
   const opendart = isRecord(providerStatus.opendart) ? providerStatus.opendart : {};
   const ai = isRecord(providerStatus.ai) ? providerStatus.ai : {};
-
   return {
     providerSummary: {
       firstRunCompleted: payload.first_run_completed !== false,
@@ -149,15 +146,16 @@ export async function fetchRuntimeSettings(): Promise<RuntimeSettings> {
 }
 
 export async function fetchCollectionStatus(slug: string): Promise<readonly CollectionAssetStatus[]> {
-  const response = await fetch(`/api/watchlists/${encodeURIComponent(slug)}/collection-status`, {
-    headers: authHeaders(),
-  });
-  if (!response.ok) {
-    return [];
-  }
-  const payload: unknown = await response.json();
+  const parsed = await apiGet(
+    `/api/watchlists/${encodeURIComponent(slug)}/collection-status`,
+    parseCollectionStatusPayload,
+  );
+  return parsed ?? [];
+}
+
+function parseCollectionStatusPayload(payload: unknown): readonly CollectionAssetStatus[] | null {
   if (!isRecord(payload) || !Array.isArray(payload.assets)) {
-    return [];
+    return null;
   }
   return payload.assets.map(parseCollectionAssetStatus).filter((item): item is CollectionAssetStatus => item !== null);
 }

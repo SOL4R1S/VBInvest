@@ -1,5 +1,5 @@
 import { normalizeOpinion, type Opinion } from "@/lib/research";
-import { authHeaders } from "@/lib/auth";
+import { apiFetch } from "@/lib/http";
 import { isRecord, nonEmptyStringField, readDetail, readJsonPayload } from "@/lib/guards";
 
 export type GeneratedResearch = {
@@ -28,11 +28,9 @@ export async function generateResearchReport(
   options: { readonly signal?: AbortSignal } = {},
 ): Promise<GeneratedResearch> {
   let response: Response;
-  const headers = authHeaders();
   try {
-    response = await fetch(`/api/research/${encodeURIComponent(symbol)}/generate`, {
+    response = await apiFetch(`/api/research/${encodeURIComponent(symbol)}/generate`, {
       method: "POST",
-      headers,
       signal: options.signal,
     });
   } catch (error) {
