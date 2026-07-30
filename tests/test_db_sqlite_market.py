@@ -122,8 +122,8 @@ class TestPriceDateQueries:
             ]
         )
         result = db.fetch_price_date_ranges([asset_id])
-        assert result[asset_id]["earliest"] == date(2026, 1, 10)
-        assert result[asset_id]["latest"] == date(2026, 1, 15)
+        assert result[asset_id]["earliest_date"] == date(2026, 1, 10)
+        assert result[asset_id]["latest_date"] == date(2026, 1, 15)
 
 
 class TestCollectionStatus:
@@ -134,4 +134,9 @@ class TestCollectionStatus:
         assert db._collection_status(0, False) == "missing"
 
     def test_status_synthetic(self, db: SQLiteVBinvestDB):
-        assert db._collection_status(0, True) == "synthetic"
+        # price_rows > 0 AND has_synthetic → "synthetic"
+        assert db._collection_status(5, True) == "synthetic"
+
+    def test_status_missing_takes_priority(self, db: SQLiteVBinvestDB):
+        # price_rows == 0 → "missing" regardless of has_synthetic
+        assert db._collection_status(0, True) == "missing"

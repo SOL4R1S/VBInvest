@@ -55,13 +55,13 @@ class TestEntitlementMixin:
         db = FakeEntitlementDB()
         db._mock_cursor.fetchone.return_value = (1,)
         result = db.grant_ad_unlock("user-1", "AAPL", "ad-event-1")
-        assert result["unlocked"] is True
+        assert result["entitlement_state"] == "ad_unlocked"
 
     def test_grant_subscription_entitlement(self):
         db = FakeEntitlementDB()
         db._mock_cursor.fetchone.return_value = (1,)
         result = db.grant_subscription_entitlement("user-1", "stripe", "sub-123")
-        assert result["granted"] is True
+        assert result["entitlement_state"] == "subscriber"
 
 
 class TestIngestMixin:
