@@ -1,6 +1,5 @@
 """Tests for scripts.lib.ai_response — parsing, validation, normalization."""
 
-
 import pytest
 
 from scripts.lib.ai_response import (

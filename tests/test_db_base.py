@@ -139,9 +139,7 @@ def test_build_price_rows_nan_handling():
 
 
 def test_build_indicator_rows():
-    frame = pd.DataFrame(
-        [{"date": "2026-01-01", "return_1d": 0.02, "ma5": 100.0, "rsi14": 55.0, "vol20": 0.3}]
-    )
+    frame = pd.DataFrame([{"date": "2026-01-01", "return_1d": 0.02, "ma5": 100.0, "rsi14": 55.0, "vol20": 0.3}])
     rows = build_indicator_rows(1, frame)
     assert len(rows) == 1
     row = rows[0]
