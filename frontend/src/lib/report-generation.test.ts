@@ -13,7 +13,7 @@ const VALID_REPORT = {
   target_slug: "NVDA",
   opinion: "매수",
   thesis: "AI 수요 강세",
-  sources_count: 5,
+  sources: ["src1", "src2", "src3", "src4", "src5"],
   run_id: "run-1",
   report_path: "/reports/nvda.md",
   obsidian_path: "/vault/nvda.md",
@@ -38,7 +38,9 @@ describe("generateResearchReport", () => {
   });
 
   it("throws ReportGenerationError on 401", async () => {
-    vi.mocked(fetch).mockResolvedValue(jsonResponse({ detail: "unauthorized" }, 401));
+    vi.mocked(fetch).mockImplementation(() =>
+      Promise.resolve(jsonResponse({ detail: "unauthorized" }, 401)),
+    );
     await expect(generateResearchReport("NVDA")).rejects.toThrow(ReportGenerationError);
     await expect(generateResearchReport("NVDA")).rejects.toThrow("로컬 세션");
   });
@@ -82,7 +84,9 @@ describe("generateResearchReport", () => {
   it("re-throws AbortError without wrapping", async () => {
     const abortError = new DOMException("Aborted", "AbortError");
     vi.mocked(fetch).mockRejectedValue(abortError);
-    await expect(generateResearchReport("NVDA")).rejects.toThrow(abortError);
+    await expect(generateResearchReport("NVDA")).rejects.toMatchObject({
+      name: "AbortError",
+    });
   });
 
   it("throws on malformed success payload", async () => {
