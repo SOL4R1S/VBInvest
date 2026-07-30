@@ -284,16 +284,16 @@ def _are_all_assets_fresh(store: StartupRefreshStore | None, assets: list[dict])
     assets_with_id = [asset for asset in assets_with_id if asset is not None]
     if not assets_with_id:
         return False
-    latest_dates = fetch_latest_price_dates(store, [int(asset["asset_id"]) for asset in assets_with_id])  # type: ignore[arg-type]
+    latest_dates = fetch_latest_price_dates(store, [int(asset["asset_id"]) for asset in assets_with_id])  # type: ignore[index]
     if not latest_dates:
         return False
     now = datetime.now(UTC)
-    price_ranges = fetch_price_date_ranges(store, [int(asset["asset_id"]) for asset in assets_with_id])  # type: ignore[arg-type]
+    price_ranges = fetch_price_date_ranges(store, [int(asset["asset_id"]) for asset in assets_with_id])  # type: ignore[index]
     backfill_start = now.date() - timedelta(days=INITIAL_BACKFILL_DAYS)
     return all(
-        latest_dates.get(int(asset["asset_id"])) is not None
-        and latest_dates[int(asset["asset_id"])] >= _trade_date_for_asset(asset, now)  # type: ignore[index]
-        and price_ranges.get(int(asset["asset_id"])) is not None
+        latest_dates.get(int(asset["asset_id"])) is not None  # type: ignore[index]
+        and latest_dates[int(asset["asset_id"])] >= _trade_date_for_asset(asset, now)  # type: ignore[index,arg-type]
+        and price_ranges.get(int(asset["asset_id"])) is not None  # type: ignore[index]
         and price_ranges[int(asset["asset_id"])].earliest_date <= backfill_start  # type: ignore[index]
         for asset in assets_with_id
     )
