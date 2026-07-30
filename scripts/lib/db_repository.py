@@ -70,3 +70,45 @@ class DBRepository(Protocol):
     ) -> dict[str, Any]: ...
 
     def cancel_report_run(self, run_id: str) -> dict[str, Any] | None: ...
+
+    # Portfolio holdings
+    def list_user_portfolio_holdings(self, auth_user_id: str) -> list[dict[str, Any]]: ...
+
+    def create_user_portfolio_holding(
+        self, auth_user_id: str, symbol: str, quantity: float,
+        average_cost: float | None, note: str | None,
+    ) -> dict[str, Any]: ...
+
+    def update_user_portfolio_holding(
+        self, auth_user_id: str, holding_id: str,
+        quantity: float | None, average_cost: float | None, note: str | None,
+    ) -> dict[str, Any] | None: ...
+
+    def delete_user_portfolio_holding(self, auth_user_id: str, holding_id: str) -> bool: ...
+
+    # Portfolio transactions
+    def list_portfolio_transactions(
+        self, auth_user_id: str, *, holding_id: str | None = None, limit: int = 100,
+    ) -> list[dict[str, Any]]: ...
+
+    def create_portfolio_transaction(
+        self, auth_user_id: str, holding_id: str, transaction_type: str,
+        quantity: float, price_per_unit: float, fee: float,
+        transaction_date: str, note: str | None,
+    ) -> dict[str, Any]: ...
+
+    # Portfolio returns
+    def fetch_portfolio_returns(
+        self, auth_user_id: str, *, days: int = 365,
+    ) -> dict[str, Any]: ...
+
+    def upsert_portfolio_snapshot(
+        self, auth_user_id: str, snapshot_date: str,
+        total_cost: float, total_value: float,
+        total_return: float, total_return_pct: float,
+        daily_return_pct: float | None, holdings_json: str,
+    ) -> None: ...
+
+    def fetch_portfolio_snapshots(
+        self, auth_user_id: str, *, days: int = 365,
+    ) -> list[dict[str, Any]]: ...

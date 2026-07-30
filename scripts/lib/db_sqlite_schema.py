@@ -193,4 +193,54 @@ CREATE TABLE IF NOT EXISTS settings_metadata (
   value TEXT NOT NULL,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS portfolio_holdings (
+  holding_id TEXT PRIMARY KEY,
+  profile_id INTEGER NOT NULL REFERENCES profiles(profile_id) ON DELETE CASCADE,
+  asset_id INTEGER NOT NULL REFERENCES assets(asset_id) ON DELETE CASCADE,
+  quantity REAL NOT NULL CHECK (quantity > 0),
+  average_cost REAL CHECK (average_cost IS NULL OR average_cost >= 0),
+  currency TEXT,
+  note TEXT,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (profile_id, asset_id)
+);
+CREATE INDEX IF NOT EXISTS idx_portfolio_holdings_profile_id
+  ON portfolio_holdings(profile_id);
+
+CREATE TABLE IF NOT EXISTS portfolio_transactions (
+  transaction_id TEXT PRIMARY KEY,
+  holding_id TEXT NOT NULL REFERENCES portfolio_holdings(holding_id) ON DELETE CASCADE,
+  profile_id INTEGER NOT NULL REFERENCES profiles(profile_id) ON DELETE CASCADE,
+  asset_id INTEGER NOT NULL REFERENCES assets(asset_id) ON DELETE CASCADE,
+  transaction_type TEXT NOT NULL CHECK (transaction_type IN ('buy', 'sell', 'dividend', 'split')),
+  quantity REAL NOT NULL,
+  price_per_unit REAL NOT NULL CHECK (price_per_unit >= 0),
+  fee REAL NOT NULL DEFAULT 0 CHECK (fee >= 0),
+  currency TEXT,
+  transaction_date DATE NOT NULL,
+  note TEXT,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_portfolio_transactions_holding
+  ON portfolio_transactions(holding_id, transaction_date);
+CREATE INDEX IF NOT EXISTS idx_portfolio_transactions_profile_date
+  ON portfolio_transactions(profile_id, transaction_date DESC);
+
+CREATE TABLE IF NOT EXISTS portfolio_snapshots (
+  snapshot_id TEXT PRIMARY KEY,
+  profile_id INTEGER NOT NULL REFERENCES profiles(profile_id) ON DELETE CASCADE,
+  snapshot_date DATE NOT NULL,
+  total_cost REAL NOT NULL,
+  total_value REAL NOT NULL,
+  total_return REAL NOT NULL,
+  total_return_pct REAL NOT NULL,
+  daily_return_pct REAL,
+  holdings_json TEXT NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (profile_id, snapshot_date)
+);
+CREATE INDEX IF NOT EXISTS idx_portfolio_snapshots_profile_date
+  ON portfolio_snapshots(profile_id, snapshot_date DESC);
 """
