@@ -4,10 +4,7 @@ from __future__ import annotations
 
 from contextlib import AbstractContextManager
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
-
-if TYPE_CHECKING:
-    import sqlite3
+from typing import Any
 
 
 class DBMixinBase:
@@ -19,7 +16,7 @@ class DBMixinBase:
     """
 
     # -- connection ----------------------------------------------------------
-    def connect(self) -> AbstractContextManager[sqlite3.Connection]:
+    def connect(self) -> AbstractContextManager[Any]:
         raise NotImplementedError
 
     # -- value coercion (from SQLiteValueMixin) ------------------------------
@@ -32,8 +29,8 @@ class DBMixinBase:
     def _coerce_datetime(self, value: Any) -> datetime | None:
         raise NotImplementedError
 
-    # -- identity helpers (from SQLiteIdentityMixin) -------------------------
-    def _ensure_profile(self, auth_user_id: str, email: str | None = None) -> dict[str, Any]:
+    # -- identity helpers (from SQLiteIdentityMixin / UserMixin) -------------
+    def _ensure_profile(self, conn: Any, auth_user_id: str) -> int:
         raise NotImplementedError
 
     # -- cross-mixin queries -------------------------------------------------

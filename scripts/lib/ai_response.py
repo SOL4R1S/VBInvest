@@ -181,7 +181,7 @@ def _backfill_list_fields(draft: dict[str, JsonValue]) -> None:
     }
     for key, fallback in defaults.items():
         if key not in draft:
-            draft[key] = fallback
+            draft[key] = fallback  # type: ignore[assignment]
 
 
 def _scenario_list(value: JsonValue) -> list[str]:
