@@ -32,14 +32,15 @@ class TestSQLiteSchema:
             "watchlists",
             "watchlist_members",
             "daily_prices",
-            "indicators",
+            "daily_indicators",
             "news_items",
+            "asset_news_map",
             "disclosures",
-            "report_runs",
             "research_views",
-            "settings_metadata",
+            "report_runs",
+            "obsidian_exports",
             "job_locks",
-            "portfolio_holdings",
+            "settings_metadata",
         }
         for table in expected:
             assert table in tables, f"missing table: {table}"

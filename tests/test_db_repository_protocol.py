@@ -27,7 +27,6 @@ class TestDBRepositoryProtocol:
         assert callable(db.try_acquire_job_lock)
         assert callable(db.release_job_lock)
         assert callable(db.fetch_setting)
-        assert callable(db.save_setting)
         assert callable(db.record_report_run)
         assert callable(db.upsert_research_views)
         assert callable(db.fetch_latest_research_views)

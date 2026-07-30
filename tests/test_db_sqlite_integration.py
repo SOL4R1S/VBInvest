@@ -82,12 +82,12 @@ class TestSQLiteIdentity:
     def test_create_and_list_watchlist(self, db):
         db.ensure_assets_for_refresh([{"symbol": "AAPL"}])
         wl = db.create_user_watchlist("user-1", "My List", ["AAPL"])
-        assert wl["name_ko"] == "My List"
+        assert wl["name"] == "My List"
         assert "AAPL" in wl.get("symbols", [])
 
         lists = db.list_user_watchlists("user-1")
         assert len(lists) == 1
-        assert lists[0]["name_ko"] == "My List"
+        assert lists[0]["name"] == "My List"
 
     def test_fetch_watchlist_assets(self, db):
         db.ensure_assets_for_refresh([{"symbol": "TSLA", "display_name_ko": "테슬라"}])
@@ -105,6 +105,8 @@ class TestSQLiteSources:
         assert db.upsert_news_items([]) == 0
 
     def test_upsert_news_items(self, db):
+        assets = db.ensure_assets_for_refresh([{"symbol": "AAPL"}])
+        asset_id = assets[0]["asset_id"]
         rows = [
             {
                 "provider": "test",
@@ -118,12 +120,15 @@ class TestSQLiteSources:
                 "language": "en",
                 "summary": "A test article",
                 "raw_json": {"foo": "bar"},
+                "asset_id": asset_id,
             },
         ]
         count = db.upsert_news_items(rows)
         assert count == 1
 
     def test_upsert_news_items_dedup_by_source_id(self, db):
+        assets = db.ensure_assets_for_refresh([{"symbol": "TSLA"}])
+        asset_id = assets[0]["asset_id"]
         row = {
             "provider": "test",
             "source": "rss",
@@ -136,6 +141,7 @@ class TestSQLiteSources:
             "language": "en",
             "summary": "First",
             "raw_json": None,
+            "asset_id": asset_id,
         }
         db.upsert_news_items([row])
         row["title"] = "Updated"
