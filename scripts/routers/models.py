@@ -31,6 +31,16 @@ class PortfolioHoldingUpdate(BaseModel):
     note: str | None = Field(default=None, max_length=500)
 
 
+class PortfolioTransactionCreate(BaseModel):
+    holding_id: str = Field(min_length=1, max_length=64)
+    transaction_type: str = Field(pattern=r"^(buy|sell|dividend|split)$")
+    quantity: float = Field(gt=0)
+    price_per_unit: float = Field(ge=0)
+    fee: float = Field(default=0, ge=0)
+    transaction_date: str = Field(min_length=10, max_length=10, description="YYYY-MM-DD")
+    note: str | None = Field(default=None, max_length=500)
+
+
 class FirstRunDatabasePayload(BaseModel):
     mode: DatabaseMode = DatabaseMode.SQLITE
     sqlite_path: str | None = Field(default=None, max_length=1000)

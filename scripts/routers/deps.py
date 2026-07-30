@@ -38,6 +38,7 @@ from scripts.routers.models import (  # noqa: F401
     LanguageSettingsPayload,
     PortfolioHoldingCreate,
     PortfolioHoldingUpdate,
+    PortfolioTransactionCreate,
     SchedulerSettingsPayload,
     ShutdownBeaconPayload,
     WatchlistAssetChange,

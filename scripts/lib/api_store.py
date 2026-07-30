@@ -176,6 +176,65 @@ class ApiStore:
     def delete_user_portfolio_holding(self, auth_user_id: str, holding_id: str) -> bool:
         return api_portfolio_store.delete_user_portfolio_holding(self.db, auth_user_id, holding_id)
 
+    def list_portfolio_transactions(
+        self, auth_user_id: str, *, holding_id: str | None = None, limit: int = 100
+    ) -> list[dict[str, Any]]:
+        return api_portfolio_store.list_portfolio_transactions(
+            self.db, auth_user_id, holding_id=holding_id, limit=limit
+        )
+
+    def create_portfolio_transaction(
+        self,
+        auth_user_id: str,
+        holding_id: str,
+        transaction_type: str,
+        quantity: float,
+        price_per_unit: float,
+        fee: float,
+        transaction_date: str,
+        note: str | None,
+    ) -> dict[str, Any]:
+        return api_portfolio_store.create_portfolio_transaction(
+            self.db,
+            auth_user_id,
+            holding_id,
+            transaction_type,
+            quantity,
+            price_per_unit,
+            fee,
+            transaction_date,
+            note,
+        )
+
+    def fetch_portfolio_returns(self, auth_user_id: str, *, days: int = 365) -> dict[str, Any]:
+        return api_portfolio_store.fetch_portfolio_returns(self.db, auth_user_id, days=days)
+
+    def upsert_portfolio_snapshot(
+        self,
+        auth_user_id: str,
+        snapshot_date: str,
+        total_cost: float,
+        total_value: float,
+        total_return: float,
+        total_return_pct: float,
+        daily_return_pct: float | None,
+        holdings_json: str,
+    ) -> None:
+        api_portfolio_store.upsert_portfolio_snapshot(
+            self.db,
+            auth_user_id,
+            snapshot_date,
+            total_cost,
+            total_value,
+            total_return,
+            total_return_pct,
+            daily_return_pct,
+            holdings_json,
+        )
+
+    def fetch_portfolio_snapshots(self, auth_user_id: str, *, days: int = 365) -> list[dict[str, Any]]:
+        return api_portfolio_store.fetch_portfolio_snapshots(self.db, auth_user_id, days=days)
+
     def fetch_latest_research_for_asset(self, symbol: str) -> dict[str, Any] | None:
         query = """
         SELECT target_slug, opinion, thesis, rationale, bull, base, bear, risks, triggers, sources, access_tier
