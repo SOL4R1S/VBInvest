@@ -1145,7 +1145,10 @@ describe("WatchlistDashboard", () => {
 
     expect(screen.getByRole("status")).toHaveTextContent("주식 정보를 확인하는 중");
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith("/api/startup/market-refresh?no_network=false&include_news=true", { method: "POST" });
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/startup/market-refresh?no_network=false&include_news=true",
+        expect.objectContaining({ method: "POST" }),
+      );
     });
     await waitFor(() => {
       expect(screen.queryByText("주식 정보를 확인하는 중")).not.toBeInTheDocument();
