@@ -229,10 +229,10 @@ export function ChartShell({ symbol, points, labels }: Props) {
   return (
     <section className="chart-shell" aria-label={`${symbol} 차트`}>
       <div className="chart-toolbar">
-        <button type="button" className={mode === "line" ? "active" : ""} onClick={() => setMode("line")} data-testid="mode-line">
+        <button type="button" className={mode === "line" ? "active" : ""} onClick={() => setMode("line")} data-testid="mode-line" aria-pressed={mode === "line"}>
           {labels.line}
         </button>
-        <button type="button" className={mode === "candle" ? "active" : ""} onClick={() => setMode("candle")} data-testid="mode-candle">
+        <button type="button" className={mode === "candle" ? "active" : ""} onClick={() => setMode("candle")} data-testid="mode-candle" aria-pressed={mode === "candle"}>
           {labels.candle}
         </button>
         <button type="button" onClick={() => chartRef.current?.timeScale().fitContent()} data-testid="chart-reset">
