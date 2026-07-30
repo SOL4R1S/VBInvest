@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
-from collections.abc import Mapping
 from typing import Any, Protocol, TypedDict, cast
 
 from scripts.lib.config import serialize_report_run_summary
