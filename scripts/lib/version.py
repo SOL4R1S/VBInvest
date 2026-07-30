@@ -3,9 +3,10 @@ from __future__ import annotations
 import os
 import re
 import subprocess
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Final, Mapping, Protocol
+from typing import Final, Protocol
 
 DEFAULT_VERSION: Final = "0.1.0"
 GIT_TIMEOUT_SECONDS: Final = 2.0

@@ -2,7 +2,7 @@ import json
 import os
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -124,7 +124,7 @@ def test_scheduler_tick_runs_startup_refresh_with_request_flags(monkeypatch):
         failures = []
         report_run_id = "startup-1"
         stale = False
-        last_success_at = datetime(2026, 6, 2, 1, 0, tzinfo=timezone.utc)
+        last_success_at = datetime(2026, 6, 2, 1, 0, tzinfo=UTC)
 
     def fake_run_startup_refresh(_store, **kwargs):
         captured.update(kwargs)

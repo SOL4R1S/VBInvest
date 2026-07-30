@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import uuid
-import hashlib
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import pandas as pd
@@ -44,7 +44,7 @@ def _profile_slug(auth_user_id: str) -> str:
 
 
 def build_price_rows(asset_id: int, frame: pd.DataFrame, fetched_at: datetime | None = None) -> list[dict[str, Any]]:
-    fetched = fetched_at or datetime.now(timezone.utc)
+    fetched = fetched_at or datetime.now(UTC)
     rows: list[dict[str, Any]] = []
     for record in frame.to_dict("records"):
         provider = record.get("provider") or record.get("source")
@@ -70,8 +70,20 @@ def build_price_rows(asset_id: int, frame: pd.DataFrame, fetched_at: datetime | 
 def build_indicator_rows(asset_id: int, frame: pd.DataFrame) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     indicator_columns = [
-        "return_1d", "return_1w", "return_1m", "return_3m", "return_6m", "return_ytd",
-        "ma5", "ma20", "ma50", "ma120", "rsi14", "vol20", "drawdown_52w", "high_52w",
+        "return_1d",
+        "return_1w",
+        "return_1m",
+        "return_3m",
+        "return_6m",
+        "return_ytd",
+        "ma5",
+        "ma20",
+        "ma50",
+        "ma120",
+        "rsi14",
+        "vol20",
+        "drawdown_52w",
+        "high_52w",
     ]
     for record in frame.to_dict("records"):
         row: dict[str, Any] = {"asset_id": asset_id, "date": record["date"]}

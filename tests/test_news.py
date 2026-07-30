@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from scripts.lib.news import dedupe_news_rows, parse_yahoo_rss, prepare_news_rows
 
@@ -22,7 +22,7 @@ def test_parse_yahoo_rss_normalizes_items():
     assert items[0]["source_id"] == "abc-1"
     assert items[0]["canonical_url"] == "https://finance.yahoo.com/news/nvda-ai-chip-supply-123.html"
     assert items[0]["language"] == "en"
-    assert items[0]["published_at"] == datetime(2026, 6, 1, 8, 0, tzinfo=timezone.utc)
+    assert items[0]["published_at"] == datetime(2026, 6, 1, 8, 0, tzinfo=UTC)
 
 
 def test_news_upsert_is_idempotent():
@@ -36,7 +36,7 @@ def test_news_upsert_is_idempotent():
                 "url": "https://example.com/news?id=1",
                 "canonical_url": "https://example.com/news",
                 "title": "Same item",
-                "published_at": datetime(2026, 6, 1, tzinfo=timezone.utc),
+                "published_at": datetime(2026, 6, 1, tzinfo=UTC),
                 "language": "en",
                 "summary": "A",
                 "raw_json": {"id": 1},
@@ -48,7 +48,7 @@ def test_news_upsert_is_idempotent():
                 "url": "https://example.com/news?id=1",
                 "canonical_url": "https://example.com/news",
                 "title": "Same item",
-                "published_at": datetime(2026, 6, 1, tzinfo=timezone.utc),
+                "published_at": datetime(2026, 6, 1, tzinfo=UTC),
                 "language": "en",
                 "summary": "A",
                 "raw_json": {"id": 1},

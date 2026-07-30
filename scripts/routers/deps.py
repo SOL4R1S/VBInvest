@@ -9,8 +9,9 @@ from __future__ import annotations
 import json
 import os
 import shutil
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from fastapi import Header, HTTPException, status
 
@@ -19,7 +20,6 @@ from scripts.lib.config import (
     ConfigError,
     DatabaseMode,
     DatabaseSettings,
-    ExportMode,
     LocalConfig,
     ObsidianSettings,
     ProviderSettings,
@@ -56,15 +56,18 @@ ShutdownCallback = Callable[[], None]
 # DB helpers
 # ---------------------------------------------------------------------------
 
+
 def db() -> DBRepository:
     """Delegate to api.db so tests can monkeypatch api.db."""
     from scripts import api
+
     return api.db()
 
 
 def auth_db() -> Any:
     """Delegate to api.auth_db so tests can monkeypatch api.auth_db."""
     from scripts import api
+
     return api.auth_db()
 
 
@@ -90,6 +93,7 @@ def local_scheduler() -> LocalScheduler:
 # ---------------------------------------------------------------------------
 # Frontend helpers
 # ---------------------------------------------------------------------------
+
 
 def frontend_out_dir() -> Path:
     configured = os.environ.get("VBINVEST_FRONTEND_OUT_DIR")
@@ -124,11 +128,7 @@ def frontend_index_response():
     html = index_file.read_text(encoding="utf-8")
     session_token = os.environ.get("VBINVEST_LOCAL_SESSION_TOKEN", "")
     if session_token:
-        script = (
-            "<script>"
-            f"window.__VBINVEST_LOCAL_SESSION_TOKEN__={json.dumps(session_token)};"
-            "</script>"
-        )
+        script = f"<script>window.__VBINVEST_LOCAL_SESSION_TOKEN__={json.dumps(session_token)};</script>"
         html = html.replace("</head>", f"{script}</head>", 1) if "</head>" in html else f"{script}{html}"
     return HTMLResponse(html)
 
@@ -136,6 +136,7 @@ def frontend_index_response():
 # ---------------------------------------------------------------------------
 # Misc helpers
 # ---------------------------------------------------------------------------
+
 
 def hosted_monetization_disabled() -> HTTPException:
     return HTTPException(status_code=status.HTTP_410_GONE, detail="hosted monetization is disabled in local mode")
@@ -194,6 +195,7 @@ def jsonable_list(value: Any) -> list[Any]:
 # First-run config builder
 # ---------------------------------------------------------------------------
 
+
 def build_first_run_config(payload: FirstRunSetupPayload) -> LocalConfig:
     data_dir = Path(payload.data_directory).expanduser()
     if data_dir.exists() and not data_dir.is_dir():
@@ -234,7 +236,9 @@ def build_first_run_config(payload: FirstRunSetupPayload) -> LocalConfig:
 def build_first_run_database(payload: FirstRunDatabasePayload, data_dir: Path) -> DatabaseSettings:
     match payload.mode:
         case DatabaseMode.SQLITE:
-            sqlite_path = Path(payload.sqlite_path).expanduser() if payload.sqlite_path else data_dir / "vbinvest.sqlite3"
+            sqlite_path = (
+                Path(payload.sqlite_path).expanduser() if payload.sqlite_path else data_dir / "vbinvest.sqlite3"
+            )
             if sqlite_path.exists() and sqlite_path.is_dir():
                 raise ConfigError("database.sqlite_path", "must be a file path")
             return DatabaseSettings(mode=DatabaseMode.SQLITE, sqlite_path=sqlite_path, postgres_url="")

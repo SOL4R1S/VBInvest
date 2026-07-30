@@ -3,8 +3,8 @@ from pathlib import Path
 from scripts.lib.dashboard import render_dashboard_html
 from scripts.lib.indicators import add_indicators
 from scripts.lib.prices import synthetic_history
-from scripts.lib.watchlists import SEMICONDUCTOR_CORE
 from scripts.lib.validate import validate_html
+from scripts.lib.watchlists import SEMICONDUCTOR_CORE
 
 
 def test_render_dashboard_contains_required_chart_hooks_and_labels():
@@ -23,7 +23,7 @@ def test_render_dashboard_contains_required_chart_hooks_and_labels():
     assert "addEventListener('wheel'" in html
     assert "줌 초기화" in html
     assert "캔들" in html
-    assert "data-mode=\"candle\"" in html
+    assert 'data-mode="candle"' in html
     assert "renderCandles" in html
     assert "candle-up" in html
     assert "200일선" not in html
@@ -33,15 +33,17 @@ def test_render_dashboard_contains_required_chart_hooks_and_labels():
 def test_render_dashboard_includes_on_demand_research_sections():
     frame = add_indicators(synthetic_history("NVDA", days=140))
     html = render_dashboard_html(
-        [{
-            "asset": {"symbol": "NVDA", "display_name_ko": "엔비디아"},
-            "history": frame,
-            "opinion": "아웃퍼폼",
-            "thesis": "AI 수요가 강하지만 가격 리스크는 관리한다.",
-            "rationale": ["모멘텀 양호", "RSI 중립"],
-            "risks": ["가이던스 리스크"],
-            "triggers": ["실적 발표"],
-        }],
+        [
+            {
+                "asset": {"symbol": "NVDA", "display_name_ko": "엔비디아"},
+                "history": frame,
+                "opinion": "아웃퍼폼",
+                "thesis": "AI 수요가 강하지만 가격 리스크는 관리한다.",
+                "rationale": ["모멘텀 양호", "RSI 중립"],
+                "risks": ["가이던스 리스크"],
+                "triggers": ["실적 발표"],
+            }
+        ],
         title="Research Test",
     )
 

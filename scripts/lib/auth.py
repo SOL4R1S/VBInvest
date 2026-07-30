@@ -10,7 +10,6 @@ import time
 from dataclasses import dataclass
 from typing import Final
 
-
 LOCAL_TEST_JWT_SECRET: Final = "vbinvest-local-test-jwt-secret"
 
 

@@ -1,6 +1,5 @@
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -10,8 +9,8 @@ FORBIDDEN_SNIPPETS = [
     "find_free_port()",
     "find_free_port",
     "load_docker_postgres_env",
-    "open \"http://127.0.0.1",
-    "start \"VBinvest API\"",
+    'open "http://127.0.0.1',
+    'start "VBinvest API"',
     "command -v npm",
     "where npm",
     "npx next dev",

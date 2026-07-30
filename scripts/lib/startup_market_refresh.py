@@ -1,29 +1,28 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from typing import Any, Protocol
 
+from scripts.lib.config import serialize_report_run_summary
+from scripts.lib.market_calendar import KST, completed_trade_date
+from scripts.lib.price_refresh_window import INITIAL_BACKFILL_DAYS, fetch_latest_price_dates, fetch_price_date_ranges
 from scripts.startup_market_refresh import (
     IngestOptions,
     fallback_assets,
     ingest_assets,
 )
-from scripts.lib.config import serialize_report_run_summary
-from scripts.lib.price_refresh_window import INITIAL_BACKFILL_DAYS, fetch_latest_price_dates, fetch_price_date_ranges
-from scripts.lib.market_calendar import KST, completed_trade_date
 
 try:
     from psycopg import OperationalError as PostgresOperationalError
 except ImportError:
     PostgresOperationalError = RuntimeError
 
-class StartupRefreshStore(Protocol):
-    def fetch_watchlist_assets(self, slug: str) -> list[dict]:
-        ...
 
-    def record_report_run(self, **kwargs: object) -> str:
-        ...
+class StartupRefreshStore(Protocol):
+    def fetch_watchlist_assets(self, slug: str) -> list[dict]: ...
+
+    def record_report_run(self, **kwargs: object) -> str: ...
 
 
 @dataclass(frozen=True)
@@ -61,9 +60,7 @@ def run_startup_market_refresh(
 ) -> StartupRefreshResult:
     effective_store = store
     try:
-        watchlist_assets = (
-            store.fetch_watchlist_assets(watchlist) if store is not None else fallback_assets(watchlist)
-        )
+        watchlist_assets = store.fetch_watchlist_assets(watchlist) if store is not None else fallback_assets(watchlist)
     except PostgresOperationalError:
         if not dry_run:
             raise
@@ -172,7 +169,7 @@ def run_startup_market_refresh(
         IngestOptions(
             no_network=no_network,
             synthetic=no_network,
-            fetched_at=datetime.now(timezone.utc),
+            fetched_at=datetime.now(UTC),
             max_attempts=2,
             retry_delay_seconds=0.0,
             job_name=None if dry_run else f"startup-market-refresh:{watchlist}",
@@ -258,8 +255,8 @@ def _fetch_latest_success_row(store: StartupRefreshStore, watchlist: str) -> Any
 def _coerce_datetime(value: Any) -> datetime | None:
     if isinstance(value, datetime):
         if value.tzinfo is None:
-            return value.replace(tzinfo=timezone.utc)
-        return value.astimezone(timezone.utc)
+            return value.replace(tzinfo=UTC)
+        return value.astimezone(UTC)
     if isinstance(value, str):
         try:
             parsed = datetime.fromisoformat(value)
@@ -290,7 +287,7 @@ def _are_all_assets_fresh(store: StartupRefreshStore | None, assets: list[dict])
     latest_dates = fetch_latest_price_dates(store, [int(asset["asset_id"]) for asset in assets_with_id])
     if not latest_dates:
         return False
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     price_ranges = fetch_price_date_ranges(store, [int(asset["asset_id"]) for asset in assets_with_id])
     backfill_start = now.date() - timedelta(days=INITIAL_BACKFILL_DAYS)
     return all(
@@ -311,7 +308,7 @@ def _is_recent_success(last_success_at: datetime | None, assets: list[dict], now
     if last_run_at is None:
         return False
     if now is None:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
     latest_trade_date = _latest_trade_date(assets, now)
     if latest_trade_date is None:
         return False

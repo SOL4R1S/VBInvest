@@ -4,7 +4,15 @@ from dataclasses import dataclass
 from pathlib import Path
 
 FORBIDDEN = ["긍정 관찰", "분할 관찰", "주의", "회피", "관찰", "보류", "비중확대", "비중축소", "200일선"]
-REQUIRED = ["function pointsFor", "function render", "setPolyline", "function shiftWindow", "pointerdown", "addEventListener('wheel'", "줌 초기화"]
+REQUIRED = [
+    "function pointsFor",
+    "function render",
+    "setPolyline",
+    "function shiftWindow",
+    "pointerdown",
+    "addEventListener('wheel'",
+    "줌 초기화",
+]
 
 
 @dataclass

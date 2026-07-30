@@ -3,7 +3,6 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
-
 KST = ZoneInfo("Asia/Seoul")
 US_EXCHANGES = {"NASDAQ", "NYSE", "AMEX", "ARCA", "BATS", "US"}
 KRX_EXCHANGES = {"KRX", "KOSPI", "KOSDAQ", "KONEX"}

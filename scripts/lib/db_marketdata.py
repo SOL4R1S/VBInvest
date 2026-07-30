@@ -11,9 +11,7 @@ from scripts.lib.db_base import _collection_status
 
 
 class MarketDataMixin:
-
     """Mixin — requires self.connect() from VBinvestDB."""
-
 
     def fetch_watchlist_assets(self, slug: str) -> list[dict[str, Any]]:
         query = """
@@ -36,7 +34,6 @@ class MarketDataMixin:
                 }
                 for row in cur.fetchall()
             ]
-
 
     def ensure_assets_for_refresh(self, assets: list[dict[str, Any]]) -> list[dict[str, Any]]:
         if not assets:
@@ -73,7 +70,6 @@ class MarketDataMixin:
                 )
         return ensured
 
-
     def upsert_prices(self, rows: list[dict[str, Any]]) -> int:
         if not rows:
             return 0
@@ -99,7 +95,6 @@ class MarketDataMixin:
         with self.connect() as conn, conn.cursor() as cur:
             cur.executemany(sql, rows)
             return len(rows)
-
 
     def upsert_indicators(self, rows: list[dict[str, Any]]) -> int:
         if not rows:
@@ -133,7 +128,6 @@ class MarketDataMixin:
             cur.executemany(sql, rows)
             return len(rows)
 
-
     def fetch_latest_price_dates(self, asset_ids: list[int]) -> dict[int, datetime.date]:
         if not asset_ids:
             return {}
@@ -146,7 +140,6 @@ class MarketDataMixin:
             cur.execute(sql, asset_ids)
             rows = cur.fetchall()
         return {int(asset_id): latest_date for asset_id, latest_date in rows if latest_date is not None}
-
 
     def fetch_price_date_ranges(self, asset_ids: list[int]) -> dict[int, dict[str, datetime.date]]:
         if not asset_ids:
@@ -164,7 +157,6 @@ class MarketDataMixin:
             for asset_id, earliest_date, latest_date in rows
             if earliest_date is not None and latest_date is not None
         }
-
 
     def fetch_watchlist_collection_status(self, slug: str) -> list[dict[str, Any]]:
         query = """
@@ -233,7 +225,6 @@ class MarketDataMixin:
             )
         return result
 
-
     def fetch_dashboard_items(self, slug: str, *, days: int = 1260) -> list[dict[str, Any]]:
         assets = self.fetch_watchlist_assets(slug)
         if not assets:
@@ -257,25 +248,62 @@ class MarketDataMixin:
                 if not rows:
                     continue
                 numeric_columns = [
-                    "open", "high", "low", "close", "volume",
-                    "return_1d", "return_1w", "return_1m", "return_3m", "return_6m", "return_ytd",
-                    "ma5", "ma20", "ma50", "ma120", "rsi14", "vol20", "drawdown_52w", "high_52w",
+                    "open",
+                    "high",
+                    "low",
+                    "close",
+                    "volume",
+                    "return_1d",
+                    "return_1w",
+                    "return_1m",
+                    "return_3m",
+                    "return_6m",
+                    "return_ytd",
+                    "ma5",
+                    "ma20",
+                    "ma50",
+                    "ma120",
+                    "rsi14",
+                    "vol20",
+                    "drawdown_52w",
+                    "high_52w",
                 ]
-                frame = pd.DataFrame(
-                    rows,
-                    columns=[
-                        "date", "open", "high", "low", "close", "volume", "source",
-                        "return_1d", "return_1w", "return_1m", "return_3m", "return_6m", "return_ytd",
-                        "ma5", "ma20", "ma50", "ma120", "rsi14", "vol20", "drawdown_52w", "high_52w",
-                    ],
-                ).sort_values("date").reset_index(drop=True)
+                frame = (
+                    pd.DataFrame(
+                        rows,
+                        columns=[
+                            "date",
+                            "open",
+                            "high",
+                            "low",
+                            "close",
+                            "volume",
+                            "source",
+                            "return_1d",
+                            "return_1w",
+                            "return_1m",
+                            "return_3m",
+                            "return_6m",
+                            "return_ytd",
+                            "ma5",
+                            "ma20",
+                            "ma50",
+                            "ma120",
+                            "rsi14",
+                            "vol20",
+                            "drawdown_52w",
+                            "high_52w",
+                        ],
+                    )
+                    .sort_values("date")
+                    .reset_index(drop=True)
+                )
                 for column in numeric_columns:
                     frame[column] = pd.to_numeric(frame[column], errors="coerce")
                 item = {"asset": asset, "history": frame}
                 item.update(views.get(asset["symbol"], {}))
                 items.append(item)
         return items
-
 
     def fetch_asset_dashboard_item(self, symbol: str, *, days: int = 1260) -> dict[str, Any] | None:
         query = """
@@ -312,18 +340,56 @@ class MarketDataMixin:
                 return None
             news = self.fetch_recent_news_for_asset(asset["asset_id"])
             disclosures = self.fetch_recent_disclosures_for_asset(asset["asset_id"])
-        frame = pd.DataFrame(
-            rows,
-            columns=[
-                "date", "open", "high", "low", "close", "volume", "source",
-                "return_1d", "return_1w", "return_1m", "return_3m", "return_6m", "return_ytd",
-                "ma5", "ma20", "ma50", "ma120", "rsi14", "vol20", "drawdown_52w", "high_52w",
-            ],
-        ).sort_values("date").reset_index(drop=True)
+        frame = (
+            pd.DataFrame(
+                rows,
+                columns=[
+                    "date",
+                    "open",
+                    "high",
+                    "low",
+                    "close",
+                    "volume",
+                    "source",
+                    "return_1d",
+                    "return_1w",
+                    "return_1m",
+                    "return_3m",
+                    "return_6m",
+                    "return_ytd",
+                    "ma5",
+                    "ma20",
+                    "ma50",
+                    "ma120",
+                    "rsi14",
+                    "vol20",
+                    "drawdown_52w",
+                    "high_52w",
+                ],
+            )
+            .sort_values("date")
+            .reset_index(drop=True)
+        )
         for column in [
-            "open", "high", "low", "close", "volume",
-            "return_1d", "return_1w", "return_1m", "return_3m", "return_6m", "return_ytd",
-            "ma5", "ma20", "ma50", "ma120", "rsi14", "vol20", "drawdown_52w", "high_52w",
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume",
+            "return_1d",
+            "return_1w",
+            "return_1m",
+            "return_3m",
+            "return_6m",
+            "return_ytd",
+            "ma5",
+            "ma20",
+            "ma50",
+            "ma120",
+            "rsi14",
+            "vol20",
+            "drawdown_52w",
+            "high_52w",
         ]:
             frame[column] = pd.to_numeric(frame[column], errors="coerce")
         return {"asset": asset, "history": frame, "news": news, "disclosures": disclosures}

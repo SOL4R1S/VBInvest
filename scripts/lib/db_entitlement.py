@@ -2,18 +2,15 @@
 
 from __future__ import annotations
 
-import json
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from scripts.lib.db_base import json_dumps
 
 
 class EntitlementMixin:
-
     """Mixin — requires self.connect() from VBinvestDB."""
-
 
     def user_has_research_entitlement(self, auth_user_id: str, symbol: str) -> bool:
         query = """
@@ -45,9 +42,8 @@ class EntitlementMixin:
             )
             return cur.fetchone() is not None
 
-
     def grant_ad_unlock(self, auth_user_id: str, symbol: str, ad_event_id: str) -> dict[str, Any]:
-        unlock_expires_at = datetime.now(timezone.utc) + timedelta(minutes=30)
+        unlock_expires_at = datetime.now(UTC) + timedelta(minutes=30)
         with self.connect() as conn, conn.cursor() as cur:
             profile_id = self._ensure_profile(cur, auth_user_id)
             cur.execute(
@@ -100,7 +96,6 @@ class EntitlementMixin:
             "expires_at": row[0] if row else unlock_expires_at,
         }
 
-
     def grant_subscription_entitlement(
         self,
         auth_user_id: str,
@@ -141,7 +136,6 @@ class EntitlementMixin:
             "entitlement_state": "subscriber",
             "expires_at": None,
         }
-
 
     def record_payment_webhook(
         self,

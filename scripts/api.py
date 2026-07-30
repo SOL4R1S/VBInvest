@@ -9,8 +9,8 @@ from __future__ import annotations
 import os
 import shutil  # noqa: F401 — kept for test monkeypatching (test_first_run_setup_api)
 import sys
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 if __package__ is None or __package__ == "":
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))

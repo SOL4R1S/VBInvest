@@ -6,7 +6,6 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from scripts.lib.config import ConfigError
 from scripts.lib.startup_market_refresh import run_startup_market_refresh
-
 from scripts.routers.deps import (
     SchedulerSettingsPayload,
     current_user,
@@ -27,6 +26,7 @@ def startup_market_refresh(
     limit: int = 0,
 ):
     from scripts import api
+
     ticker_catalog = api.refresh_ticker_catalog()
     try:
         result = run_startup_market_refresh(
@@ -87,12 +87,16 @@ def scheduler_settings():
 @router.patch("/api/scheduler/settings")
 def patch_scheduler_settings(payload: SchedulerSettingsPayload, user=Depends(current_user)):
     try:
-        return local_scheduler().patch_settings(
-            daily_refresh_enabled=payload.daily_refresh_enabled,
-            weekly_precompute_enabled=payload.weekly_precompute_enabled,
-            watchlist=payload.watchlist,
-            include_news=payload.include_news,
-        ).as_dict()
+        return (
+            local_scheduler()
+            .patch_settings(
+                daily_refresh_enabled=payload.daily_refresh_enabled,
+                weekly_precompute_enabled=payload.weekly_precompute_enabled,
+                watchlist=payload.watchlist,
+                include_news=payload.include_news,
+            )
+            .as_dict()
+        )
     except (ConfigError, ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -108,6 +112,7 @@ def run_scheduler_tick(
 ):
     try:
         from scripts import api
+
         return local_scheduler().tick(
             dry_run=dry_run,
             no_network=no_network,

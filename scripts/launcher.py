@@ -18,10 +18,17 @@ if __package__ is None or __package__ == "":
 import uvicorn
 
 from scripts.lib.db_factory import build_database_from_local_config
-from scripts.lib.launcher_config import DEFAULT_HOST, DEFAULT_PREFERRED_PORT, DEFAULT_SCAN_END, DEFAULT_SCAN_START, LauncherConfig, parse_host, parse_port
+from scripts.lib.launcher_config import (
+    DEFAULT_HOST,
+    DEFAULT_PREFERRED_PORT,
+    DEFAULT_SCAN_END,
+    DEFAULT_SCAN_START,
+    LauncherConfig,
+    parse_host,
+    parse_port,
+)
 from scripts.lib.launcher_ports import PortSelector, ReservedSocket
 from scripts.lib.version import load_version_metadata
-
 
 LAUNCHER_ENV_KEYS = (
     "VBINVEST_LOCAL_SESSION_TOKEN",
@@ -138,7 +145,8 @@ class LocalLauncher:
         self._server_thread = threading.Thread(
             target=self._server.run,
             kwargs={"sockets": [reserved.socket]},
-            name="vbinvest-backend", daemon=False,
+            name="vbinvest-backend",
+            daemon=False,
         )
         self._server_thread.start()
 
@@ -151,7 +159,7 @@ class LocalLauncher:
 
     def _request_server_exit(self) -> None:
         if self._server is not None:
-            setattr(self._server, "should_exit", True)
+            self._server.should_exit = True
 
     def wait_for_health(self) -> None:
         deadline = time.time() + self.config.health_timeout_seconds
@@ -160,7 +168,12 @@ class LocalLauncher:
             try:
                 with urlopen(Request(self.api_base_url() + "/health", method="GET"), timeout=1.0) as response:
                     payload = json.loads(response.read().decode("utf-8"))
-                if isinstance(payload, dict) and payload.get("status") == "ok" and payload.get("version") and payload.get("build_version"):
+                if (
+                    isinstance(payload, dict)
+                    and payload.get("status") == "ok"
+                    and payload.get("version")
+                    and payload.get("build_version")
+                ):
                     return
             except (OSError, URLError, json.JSONDecodeError, ValueError):
                 if self._server_thread is None or not self._server_thread.is_alive():
@@ -171,7 +184,7 @@ class LocalLauncher:
 
     def shutdown(self) -> None:
         if self._server is not None:
-            setattr(self._server, "should_exit", True)
+            self._server.should_exit = True
         try:
             from scripts import api
 

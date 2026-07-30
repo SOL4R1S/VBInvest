@@ -1,12 +1,12 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pandas as pd
 from fastapi.testclient import TestClient
 
 from scripts import api
 from scripts.api import app
-from scripts.lib.auth import create_test_token
 from scripts.lib.ai_provider import AIProviderConfigError
+from scripts.lib.auth import create_test_token
 from scripts.lib.version import load_version_metadata
 
 
@@ -19,7 +19,7 @@ class FakeSettingsDB:
             "run_type": run_type,
             "scope_type": "watchlist",
             "scope_slug": scope_slug,
-            "completed_at": datetime(2026, 6, 1, 0, 0, tzinfo=timezone.utc),
+            "completed_at": datetime(2026, 6, 1, 0, 0, tzinfo=UTC),
             "status": "ok",
             "output_summary": (
                 "dry_run=False stale=False assets=1 price_rows=2 indicator_rows=3 news_items=4 disclosures=5 "
@@ -52,10 +52,17 @@ class FakeSchedulerDB(FakeSettingsDB):
     def fetch_watchlist_assets(self, slug: str):
         if slug != "semiconductor-core":
             return []
-        return [{"asset_id": 1, "symbol": "NVDA", "display_name_ko": "엔비디아", "exchange": "NASDAQ", "currency": "USD"}]
+        return [
+            {"asset_id": 1, "symbol": "NVDA", "display_name_ko": "엔비디아", "exchange": "NASDAQ", "currency": "USD"}
+        ]
 
     def fetch_profile_by_auth_user(self, auth_user_id: str):
-        return {"profile_id": 1, "auth_user_id": auth_user_id, "slug": auth_user_id, "email": f"{auth_user_id}@example.com"}
+        return {
+            "profile_id": 1,
+            "auth_user_id": auth_user_id,
+            "slug": auth_user_id,
+            "email": f"{auth_user_id}@example.com",
+        }
 
     def record_report_run(self, **kwargs):
         return "run-scheduler-1"
@@ -78,10 +85,25 @@ class FakeSchedulerDB(FakeSettingsDB):
 
 class FakeResearchDB:
     def fetch_profile_by_auth_user(self, auth_user_id: str):
-        return {"profile_id": 1, "auth_user_id": auth_user_id, "slug": auth_user_id, "email": f"{auth_user_id}@example.com"}
+        return {
+            "profile_id": 1,
+            "auth_user_id": auth_user_id,
+            "slug": auth_user_id,
+            "email": f"{auth_user_id}@example.com",
+        }
 
     def fetch_latest_research_for_asset(self, symbol: str):
-        return {"target_slug": symbol, "opinion": "중립", "thesis": "thesis", "bull": "bull", "base": "base", "bear": "bear", "risks": [], "triggers": [], "sources": []}
+        return {
+            "target_slug": symbol,
+            "opinion": "중립",
+            "thesis": "thesis",
+            "bull": "bull",
+            "base": "base",
+            "bear": "bear",
+            "risks": [],
+            "triggers": [],
+            "sources": [],
+        }
 
     def user_has_research_entitlement(self, auth_user_id: str, symbol: str):
         return True
@@ -92,7 +114,12 @@ class FakeResearchDB:
 
 class FakeGeneratedResearchDB:
     def fetch_profile_by_auth_user(self, auth_user_id: str):
-        return {"profile_id": 1, "auth_user_id": auth_user_id, "slug": auth_user_id, "email": f"{auth_user_id}@example.com"}
+        return {
+            "profile_id": 1,
+            "auth_user_id": auth_user_id,
+            "slug": auth_user_id,
+            "email": f"{auth_user_id}@example.com",
+        }
 
     def generate_research_for_asset(self, auth_user_id: str, symbol: str, *, obsidian_vault_path=None):
         return {
@@ -121,8 +148,8 @@ class FakeDashboardDB:
                 "display_name_ko": "엔비디아",
                 "exchange": "NASDAQ",
                 "provider": "yfinance",
-                "latest_price_date": datetime(2026, 6, 1, tzinfo=timezone.utc).date(),
-                "latest_fetched_at": datetime(2026, 6, 2, 1, 0, tzinfo=timezone.utc),
+                "latest_price_date": datetime(2026, 6, 1, tzinfo=UTC).date(),
+                "latest_fetched_at": datetime(2026, 6, 2, 1, 0, tzinfo=UTC),
                 "price_rows": 260,
                 "indicator_rows": 260,
                 "has_synthetic": False,
@@ -133,8 +160,8 @@ class FakeDashboardDB:
                 "display_name_ko": "삼성전자",
                 "exchange": "KRX",
                 "provider": "synthetic",
-                "latest_price_date": datetime(2026, 6, 1, tzinfo=timezone.utc).date(),
-                "latest_fetched_at": datetime(2026, 6, 2, 1, 0, tzinfo=timezone.utc),
+                "latest_price_date": datetime(2026, 6, 1, tzinfo=UTC).date(),
+                "latest_fetched_at": datetime(2026, 6, 2, 1, 0, tzinfo=UTC),
                 "price_rows": 260,
                 "indicator_rows": 260,
                 "has_synthetic": True,
@@ -157,7 +184,7 @@ class FakeDashboardDB:
                 "history": pd.DataFrame(
                     [
                         {
-                            "date": datetime(2026, 5, 29, tzinfo=timezone.utc).date(),
+                            "date": datetime(2026, 5, 29, tzinfo=UTC).date(),
                             "open": 100.0,
                             "high": 104.0,
                             "low": 99.0,
@@ -173,7 +200,7 @@ class FakeDashboardDB:
                             "rsi14": 62.5,
                         },
                         {
-                            "date": datetime(2026, 5, 30, tzinfo=timezone.utc).date(),
+                            "date": datetime(2026, 5, 30, tzinfo=UTC).date(),
                             "open": 104.0,
                             "high": 105.0,
                             "low": 101.0,
@@ -189,7 +216,7 @@ class FakeDashboardDB:
                             "rsi14": 60.0,
                         },
                         {
-                            "date": datetime(2026, 6, 1, tzinfo=timezone.utc).date(),
+                            "date": datetime(2026, 6, 1, tzinfo=UTC).date(),
                             "open": 103.0,
                             "high": 108.0,
                             "low": 102.0,
@@ -235,9 +262,9 @@ def test_settings_exposes_safe_provider_status(monkeypatch, tmp_path):
         "\n".join(
             [
                 "[providers]",
-                "opendart_api_key = \"config-dart-key\"",
-                "ai_base_url = \"http://127.0.0.1:11434/v1\"",
-                "ai_api_key = \"\"",
+                'opendart_api_key = "config-dart-key"',
+                'ai_base_url = "http://127.0.0.1:11434/v1"',
+                'ai_api_key = ""',
             ]
         ),
         encoding="utf-8",
@@ -263,7 +290,7 @@ def test_settings_exposes_safe_provider_status(monkeypatch, tmp_path):
 
 def test_settings_exposes_latest_startup_refresh_summary(monkeypatch, tmp_path):
     config_path = tmp_path / "config.toml"
-    config_path.write_text("[providers]\nai_base_url = \"http://127.0.0.1:11434/v1\"\n", encoding="utf-8")
+    config_path.write_text('[providers]\nai_base_url = "http://127.0.0.1:11434/v1"\n', encoding="utf-8")
     monkeypatch.setenv("VBINVEST_CONFIG_PATH", str(config_path))
     monkeypatch.setenv("AI_PROVIDER_MODEL", "qwen2.5")
     client = client_with_db(monkeypatch, FakeSettingsDB())

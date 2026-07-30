@@ -1,13 +1,13 @@
 import subprocess
 import sys
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 
 import pandas as pd
 
-from scripts.startup_market_refresh import IngestOptions, ingest_assets
 from scripts.lib.disclosures import DisclosureFetchResult
 from scripts.lib.news import NewsFetchResult
 from scripts.lib.prices import PriceFetchError, synthetic_history
+from scripts.startup_market_refresh import IngestOptions, ingest_assets
 
 
 def _market_frame(start: date, end: date) -> pd.DataFrame:
@@ -42,7 +42,9 @@ class CaptureDB:
         return {asset_id: self.latest_dates[asset_id] for asset_id in asset_ids if asset_id in self.latest_dates}
 
     def fetch_price_date_ranges(self, asset_ids):
-        return {asset_id: self.price_date_ranges[asset_id] for asset_id in asset_ids if asset_id in self.price_date_ranges}
+        return {
+            asset_id: self.price_date_ranges[asset_id] for asset_id in asset_ids if asset_id in self.price_date_ranges
+        }
 
     def upsert_prices(self, rows):
         self.price_rows.extend(rows)
@@ -173,7 +175,9 @@ def test_ingest_assets_respects_job_lock_for_writes():
     result = ingest_assets(
         [{"asset_id": 1, "symbol": "NVDA", "exchange": "NASDAQ"}],
         db=db,
-        options=IngestOptions(no_network=True, synthetic=False, job_name="startup-market-refresh:test", lock_holder="test"),
+        options=IngestOptions(
+            no_network=True, synthetic=False, job_name="startup-market-refresh:test", lock_holder="test"
+        ),
     )
 
     assert result.status == "locked"
@@ -255,7 +259,7 @@ def test_ingest_assets_first_write_requests_historical_backfill_window():
     result = ingest_assets(
         [{"asset_id": 1, "symbol": "NVDA", "exchange": "NASDAQ"}],
         db=db,
-        options=IngestOptions(fetched_at=datetime(2026, 6, 2, 8, 0, tzinfo=timezone.utc)),
+        options=IngestOptions(fetched_at=datetime(2026, 6, 2, 8, 0, tzinfo=UTC)),
         fetch_history=fetch_history,
     )
 
@@ -282,7 +286,7 @@ def test_ingest_assets_backfills_existing_short_history_before_incremental_skip(
     result = ingest_assets(
         [{"asset_id": 1, "symbol": "NVDA", "exchange": "NASDAQ"}],
         db=db,
-        options=IngestOptions(fetched_at=datetime(2026, 6, 2, 8, 0, tzinfo=timezone.utc)),
+        options=IngestOptions(fetched_at=datetime(2026, 6, 2, 8, 0, tzinfo=UTC)),
         fetch_history=fetch_history,
     )
 
@@ -303,7 +307,7 @@ def test_ingest_assets_incremental_write_persists_only_rows_after_latest_saved_d
     result = ingest_assets(
         [{"asset_id": 1, "symbol": "NVDA", "exchange": "NASDAQ"}],
         db=db,
-        options=IngestOptions(fetched_at=datetime(2026, 6, 2, 8, 0, tzinfo=timezone.utc)),
+        options=IngestOptions(fetched_at=datetime(2026, 6, 2, 8, 0, tzinfo=UTC)),
         fetch_history=fetch_history,
     )
 
@@ -332,7 +336,7 @@ def test_ingest_assets_skips_price_fetch_when_latest_saved_date_reaches_run_date
     result = ingest_assets(
         [{"asset_id": 1, "symbol": "NVDA", "exchange": "NASDAQ"}],
         db=db,
-        options=IngestOptions(fetched_at=datetime(2026, 6, 2, 8, 0, tzinfo=timezone.utc)),
+        options=IngestOptions(fetched_at=datetime(2026, 6, 2, 8, 0, tzinfo=UTC)),
         fetch_history=fetch_history,
     )
 
@@ -347,7 +351,7 @@ def test_ingest_assets_no_network_write_uses_windowed_synthetic_history():
     result = ingest_assets(
         [{"asset_id": 1, "symbol": "NVDA", "exchange": "NASDAQ"}],
         db=db,
-        options=IngestOptions(no_network=True, fetched_at=datetime(2026, 6, 2, 8, 0, tzinfo=timezone.utc)),
+        options=IngestOptions(no_network=True, fetched_at=datetime(2026, 6, 2, 8, 0, tzinfo=UTC)),
     )
 
     assert result.status == "ok"

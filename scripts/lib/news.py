@@ -7,10 +7,9 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from typing import Any
-
 
 YAHOO_NEWS_RSS_URL = "https://feeds.finance.yahoo.com/rss/2.0/headline?s={symbol}&region=US&lang=en-US"
 
@@ -138,8 +137,8 @@ def parse_rfc2822_datetime(value: str | None) -> datetime | None:
         return None
     parsed = parsedate_to_datetime(value)
     if parsed.tzinfo is None:
-        return parsed.replace(tzinfo=timezone.utc)
-    return parsed.astimezone(timezone.utc)
+        return parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
 
 
 def _text(item: ET.Element, tag: str) -> str | None:

@@ -1,8 +1,5 @@
 """Tests for scripts.routers.frontend — health, system, and static serving."""
 
-import json
-from pathlib import Path
-
 from fastapi.testclient import TestClient
 
 from scripts import api

@@ -2,7 +2,7 @@ import time
 
 import pytest
 
-from scripts.lib.auth import AuthError, LOCAL_TEST_JWT_SECRET, _encode_hs256, create_test_token, verify_bearer_token
+from scripts.lib.auth import LOCAL_TEST_JWT_SECRET, AuthError, _encode_hs256, create_test_token, verify_bearer_token
 
 
 def test_local_auth_mode_allows_default_test_secret():

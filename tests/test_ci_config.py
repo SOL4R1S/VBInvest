@@ -5,7 +5,6 @@ from pathlib import Path
 
 from scripts.secret_scan import scan_text
 
-
 ROOT = Path(__file__).resolve().parents[1]
 TEST_FILES = [
     ROOT / "tests" / "test_db_quality.py",
@@ -127,10 +126,6 @@ def test_ci_workflow_declares_release_branch_glob_only_once_for_branches_array()
 
 def test_test_files_do_not_hardcode_repo_absolute_path() -> None:
     hardcoded_path = "/Volumes/" + "nv6000t/project/VBInvest"
-    offenders = [
-        path.name
-        for path in TEST_FILES
-        if hardcoded_path in path.read_text(encoding="utf-8")
-    ]
+    offenders = [path.name for path in TEST_FILES if hardcoded_path in path.read_text(encoding="utf-8")]
 
     assert offenders == []

@@ -8,7 +8,9 @@ from fastapi.testclient import TestClient
 from scripts import api
 
 
-def setup_payload(data_dir: Path, vault_dir: Path, *, mode: str = "sqlite", postgres_url: str = "") -> dict[str, object]:
+def setup_payload(
+    data_dir: Path, vault_dir: Path, *, mode: str = "sqlite", postgres_url: str = ""
+) -> dict[str, object]:
     return {
         "language": "ko",
         "data_directory": str(data_dir),
@@ -29,7 +31,9 @@ def setup_payload(data_dir: Path, vault_dir: Path, *, mode: str = "sqlite", post
     }
 
 
-def test_first_run_setup_saves_sqlite_config_and_redacts_settings(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_first_run_setup_saves_sqlite_config_and_redacts_settings(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     config_path = tmp_path / "config.toml"
     data_dir = tmp_path / "data"
     vault_dir = tmp_path / "vault"

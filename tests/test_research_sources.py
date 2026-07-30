@@ -1,5 +1,5 @@
 import json
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 
 import pytest
 
@@ -26,8 +26,20 @@ def test_source_packet_has_db_source_or_source_gap():
 def test_source_packet_includes_news_and_disclosures():
     asset = {"symbol": "NVDA", "display_name_ko": "엔비디아"}
     latest = {"date": date(2026, 6, 1), "close": 120, "rsi14": 62}
-    news = [{"title": "NVIDIA files update", "url": "https://example.com/n", "published_at": datetime(2026, 6, 1, tzinfo=timezone.utc)}]
-    disclosures = [{"title": "10-Q Quarterly report", "url": "https://example.com/d", "published_at": datetime(2026, 5, 1, tzinfo=timezone.utc)}]
+    news = [
+        {
+            "title": "NVIDIA files update",
+            "url": "https://example.com/n",
+            "published_at": datetime(2026, 6, 1, tzinfo=UTC),
+        }
+    ]
+    disclosures = [
+        {
+            "title": "10-Q Quarterly report",
+            "url": "https://example.com/d",
+            "published_at": datetime(2026, 5, 1, tzinfo=UTC),
+        }
+    ]
 
     packet = build_source_packet(asset, latest, news=news, disclosures=disclosures)
 
@@ -37,7 +49,15 @@ def test_source_packet_includes_news_and_disclosures():
 
 def test_missing_ai_credentials_use_deterministic_fallback():
     asset = {"symbol": "NVDA", "display_name_ko": "엔비디아"}
-    latest = {"date": date(2026, 6, 1), "return_1m": 0.12, "rsi14": 62, "drawdown_52w": -0.08, "close": 120, "ma20": 110, "ma50": 100}
+    latest = {
+        "date": date(2026, 6, 1),
+        "return_1m": 0.12,
+        "rsi14": 62,
+        "drawdown_52w": -0.08,
+        "close": 120,
+        "ma20": 110,
+        "ma50": 100,
+    }
     packet = build_source_packet(asset, latest, news=[], disclosures=[])
 
     row = build_on_demand_research_view(asset, latest, packet, ai_credentials_present=False)
@@ -50,7 +70,15 @@ def test_missing_ai_credentials_use_deterministic_fallback():
 
 def test_research_view_sources_are_json_serialized_for_db():
     asset = {"symbol": "NVDA", "display_name_ko": "엔비디아"}
-    latest = {"date": date(2026, 6, 1), "return_1m": 0.0, "rsi14": 50, "drawdown_52w": -0.2, "close": 100, "ma20": 100, "ma50": 100}
+    latest = {
+        "date": date(2026, 6, 1),
+        "return_1m": 0.0,
+        "rsi14": 50,
+        "drawdown_52w": -0.2,
+        "close": 100,
+        "ma20": 100,
+        "ma50": 100,
+    }
     packet = build_source_packet(asset, latest, news=[], disclosures=[])
 
     row = build_on_demand_research_view(asset, latest, packet, ai_credentials_present=False)

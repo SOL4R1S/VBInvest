@@ -11,26 +11,17 @@ Original monolith split into:
 
 from __future__ import annotations
 
-import os
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Mapping
 from urllib.parse import quote_plus
 
-from scripts.lib.keychain import SecretStore, resolve_secret
-from scripts.lib.db_base import (
-    build_indicator_rows,
-    build_price_rows,
-    hashlib_sha,
-    json_dumps,
-    none_if_na,
-    _profile_slug,
-)
-from scripts.lib.db_marketdata import MarketDataMixin
-from scripts.lib.db_user import UserMixin
-from scripts.lib.db_ingest import IngestMixin
-from scripts.lib.db_research import ResearchMixin
 from scripts.lib.db_entitlement import EntitlementMixin
+from scripts.lib.db_ingest import IngestMixin
+from scripts.lib.db_marketdata import MarketDataMixin
+from scripts.lib.db_research import ResearchMixin
+from scripts.lib.db_user import UserMixin
+from scripts.lib.keychain import SecretStore, resolve_secret
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,7 +39,7 @@ class DatabaseConfig:
         *,
         system_name: str | None = None,
         secret_store: SecretStore | None = None,
-    ) -> "DatabaseConfig":
+    ) -> DatabaseConfig:
         return cls(
             host=env.get("VBINVEST_DB_HOST") or env.get("POSTGRES_HOST") or "host.docker.internal",
             port=int(env.get("VBINVEST_DB_PORT") or env.get("POSTGRES_PORT") or 5432),
@@ -71,10 +62,7 @@ class DatabaseConfig:
 
     def safe_summary(self) -> str:
         password_state = "***" if self.password else "<unset>"
-        return (
-            f"host={self.host} port={self.port} database={self.database} "
-            f"user={self.user} password={password_state}"
-        )
+        return f"host={self.host} port={self.port} database={self.database} user={self.user} password={password_state}"
 
 
 class VBinvestDB(MarketDataMixin, UserMixin, IngestMixin, ResearchMixin, EntitlementMixin):
@@ -99,5 +87,6 @@ class VBinvestDB(MarketDataMixin, UserMixin, IngestMixin, ResearchMixin, Entitle
         from scripts.lib.db_factory import build_database_from_local_config
 
         return build_database_from_local_config(config_path=config_path, environ=environ)
+
     def connect(self):
         return self._psycopg.connect(self.config.dsn(mask_password=False))

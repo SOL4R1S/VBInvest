@@ -6,10 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Final
 
-
-COMMIT_PATTERN: Final = re.compile(
-    r"^(feat|fix|docs|test|build|ci|chore|refactor)(\([a-z0-9._-]+\))?!?: .+"
-)
+COMMIT_PATTERN: Final = re.compile(r"^(feat|fix|docs|test|build|ci|chore|refactor)(\([a-z0-9._-]+\))?!?: .+")
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,10 +21,7 @@ def validate_commit_message(message: str) -> HookResult:
         return HookResult(ok=True, message="commit_msg=ok")
     return HookResult(
         ok=False,
-        message=(
-            "Commit message must follow Conventional Commit format, "
-            "for example: chore: initialize git flow"
-        ),
+        message=("Commit message must follow Conventional Commit format, for example: chore: initialize git flow"),
     )
 
 

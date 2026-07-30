@@ -3,7 +3,6 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 COMPOSE_PATH = ROOT / "postgres" / "docker-compose.yml"
 ENV_EXAMPLE_PATH = ROOT / "postgres" / ".env.example"

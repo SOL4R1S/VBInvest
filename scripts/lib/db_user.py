@@ -5,13 +5,11 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from scripts.lib.db_base import hashlib_sha
+from scripts.lib.db_base import _profile_slug, hashlib_sha
 
 
 class UserMixin:
-
     """Mixin — requires self.connect() from VBinvestDB."""
-
 
     def fetch_profile_by_auth_user(self, auth_user_id: str) -> dict[str, Any] | None:
         query = """
@@ -32,7 +30,6 @@ class UserMixin:
                 "email": row[4],
                 "auth_provider": row[5],
             }
-
 
     def ensure_profile_for_auth_user(self, auth_user_id: str, email: str | None) -> dict[str, Any]:
         slug = _profile_slug(auth_user_id)
@@ -57,7 +54,6 @@ class UserMixin:
                 "auth_provider": row[5],
             }
 
-
     def list_user_watchlists(self, auth_user_id: str) -> list[dict[str, Any]]:
         query = """
         SELECT w.watchlist_id, w.name_ko, w.slug, COALESCE(json_agg(a.symbol ORDER BY wm.sort_order) FILTER (WHERE a.symbol IS NOT NULL), '[]'::json)
@@ -75,7 +71,6 @@ class UserMixin:
                 {"watchlist_id": str(row[0]), "name": row[1], "slug": row[2], "symbols": row[3] or []}
                 for row in cur.fetchall()
             ]
-
 
     def create_user_watchlist(self, auth_user_id: str, name: str, symbols: list[str]) -> dict[str, Any]:
         with self.connect() as conn, conn.cursor() as cur:
@@ -110,7 +105,6 @@ class UserMixin:
                 )
             return {"watchlist_id": str(row[0]), "name": row[1], "slug": row[2], "symbols": clean_symbols}
 
-
     def get_user_watchlist(self, auth_user_id: str, watchlist_id: str) -> dict[str, Any] | None:
         query = """
         SELECT w.watchlist_id, w.name_ko, w.slug, COALESCE(json_agg(a.symbol ORDER BY wm.sort_order) FILTER (WHERE a.symbol IS NOT NULL), '[]'::json)
@@ -128,7 +122,6 @@ class UserMixin:
                 return None
             return {"watchlist_id": str(row[0]), "name": row[1], "slug": row[2], "symbols": row[3] or []}
 
-
     def _ensure_profile(self, cur, auth_user_id: str) -> int:
         slug = f"user-{hashlib_sha(auth_user_id)[:12]}"
         cur.execute(
@@ -142,7 +135,6 @@ class UserMixin:
         )
         return cur.fetchone()[0]
 
-
     def _ensure_asset(self, cur, symbol: str) -> int:
         cur.execute(
             """
@@ -154,7 +146,6 @@ class UserMixin:
             (symbol,),
         )
         return cur.fetchone()[0]
-
 
     def _watchlist_slug(self, auth_user_id: str, name: str) -> str:
         base = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-") or "watchlist"

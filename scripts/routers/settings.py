@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from dataclasses import replace
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 
 from scripts.lib.ai_catalog import provider_catalog
 from scripts.lib.ai_cli import detect_ai_cli
@@ -17,7 +17,6 @@ from scripts.lib.config import (
     provider_status,
     write_local_config,
 )
-
 from scripts.routers.deps import (
     FirstRunSetupPayload,
     LanguageSettingsPayload,
@@ -114,6 +113,7 @@ def opendart_provider_status(check: bool = False):
     if not check:
         return {"status": "enabled", "source": source, "configured": True}
     from scripts import api
+
     result = api.check_opendart_api_key(api.load_opendart_api_key())
     return {
         "status": result.status,

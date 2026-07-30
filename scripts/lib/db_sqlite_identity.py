@@ -146,7 +146,9 @@ class SQLiteIdentityMixin:
                 """,
                 (slug, name, profile_id),
             )
-            watchlist_row = conn.execute("SELECT watchlist_id, name_ko, slug FROM watchlists WHERE slug = ?", (slug,)).fetchone()
+            watchlist_row = conn.execute(
+                "SELECT watchlist_id, name_ko, slug FROM watchlists WHERE slug = ?", (slug,)
+            ).fetchone()
             if watchlist_row is None:
                 raise LookupError("watchlist not created")
             watchlist_id = int(watchlist_row["watchlist_id"])
@@ -162,7 +164,12 @@ class SQLiteIdentityMixin:
                     """,
                     (watchlist_id, asset_id, index),
                 )
-        return {"watchlist_id": str(watchlist_row["watchlist_id"]), "name": watchlist_row["name_ko"], "slug": watchlist_row["slug"], "symbols": clean_symbols}
+        return {
+            "watchlist_id": str(watchlist_row["watchlist_id"]),
+            "name": watchlist_row["name_ko"],
+            "slug": watchlist_row["slug"],
+            "symbols": clean_symbols,
+        }
 
     def get_user_watchlist(self, auth_user_id: str, watchlist_id: str) -> dict[str, Any] | None:
         with self.connect() as conn:
@@ -230,7 +237,12 @@ class SQLiteIdentityMixin:
                 (row["watchlist_id"],),
             ).fetchall()
         ]
-        return {"watchlist_id": str(row["watchlist_id"]), "name": row["name_ko"], "slug": row["slug"], "symbols": symbols}
+        return {
+            "watchlist_id": str(row["watchlist_id"]),
+            "name": row["name_ko"],
+            "slug": row["slug"],
+            "symbols": symbols,
+        }
 
     def _ensure_profile(self, conn: sqlite3.Connection, auth_user_id: str) -> int:
         slug = _profile_slug(auth_user_id)
@@ -245,7 +257,10 @@ class SQLiteIdentityMixin:
 
     def _ensure_asset(self, conn: sqlite3.Connection, symbol: str) -> int:
         normalized = symbol.strip().upper()
-        conn.execute("INSERT INTO assets (symbol) VALUES (?) ON CONFLICT (symbol) DO UPDATE SET updated_at = CURRENT_TIMESTAMP", (normalized,))
+        conn.execute(
+            "INSERT INTO assets (symbol) VALUES (?) ON CONFLICT (symbol) DO UPDATE SET updated_at = CURRENT_TIMESTAMP",
+            (normalized,),
+        )
         row = conn.execute("SELECT asset_id FROM assets WHERE symbol = ?", (normalized,)).fetchone()
         if row is None:
             raise LookupError(f"asset not found: {normalized}")

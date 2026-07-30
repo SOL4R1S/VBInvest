@@ -5,9 +5,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
-
 
 SEC_SUBMISSIONS_URL = "https://data.sec.gov/submissions/CIK{cik}.json"
 DART_LIST_URL = "https://opendart.fss.or.kr/api/list.json"
@@ -56,8 +55,10 @@ def check_opendart_api_key(api_key: str) -> OpenDartProviderStatus:
     return OpenDartProviderStatus(status="provider_error", provider_code=None, message="invalid provider response")
 
 
-def normalize_sec_submissions(asset: dict[str, Any], payload: dict[str, Any], *, limit: int = 20) -> list[dict[str, Any]]:
-    recent = ((payload.get("filings") or {}).get("recent") or {})
+def normalize_sec_submissions(
+    asset: dict[str, Any], payload: dict[str, Any], *, limit: int = 20
+) -> list[dict[str, Any]]:
+    recent = (payload.get("filings") or {}).get("recent") or {}
     accessions = recent.get("accessionNumber") or []
     forms = recent.get("form") or []
     filing_dates = recent.get("filingDate") or []
@@ -95,7 +96,9 @@ def normalize_sec_submissions(asset: dict[str, Any], payload: dict[str, Any], *,
 
 def normalize_dart_list(asset: dict[str, Any], payload: dict[str, Any]) -> list[dict[str, Any]]:
     if payload.get("status") not in (None, "000"):
-        raise DisclosureFetchError(f"{asset.get('symbol')}: dart status {payload.get('status')} {payload.get('message')}")
+        raise DisclosureFetchError(
+            f"{asset.get('symbol')}: dart status {payload.get('status')} {payload.get('message')}"
+        )
 
     rows: list[dict[str, Any]] = []
     for item in payload.get("list") or []:
@@ -189,7 +192,7 @@ def parse_yyyymmdd(value: str | None, *, dashed: bool) -> datetime | None:
     if not value:
         return None
     fmt = "%Y-%m-%d" if dashed else "%Y%m%d"
-    return datetime.strptime(value, fmt).replace(tzinfo=timezone.utc)
+    return datetime.strptime(value, fmt).replace(tzinfo=UTC)
 
 
 def sec_filing_url(cik: str, accession_path: str, document: str | None) -> str:

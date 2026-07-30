@@ -1,4 +1,4 @@
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -30,7 +30,9 @@ class FakeStartupRefreshDB:
     def fetch_watchlist_assets(self, slug: str):
         if slug != "semiconductor-core":
             return []
-        return [{"asset_id": 1, "symbol": "NVDA", "display_name_ko": "엔비디아", "exchange": "NASDAQ", "currency": "USD"}]
+        return [
+            {"asset_id": 1, "symbol": "NVDA", "display_name_ko": "엔비디아", "exchange": "NASDAQ", "currency": "USD"}
+        ]
 
     def try_acquire_job_lock(self, lock_name: str, holder: str, ttl_seconds: int) -> bool:
         self.lock_calls.append((lock_name, holder, ttl_seconds))
@@ -186,8 +188,8 @@ def test_startup_refresh_defaults_to_source_collection(monkeypatch):
 
 
 def test_startup_refresh_treats_same_trading_day_success_as_fresh(monkeypatch):
-    recent = datetime.now(timezone.utc) - timedelta(hours=2)
-    today = datetime.now(timezone.utc).date()
+    recent = datetime.now(UTC) - timedelta(hours=2)
+    today = datetime.now(UTC).date()
     complete_start = today - timedelta(days=365 * 5)
     fake_db = FakeStartupRefreshDB(
         last_success_at=recent,
@@ -206,8 +208,8 @@ def test_startup_refresh_treats_same_trading_day_success_as_fresh(monkeypatch):
 
 
 def test_startup_refresh_skips_when_recent_success_exists_unless_forced(monkeypatch):
-    recent = datetime.now(timezone.utc) - timedelta(minutes=5)
-    today = datetime.now(timezone.utc).date()
+    recent = datetime.now(UTC) - timedelta(minutes=5)
+    today = datetime.now(UTC).date()
     complete_start = today - timedelta(days=365 * 5)
     fake_db = FakeStartupRefreshDB(
         last_success_at=recent,
@@ -234,7 +236,7 @@ def test_startup_refresh_skips_when_recent_success_exists_unless_forced(monkeypa
 
 
 def test_startup_refresh_skips_when_all_assets_are_fresh(monkeypatch):
-    today = datetime.now(timezone.utc).date()
+    today = datetime.now(UTC).date()
     complete_start = today - timedelta(days=365 * 5)
 
     class FreshAssetsDB(FakeStartupRefreshDB):
@@ -260,7 +262,7 @@ def test_startup_refresh_skips_when_all_assets_are_fresh(monkeypatch):
 
 
 def test_startup_refresh_force_ignores_fresh_asset_skip(monkeypatch):
-    today = datetime.now(timezone.utc).date()
+    today = datetime.now(UTC).date()
     complete_start = today - timedelta(days=365 * 5)
     captured: dict[str, list[dict[str, object]]] = {}
 
@@ -298,7 +300,7 @@ def test_startup_refresh_force_ignores_fresh_asset_skip(monkeypatch):
 
 
 def test_startup_refresh_does_not_skip_existing_ticker_with_short_history(monkeypatch):
-    today = datetime.now(timezone.utc).date()
+    today = datetime.now(UTC).date()
     captured: dict[str, list[dict[str, object]]] = {}
 
     class ShortHistoryDB(FakeStartupRefreshDB):
@@ -336,9 +338,9 @@ def test_startup_refresh_does_not_skip_existing_ticker_with_short_history(monkey
 
 def test_recent_success_uses_kst_calendar_date():
     assert refresh_module._is_recent_success(
-        datetime(2026, 6, 1, 16, 0, tzinfo=timezone.utc),
+        datetime(2026, 6, 1, 16, 0, tzinfo=UTC),
         [{"asset_id": 1, "symbol": "005930.KS", "exchange": "KRX"}],
-        now=datetime(2026, 6, 2, 8, 0, tzinfo=timezone.utc),
+        now=datetime(2026, 6, 2, 8, 0, tzinfo=UTC),
     )
 
 

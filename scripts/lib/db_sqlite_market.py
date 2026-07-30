@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 import pandas as pd
@@ -102,7 +102,7 @@ class SQLiteMarketMixin:
         return len(rows)
 
     def try_acquire_job_lock(self, lock_name: str, holder: str, ttl_seconds: int) -> bool:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         expires_at = now + timedelta(seconds=ttl_seconds)
         with self.connect() as conn:
             row = conn.execute("SELECT holder, expires_at FROM job_locks WHERE lock_name = ?", (lock_name,)).fetchone()
@@ -228,7 +228,9 @@ class SQLiteMarketMixin:
             price_rows = int(row["price_rows"])
             has_synthetic = bool(row["has_synthetic"])
             latest_price_date = row["latest_price_date"]
-            parsed_date = date.fromisoformat(latest_price_date) if isinstance(latest_price_date, str) else latest_price_date
+            parsed_date = (
+                date.fromisoformat(latest_price_date) if isinstance(latest_price_date, str) else latest_price_date
+            )
             result.append(
                 {
                     "symbol": row["symbol"],
@@ -312,32 +314,36 @@ class SQLiteMarketMixin:
                 rows = conn.execute(query, (asset["asset_id"], days)).fetchall()
                 if not rows:
                     continue
-                frame = pd.DataFrame(
-                    rows,
-                    columns=[
-                        "date",
-                        "open",
-                        "high",
-                        "low",
-                        "close",
-                        "volume",
-                        "source",
-                        "return_1d",
-                        "return_1w",
-                        "return_1m",
-                        "return_3m",
-                        "return_6m",
-                        "return_ytd",
-                        "ma5",
-                        "ma20",
-                        "ma50",
-                        "ma120",
-                        "rsi14",
-                        "vol20",
-                        "drawdown_52w",
-                        "high_52w",
-                    ],
-                ).sort_values("date").reset_index(drop=True)
+                frame = (
+                    pd.DataFrame(
+                        rows,
+                        columns=[
+                            "date",
+                            "open",
+                            "high",
+                            "low",
+                            "close",
+                            "volume",
+                            "source",
+                            "return_1d",
+                            "return_1w",
+                            "return_1m",
+                            "return_3m",
+                            "return_6m",
+                            "return_ytd",
+                            "ma5",
+                            "ma20",
+                            "ma50",
+                            "ma120",
+                            "rsi14",
+                            "vol20",
+                            "drawdown_52w",
+                            "high_52w",
+                        ],
+                    )
+                    .sort_values("date")
+                    .reset_index(drop=True)
+                )
                 for column in [
                     "open",
                     "high",

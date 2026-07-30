@@ -203,7 +203,9 @@ class ApiStore:
             "access_tier": row[10],
         }
 
-    def generate_research_for_asset(self, auth_user_id: str, symbol: str, *, obsidian_vault_path=None) -> dict[str, Any]:
+    def generate_research_for_asset(
+        self, auth_user_id: str, symbol: str, *, obsidian_vault_path=None
+    ) -> dict[str, Any]:
         return self.db.generate_research_for_asset(auth_user_id, symbol, obsidian_vault_path=obsidian_vault_path)
 
     def fetch_latest_report_run(self, run_type: str, scope_slug: str | None) -> dict[str, Any] | None:
@@ -287,7 +289,12 @@ class ApiStore:
                     json_dumps({"symbol": symbol, "ad_event_id": ad_event_id}),
                 ),
             )
-        return {"auth_user_id": auth_user_id, "entitlement_state": "ad_unlocked", "target_slug": symbol, "expires_at": row[0]}
+        return {
+            "auth_user_id": auth_user_id,
+            "entitlement_state": "ad_unlocked",
+            "target_slug": symbol,
+            "expires_at": row[0],
+        }
 
     def grant_subscription_entitlement(
         self,
@@ -383,6 +390,7 @@ class ApiStore:
         )
         row = cur.fetchone()
         return None if row is None else row[0]
+
 
 def _watchlist_row(row: tuple[Any, ...]) -> dict[str, Any]:
     symbols = [symbol for symbol in (row[2] or []) if symbol is not None]

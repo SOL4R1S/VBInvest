@@ -6,7 +6,6 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from scripts.lib.ai_provider import AIProviderConfigError
 from scripts.lib.on_demand_report import OnDemandReportError
-
 from scripts.routers.deps import (
     auth_db,
     current_user,

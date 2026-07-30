@@ -1,19 +1,19 @@
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import signal
 import subprocess
 import tempfile
 import threading
 import time
-import re
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Mapping
+from typing import Any
 
 from scripts.lib.ai_cli import AICliStatus, detect_ai_cli
-
 
 DEFAULT_CLI_MAX_OUTPUT_BYTES = 256 * 1024
 DEFAULT_CLI_TIMEOUT_SECONDS = 120.0
@@ -414,16 +414,8 @@ def _cleanup_workspace(workspace: Path) -> None:
 
 
 def sanitize_report_prompt_payload(ticker: str, payload: Mapping[str, Any]) -> dict[str, Any]:
-    allowed_sources = [
-        _safe_to_text(value)
-        for value in payload.get("sources", [])
-        if isinstance(value, str)
-    ]
-    allowed_disclosures = [
-        _safe_to_text(value)
-        for value in payload.get("disclosures", [])
-        if isinstance(value, str)
-    ]
+    allowed_sources = [_safe_to_text(value) for value in payload.get("sources", []) if isinstance(value, str)]
+    allowed_disclosures = [_safe_to_text(value) for value in payload.get("disclosures", []) if isinstance(value, str)]
     return {
         "asset": _safe_to_text(ticker),
         "payload": _sanitize_mapping(payload),
@@ -443,7 +435,11 @@ def _sanitize_mapping(value: Any) -> Any:
             out[str(key)] = _sanitize_mapping(item)
         return out
     if isinstance(value, list):
-        return [_sanitize_mapping(item) for item in value if not (isinstance(item, str) and any(x in item.lower() for x in _SECRET_LIKE_KEYS))]
+        return [
+            _sanitize_mapping(item)
+            for item in value
+            if not (isinstance(item, str) and any(x in item.lower() for x in _SECRET_LIKE_KEYS))
+        ]
     if isinstance(value, str):
         return _safe_to_text(value)
     if isinstance(value, (int, float, bool)) or value is None:

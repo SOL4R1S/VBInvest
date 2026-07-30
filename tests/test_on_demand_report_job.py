@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from datetime import date
 import json
+from datetime import date
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from threading import Thread
@@ -12,8 +12,8 @@ import pytest
 
 from scripts.lib.db import build_indicator_rows, build_price_rows
 from scripts.lib.db_sqlite import SQLiteVBinvestDB
-from scripts.lib.on_demand_report import generate_on_demand_research_for_asset
 from scripts.lib.obsidian import GENERATED_MARKER, note_path
+from scripts.lib.on_demand_report import generate_on_demand_research_for_asset
 
 AI_DRAFT: Final = {
     "opinion": "중립",
@@ -72,7 +72,7 @@ class _LocalAIServer:
         host, port = self._server.server_address
         return f"http://{host}:{port}/v1"
 
-    def __enter__(self) -> "_LocalAIServer":
+    def __enter__(self) -> _LocalAIServer:
         _AIHandler.calls = 0
         _AIHandler.response = AI_RESPONSE
         self._thread.start()
@@ -90,14 +90,48 @@ def _seed_sqlite_asset(repo: SQLiteVBinvestDB) -> None:
     asset_id = repo.fetch_watchlist_assets(watchlist["slug"])[0]["asset_id"]
     prices = pd.DataFrame(
         [
-            {"date": date(2026, 6, 1), "open": 100, "high": 105, "low": 99, "close": 104, "volume": 1000, "source": "yfinance"},
-            {"date": date(2026, 6, 2), "open": 104, "high": 110, "low": 103, "close": 108, "volume": 1200, "source": "yfinance"},
+            {
+                "date": date(2026, 6, 1),
+                "open": 100,
+                "high": 105,
+                "low": 99,
+                "close": 104,
+                "volume": 1000,
+                "source": "yfinance",
+            },
+            {
+                "date": date(2026, 6, 2),
+                "open": 104,
+                "high": 110,
+                "low": 103,
+                "close": 108,
+                "volume": 1200,
+                "source": "yfinance",
+            },
         ]
     )
     indicators = pd.DataFrame(
         [
-            {"date": date(2026, 6, 1), "return_1d": 0.01, "return_1m": 0.05, "ma5": 101, "ma20": 100, "ma50": 99, "ma120": 95, "rsi14": 58},
-            {"date": date(2026, 6, 2), "return_1d": 0.04, "return_1m": 0.12, "ma5": 103, "ma20": 101, "ma50": 99, "ma120": 95, "rsi14": 62},
+            {
+                "date": date(2026, 6, 1),
+                "return_1d": 0.01,
+                "return_1m": 0.05,
+                "ma5": 101,
+                "ma20": 100,
+                "ma50": 99,
+                "ma120": 95,
+                "rsi14": 58,
+            },
+            {
+                "date": date(2026, 6, 2),
+                "return_1d": 0.04,
+                "return_1m": 0.12,
+                "ma5": 103,
+                "ma20": 101,
+                "ma50": 99,
+                "ma120": 95,
+                "rsi14": 62,
+            },
         ]
     )
     repo.upsert_prices(build_price_rows(asset_id, prices))

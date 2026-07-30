@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from html import escape
 from typing import Any
 
@@ -28,7 +28,7 @@ DEFAULT_RESEARCH = {
 
 
 def render_dashboard_html(items: list[dict[str, Any]], *, title: str = "VBinvest Semiconductor Dashboard") -> str:
-    now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    now = datetime.now(UTC).isoformat(timespec="seconds")
     cards = []
     details = []
     payload = {}
@@ -48,9 +48,9 @@ def render_dashboard_html(items: list[dict[str, Any]], *, title: str = "VBinvest
             f"""
             <a class="stock-card" href="#detail-{safe_id}">
               <div class="card-title"><strong>{escape(display)}</strong><span>{escape(symbol)}</span></div>
-              <div class="price">{latest['close']:.2f}</div>
-              <div class="metric">1D {pct(latest.get('return_1d'))} · 1M {pct(latest.get('return_1m'))}</div>
-              <div class="metric">RSI {num(latest.get('rsi14'))} · 52W DD {pct(latest.get('drawdown_52w'))}</div>
+              <div class="price">{latest["close"]:.2f}</div>
+              <div class="metric">1D {pct(latest.get("return_1d"))} · 1M {pct(latest.get("return_1m"))}</div>
+              <div class="metric">RSI {num(latest.get("rsi14"))} · 52W DD {pct(latest.get("drawdown_52w"))}</div>
               <div class="badge {badge}">{escape(opinion)}</div>
             </a>
             """
@@ -72,8 +72,8 @@ def render_dashboard_html(items: list[dict[str, Any]], *, title: str = "VBinvest
     <h1>{escape(title)}</h1>
     <p>generated {escape(now)} · DB-backed · self-contained HTML · 리서치/학습용, 투자 조언 아님</p>
   </header>
-  <section class="grid">{''.join(cards)}</section>
-  {''.join(details)}
+  <section class="grid">{"".join(cards)}</section>
+  {"".join(details)}
 </main>
 <script>const CHART_DATA = {json.dumps(payload, ensure_ascii=False)};\n{chart_js()}</script>
 </body>
@@ -83,7 +83,18 @@ def render_dashboard_html(items: list[dict[str, Any]], *, title: str = "VBinvest
 
 def merged_research(item: dict[str, Any]) -> dict[str, Any]:
     research = dict(DEFAULT_RESEARCH)
-    for key in ["opinion", "thesis", "rationale", "bull", "base", "bear", "risks", "triggers", "sources", "research_date"]:
+    for key in [
+        "opinion",
+        "thesis",
+        "rationale",
+        "bull",
+        "base",
+        "bear",
+        "risks",
+        "triggers",
+        "sources",
+        "research_date",
+    ]:
         if item.get(key) is not None:
             research[key] = item[key]
     if research["opinion"] not in BADGE_CLASS:
@@ -91,7 +102,9 @@ def merged_research(item: dict[str, Any]) -> dict[str, Any]:
     return research
 
 
-def render_detail(display: str, symbol: str, safe_id: str, opinion: str, badge: str, latest: Any, research: dict[str, Any]) -> str:
+def render_detail(
+    display: str, symbol: str, safe_id: str, opinion: str, badge: str, latest: Any, research: dict[str, Any]
+) -> str:
     rationale = bullets(research.get("rationale", []))
     risks = bullets(research.get("risks", []))
     triggers = bullets(research.get("triggers", []))
@@ -101,10 +114,10 @@ def render_detail(display: str, symbol: str, safe_id: str, opinion: str, badge: 
       <a class="back" href="#top">← 메인으로</a>
       <h2>{escape(display)} <small>({escape(symbol)})</small> <span class="badge {badge}">{escape(opinion)}</span></h2>
       <div class="summary-grid">
-        <div><b>현재/최근 종가</b><span>{latest['close']:.2f}</span></div>
-        <div><b>1개월</b><span>{pct(latest.get('return_1m'))}</span></div>
-        <div><b>RSI14</b><span>{num(latest.get('rsi14'))}</span></div>
-        <div><b>MA20 / MA50 / MA120</b><span>{num(latest.get('ma20'))} / {num(latest.get('ma50'))} / {num(latest.get('ma120'))}</span></div>
+        <div><b>현재/최근 종가</b><span>{latest["close"]:.2f}</span></div>
+        <div><b>1개월</b><span>{pct(latest.get("return_1m"))}</span></div>
+        <div><b>RSI14</b><span>{num(latest.get("rsi14"))}</span></div>
+        <div><b>MA20 / MA50 / MA120</b><span>{num(latest.get("ma20"))} / {num(latest.get("ma50"))} / {num(latest.get("ma120"))}</span></div>
       </div>
       <div class="chart-shell" data-chart="{safe_id}">
         <div class="chart-toolbar">
@@ -129,13 +142,13 @@ def render_detail(display: str, symbol: str, safe_id: str, opinion: str, badge: 
       </div>
       <div class="research">
         <h3>리서치 의견</h3>
-        <p>{escape(str(research.get('thesis') or ''))}</p>
+        <p>{escape(str(research.get("thesis") or ""))}</p>
         <div class="columns">
           <div><h4>근거</h4>{rationale}</div>
           <div><h4>리스크</h4>{risks}</div>
           <div><h4>확인 트리거</h4>{triggers}</div>
         </div>
-        <div class="scenario"><b>Bull</b><p>{escape(str(research.get('bull') or ''))}</p><b>Base</b><p>{escape(str(research.get('base') or ''))}</p><b>Bear</b><p>{escape(str(research.get('bear') or ''))}</p></div>
+        <div class="scenario"><b>Bull</b><p>{escape(str(research.get("bull") or ""))}</p><b>Base</b><p>{escape(str(research.get("base") or ""))}</p><b>Bear</b><p>{escape(str(research.get("bear") or ""))}</p></div>
       </div>
       <p class="disclaimer">본 화면은 리서치/학습용이며 투자 조언이 아닙니다.</p>
     </section>
