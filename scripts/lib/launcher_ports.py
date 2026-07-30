@@ -51,7 +51,8 @@ class PortSelector:
             try:
                 sock.bind((self.host, candidate))
                 sock.listen()
-                return ReservedSocket(self.host, candidate, sock)
+                actual_port = sock.getsockname()[1]
+                return ReservedSocket(self.host, actual_port, sock)
             except OSError:
                 sock.close()
         return self.allocate_fallback_port()
