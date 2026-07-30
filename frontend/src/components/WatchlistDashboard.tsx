@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { authHeaders } from "@/lib/auth";
+import { isRecord } from "@/lib/guards";
 import {
   INITIAL_STARTUP_REFRESH,
   collectionStatusLabel,
@@ -944,19 +946,4 @@ function logStartupWarning(error: unknown, fallback: string): void {
 
 function isLanguageResponse(value: unknown): value is { readonly language: Language } {
   return isRecord(value) && (value.language === "ko" || value.language === "en");
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function authHeaders(): Record<string, string> {
-  const token = typeof window === "undefined" ? "" : window.__VBINVEST_LOCAL_SESSION_TOKEN__ ?? "";
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
-declare global {
-  interface Window {
-    __VBINVEST_LOCAL_SESSION_TOKEN__?: string;
-  }
 }

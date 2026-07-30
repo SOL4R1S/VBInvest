@@ -1,11 +1,12 @@
+import { authHeaders } from "@/lib/auth";
+import { boolField, isRecord, readJsonPayload, stringOrEmpty } from "@/lib/guards";
+
 export type SchedulerSettings = {
   readonly dailyRefreshEnabled: boolean;
   readonly weeklyPrecomputeEnabled: boolean;
   readonly watchlist: string;
   readonly includeNews: boolean;
 };
-
-type JsonObject = Record<string, unknown>;
 
 type SchedulerSettingsPatch = {
   readonly dailyRefreshEnabled?: boolean;
@@ -85,49 +86,4 @@ function encodePatchPayload(payload: SchedulerSettingsPatch): Record<string, boo
     encoded.include_news = payload.includeNews;
   }
   return encoded;
-}
-
-function isRecord(value: unknown): value is JsonObject {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function boolField(payload: JsonObject, key: string): boolean | null {
-  const value = payload[key];
-  return typeof value === "boolean" ? value : null;
-}
-
-function stringOrEmpty(value: unknown): string {
-  return typeof value === "string" ? value : "";
-}
-
-async function readJsonPayload(response: Response): Promise<unknown | null> {
-  try {
-    return await response.json();
-  } catch (error) {
-    if (error instanceof SyntaxError) {
-      return null;
-    }
-    throw error;
-  }
-}
-
-function authHeaders(): Record<string, string> {
-  const token = localSessionToken();
-  if (!token) {
-    return {};
-  }
-  return { Authorization: `Bearer ${token}` };
-}
-
-function localSessionToken(): string {
-  if (typeof window === "undefined") {
-    return "";
-  }
-  return window.__VBINVEST_LOCAL_SESSION_TOKEN__ ?? "";
-}
-
-declare global {
-  interface Window {
-    __VBINVEST_LOCAL_SESSION_TOKEN__?: string;
-  }
 }
