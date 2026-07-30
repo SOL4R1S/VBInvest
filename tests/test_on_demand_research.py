@@ -50,11 +50,11 @@ class FakeAIResearchClient:
     def generate_research(self, asset, latest, packet):
         return {
             "opinion": "아웃퍼폼",
-            "thesis": "DB 가격 지표와 공개 소스를 바탕으로 다음 주 모멘텀 개선 가능성을 점검합니다.",
-            "rationale": ["RSI14가 과열권 밖에 있습니다.", "최근 수익률이 개선됐습니다."],
-            "bull": "AI 서버 수요가 추가 업사이드를 만들 수 있습니다.",
-            "base": "현재 지표는 점진적 개선을 가리킵니다.",
-            "bear": "CAPEX 둔화와 재고 조정은 하방 리스크입니다.",
+            "thesis": "DB 가격 지표와 공개 소스를 바탕으로 다음 주 모멘텀 개선 가능성을 점검합니다. [source:0]",
+            "rationale": ["RSI14가 과열권 밖에 있습니다. [source:0]", "최근 수익률이 개선됐습니다. [source:1]"],
+            "bull": "AI 서버 수요가 추가 업사이드를 만들 수 있습니다. [source:1]",
+            "base": "현재 지표는 점진적 개선을 가리킵니다. [source:0]",
+            "bear": "CAPEX 둔화와 재고 조정은 하방 리스크입니다. [source:1]",
             "risks": ["수요 둔화", "마진 압박"],
             "triggers": ["실적 발표", "가이던스"],
             "confidence": 0.68,
