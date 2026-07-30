@@ -1,4 +1,8 @@
-from scripts.lib.ticker_catalog import parse_kind_listed_company_html, refresh_ticker_catalog, search_korean_ticker_catalog
+from scripts.lib.ticker_catalog import (
+    parse_kind_listed_company_html,
+    refresh_ticker_catalog,
+    search_korean_ticker_catalog,
+)
 
 
 def test_parse_kind_listed_company_html_maps_krx_codes_to_yfinance_symbols():

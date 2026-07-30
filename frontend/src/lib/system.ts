@@ -1,4 +1,5 @@
-import { authHeaders, localSessionToken } from "@/lib/auth";
+import { localSessionToken } from "@/lib/auth";
+import { apiFetch } from "@/lib/http";
 
 export type SystemShutdownResult =
   | {
@@ -13,10 +14,7 @@ export type SystemShutdownResult =
 export async function shutdownSystem(): Promise<SystemShutdownResult> {
   let response: Response;
   try {
-    response = await fetch("/api/system/shutdown", {
-      method: "POST",
-      headers: authHeaders(),
-    });
+    response = await apiFetch("/api/system/shutdown", { method: "POST" });
   } catch (_error) {
     return {
       ok: false,

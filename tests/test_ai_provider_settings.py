@@ -19,7 +19,16 @@ def write_executable(path: Path, body: str) -> Path:
 def test_ai_provider_catalog_contains_required_cloud_and_local_options() -> None:
     providers = {entry.id: entry for entry in provider_catalog()}
 
-    for provider_id in ["openai", "openrouter", "deepseek", "qwen_dashscope", "kimi_moonshot", "glm_zai", "custom", "ollama"]:
+    for provider_id in [
+        "openai",
+        "openrouter",
+        "deepseek",
+        "qwen_dashscope",
+        "kimi_moonshot",
+        "glm_zai",
+        "custom",
+        "ollama",
+    ]:
         assert provider_id in providers
         assert providers[provider_id].display_name
         assert providers[provider_id].default_base_url
@@ -33,7 +42,9 @@ def test_detect_ai_cli_reports_installed_authenticated_and_missing(tmp_path: Pat
 
     codex = detect_ai_cli("codex", executable_path=str(authenticated), login_command="codex login --device-auth")
     copilot = detect_ai_cli("copilot", executable_path=str(unauthenticated), login_command="copilot login")
-    missing = detect_ai_cli("codex", executable_path=str(tmp_path / "missing"), login_command="codex login --device-auth")
+    missing = detect_ai_cli(
+        "codex", executable_path=str(tmp_path / "missing"), login_command="codex login --device-auth"
+    )
 
     assert codex.installed is True
     assert codex.authenticated is True

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import subprocess
 
-from scripts.lib.keychain import KeychainSecretStore, WindowsCredentialStore, platform_secret_store, resolve_secret
 from scripts.lib import config
+from scripts.lib.keychain import KeychainSecretStore, WindowsCredentialStore, platform_secret_store, resolve_secret
 
 
 def test_keychain_store_reads_secret_without_logging_value() -> None:

@@ -10,9 +10,7 @@ from scripts.lib.db_base import json_dumps
 
 
 class IngestMixin:
-
     """Mixin — requires self.connect() from VBinvestDB."""
-
 
     def try_acquire_job_lock(self, lock_name: str, holder: str, ttl_seconds: int) -> bool:
         sql = """
@@ -30,12 +28,10 @@ class IngestMixin:
             cur.execute(sql, params)
             return cur.fetchone() is not None
 
-
     def release_job_lock(self, lock_name: str, holder: str) -> None:
         sql = "DELETE FROM job_locks WHERE lock_name = %s AND holder = %s"
         with self.connect() as conn, conn.cursor() as cur:
             cur.execute(sql, (lock_name, holder))
-
 
     def fetch_setting(self, key: str) -> str | None:
         self._ensure_settings_metadata()
@@ -45,13 +41,11 @@ class IngestMixin:
             row = cur.fetchone()
         return None if row is None else row[0]
 
-
     def upsert_setting(self, key: str, value: str) -> None:
         self._ensure_settings_metadata()
         sql = "INSERT INTO settings_metadata (key, value) VALUES (%s, %s) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()"
         with self.connect() as conn, conn.cursor() as cur:
             cur.execute(sql, (key, value))
-
 
     def upsert_news_items(self, rows: list[dict[str, Any]]) -> int:
         if not rows:
@@ -78,7 +72,6 @@ class IngestMixin:
                 )
                 count += 1
         return count
-
 
     def upsert_disclosures(self, rows: list[dict[str, Any]]) -> int:
         if not rows:
@@ -108,7 +101,6 @@ class IngestMixin:
             cur.executemany(sql, prepared)
             return len(prepared)
 
-
     def _news_upsert_sql(self, row: dict[str, Any]) -> str:
         conflict = "(provider, content_hash) WHERE content_hash IS NOT NULL"
         if row.get("source_id"):
@@ -136,7 +128,6 @@ class IngestMixin:
           updated_at = now()
         RETURNING news_id
         """
-
 
     def record_report_run(
         self,
@@ -175,7 +166,6 @@ class IngestMixin:
             cur.execute(sql, params)
         return run_id
 
-
     def fetch_latest_report_run(self, run_type: str, scope_slug: str | None) -> dict[str, Any] | None:
         sql = """
         SELECT run_id, run_type, scope_type, scope_slug, completed_at, status, failed_assets, output_summary, output_path, error_message
@@ -202,7 +192,6 @@ class IngestMixin:
             "error_message": row[9],
         }
 
-
     def fetch_latest_successful_report_run(self, run_type: str, scope_slug: str | None) -> dict[str, Any] | None:
         sql = """
         SELECT run_id, run_type, scope_type, scope_slug, completed_at, status, failed_assets, output_summary, output_path, error_message
@@ -228,7 +217,6 @@ class IngestMixin:
             "output_path": row[8],
             "error_message": row[9],
         }
-
 
     def cancel_report_run(self, run_id: str) -> dict[str, Any] | None:
         with self.connect() as conn, conn.cursor() as cur:
@@ -264,7 +252,6 @@ class IngestMixin:
             "output_path": row[8],
             "error_message": row[9],
         }
-
 
     def _ensure_settings_metadata(self) -> None:
         if self._settings_metadata_ready:

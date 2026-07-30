@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 import sys
-from typing import Mapping
+from collections.abc import Mapping
 
 from scripts.lib.keychain import SecretWriteStore, platform_secret_store
 

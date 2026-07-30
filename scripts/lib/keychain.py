@@ -2,34 +2,29 @@ from __future__ import annotations
 
 import platform
 import subprocess
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Mapping, Protocol
-
+from typing import Protocol
 
 KEYCHAIN_SERVICE = "VBinvest"
 
 
 class SecretStore(Protocol):
-    def get(self, account: str) -> str:
-        ...
+    def get(self, account: str) -> str: ...
 
 
 class SecretWriteStore(SecretStore, Protocol):
-    def set(self, account: str, value: str) -> None:
-        ...
+    def set(self, account: str, value: str) -> None: ...
 
 
 class CommandRunner(Protocol):
-    def __call__(self, command: list[str]) -> subprocess.CompletedProcess[str]:
-        ...
+    def __call__(self, command: list[str]) -> subprocess.CompletedProcess[str]: ...
 
 
 class WindowsCredentialBackend(Protocol):
-    def read(self, target_name: str) -> str:
-        ...
+    def read(self, target_name: str) -> str: ...
 
-    def write(self, target_name: str, value: str) -> None:
-        ...
+    def write(self, target_name: str, value: str) -> None: ...
 
 
 def _run_security(command: list[str]) -> subprocess.CompletedProcess[str]:

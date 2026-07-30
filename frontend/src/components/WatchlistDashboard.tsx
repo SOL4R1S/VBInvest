@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { authHeaders } from "@/lib/auth";
 import { isRecord } from "@/lib/guards";
+import { apiFetch } from "@/lib/http";
 import {
   INITIAL_STARTUP_REFRESH,
   collectionStatusLabel,
@@ -157,7 +157,7 @@ async function validatedTickerSymbol(response: Response, fallbackSymbol: string)
 }
 
 async function tickerSearchSuggestions(query: string, signal: AbortSignal): Promise<readonly TickerSuggestion[]> {
-  const response = await fetch(`/api/tickers/search?query=${encodeURIComponent(query)}&limit=8`, { signal });
+  const response = await apiFetch(`/api/tickers/search?query=${encodeURIComponent(query)}&limit=8`, { signal });
   if (!response.ok) {
     return [];
   }
@@ -364,7 +364,7 @@ export function WatchlistDashboard() {
         logStartupWarning(error, "settings status refresh failed");
       }
       try {
-        const response = await fetch("/api/startup/market-refresh?no_network=false&include_news=true", { method: "POST" });
+        const response = await apiFetch("/api/startup/market-refresh?no_network=false&include_news=true", { method: "POST" });
         if (!response.ok) {
           throw new Error(`startup market refresh failed: ${response.status}`);
         }
@@ -439,9 +439,9 @@ export function WatchlistDashboard() {
       return;
     }
     try {
-      const response = await fetch("/api/settings/language", {
+      const response = await apiFetch("/api/settings/language", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", ...authHeaders() },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ language: nextLanguage }),
       });
       if (!response.ok) {
@@ -541,7 +541,7 @@ export function WatchlistDashboard() {
     setSymbolSuggestions([]);
     let symbol = fallbackSymbol;
     try {
-      const response = await fetch(`/api/tickers/validate?symbol=${encodeURIComponent(query)}`);
+      const response = await apiFetch(`/api/tickers/validate?symbol=${encodeURIComponent(query)}`);
       if (!response.ok) {
         const validation = await tickerValidationFailure(response, labels);
         setSymbolValidationMessage(validation.message);

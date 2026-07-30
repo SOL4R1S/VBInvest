@@ -5,7 +5,6 @@ import re
 from datetime import date, datetime
 from typing import Any, Protocol
 
-
 APPROVED_OPINIONS = {"매수", "아웃퍼폼", "중립", "언더퍼폼", "매도"}
 FORBIDDEN_RESEARCH_PHRASES = ("수익을 보장", "보장합니다", "guaranteed return", "risk-free")
 
@@ -15,8 +14,9 @@ class GuardrailError(ValueError):
 
 
 class ResearchAIClient(Protocol):
-    def generate_research(self, asset: dict[str, Any], latest: dict[str, Any], packet: dict[str, Any]) -> dict[str, Any]:
-        ...
+    def generate_research(
+        self, asset: dict[str, Any], latest: dict[str, Any], packet: dict[str, Any]
+    ) -> dict[str, Any]: ...
 
 
 def build_source_packet(
@@ -59,7 +59,11 @@ def build_on_demand_research_view(
     ai_client: ResearchAIClient | None = None,
 ) -> dict[str, Any]:
     provider = model_provider or ("configured-ai" if ai_credentials_present else "fallback")
-    row = _ai_view(asset, latest, packet, provider, ai_client) if ai_client is not None else _fallback_view(asset, latest, packet, provider)
+    row = (
+        _ai_view(asset, latest, packet, provider, ai_client)
+        if ai_client is not None
+        else _fallback_view(asset, latest, packet, provider)
+    )
     validate_research_view(row)
     return row
 
@@ -105,7 +109,9 @@ def validate_research_view(row: dict[str, Any]) -> None:
         raise GuardrailError("research row requires sources or source_gap")
 
 
-def _fallback_view(asset: dict[str, Any], latest: dict[str, Any], packet: dict[str, Any], provider: str) -> dict[str, Any]:
+def _fallback_view(
+    asset: dict[str, Any], latest: dict[str, Any], packet: dict[str, Any], provider: str
+) -> dict[str, Any]:
     symbol = asset["symbol"]
     name = asset.get("display_name_ko") or symbol
     opinion = opinion_from_metrics(latest)
@@ -131,11 +137,17 @@ def _fallback_view(asset: dict[str, Any], latest: dict[str, Any], packet: dict[s
         "bull": "AI 서버/메모리/스토리지/장비 수요와 실적 가이던스가 동시에 개선되면 업사이드가 커질 수 있습니다.",
         "base": "현재 확인된 가격·지표 흐름과 공개 소스의 신선도를 기준으로 섹터 내 상대 모멘텀을 점검합니다.",
         "bear": "수요 둔화, 재고 조정, 과도한 밸류에이션, 금리·환율 변수는 하방 리스크입니다.",
-        "risks": json.dumps(["실적/가이던스 하향", "AI 투자 사이클 둔화", "환율·금리 변동", "지정학/수출규제"], ensure_ascii=False),
-        "triggers": json.dumps(["실적 발표", "메모리 가격", "CAPEX 코멘트", "AI 서버 주문", "장비 발주"], ensure_ascii=False),
+        "risks": json.dumps(
+            ["실적/가이던스 하향", "AI 투자 사이클 둔화", "환율·금리 변동", "지정학/수출규제"], ensure_ascii=False
+        ),
+        "triggers": json.dumps(
+            ["실적 발표", "메모리 가격", "CAPEX 코멘트", "AI 서버 주문", "장비 발주"], ensure_ascii=False
+        ),
         "sources": json.dumps(packet["sources"], ensure_ascii=False, default=str),
         "metrics_snapshot": json.dumps(_metrics_snapshot(asset, latest), ensure_ascii=False, default=str),
-        "target_price_summary": json.dumps(_target_price_summary(packet["sources"], latest, opinion), ensure_ascii=False, default=str),
+        "target_price_summary": json.dumps(
+            _target_price_summary(packet["sources"], latest, opinion), ensure_ascii=False, default=str
+        ),
         "model_provider": provider,
         "model_name": "deterministic-fallback" if provider == "fallback" else "mock-research-adapter",
         "confidence": confidence,

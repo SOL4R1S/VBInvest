@@ -1,12 +1,16 @@
-import json
 import io
+import json
 import math
-import socket
 import urllib.error
 
 import pytest
 
-from scripts.lib.ai_provider import AIProviderConfig, AIProviderConfigError, AIProviderError, OpenAICompatibleResearchClient
+from scripts.lib.ai_provider import (
+    AIProviderConfig,
+    AIProviderConfigError,
+    AIProviderError,
+    OpenAICompatibleResearchClient,
+)
 
 
 class FakeResponse:
@@ -65,7 +69,7 @@ class SequencedUrlopen:
 
 
 def _extract_request_payload(request: object) -> dict:
-    data = getattr(request, "data")
+    data = request.data
     if isinstance(data, bytes):
         return json.loads(data.decode("utf-8"))
     if isinstance(data, str):
@@ -283,7 +287,7 @@ def test_generate_research_maps_rate_limit_to_ai_provider_error():
             429,
             "Too Many Requests",
             hdrs={},
-            fp=io.BytesIO(b"{\"error\":\"rate limited\"}"),
+            fp=io.BytesIO(b'{"error":"rate limited"}'),
         )
     )
     config = AIProviderConfig(
@@ -306,7 +310,7 @@ def test_generate_research_maps_auth_error_to_clear_error():
             401,
             "Unauthorized",
             hdrs={},
-            fp=io.BytesIO(b"{\"error\":\"invalid key\"}"),
+            fp=io.BytesIO(b'{"error":"invalid key"}'),
         )
     )
     config = AIProviderConfig(
@@ -323,7 +327,7 @@ def test_generate_research_maps_auth_error_to_clear_error():
 
 
 def test_generate_research_maps_timeout_to_ai_provider_error():
-    opener = ErrorUrlopen(socket.timeout("timed out"))
+    opener = ErrorUrlopen(TimeoutError("timed out"))
     config = AIProviderConfig(
         name="example-ai",
         api_key="secret-token",
@@ -340,7 +344,7 @@ def test_generate_research_rejects_non_serializable_payload():
     class Unserializable:
         pass
 
-    opener = ErrorUrlopen(socket.timeout("timeout"))
+    opener = ErrorUrlopen(TimeoutError("timeout"))
     config = AIProviderConfig(
         name="example-ai",
         api_key="secret-token",
@@ -438,7 +442,7 @@ def test_generate_research_includes_prompt_payload_without_altering_source_text(
     )
     client = OpenAICompatibleResearchClient(config, urlopen=opener)
 
-    client.generate_research(payload, {"close": 100}, {"sources": [] , "source_gap": True})
+    client.generate_research(payload, {"close": 100}, {"sources": [], "source_gap": True})
 
     request_body = _extract_request_payload(opener.request)
     user_content = request_body["messages"][1]["content"]
@@ -753,7 +757,7 @@ def test_generate_research_falls_back_when_structured_output_is_unsupported():
         400,
         "Bad Request",
         hdrs={},
-        fp=io.BytesIO(b"{\"error\":\"Unsupported parameter: response_format\"}"),
+        fp=io.BytesIO(b'{"error":"Unsupported parameter: response_format"}'),
     )
     second_payload = {
         "choices": [

@@ -6,14 +6,13 @@ Response parsing/validation lives in ai_response.py.
 from __future__ import annotations
 
 import json
-import socket
 import urllib.error
 import urllib.parse
 import urllib.request
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Mapping, Protocol, TypeAlias
+from typing import Protocol
 
-from scripts.lib.keychain import SecretStore, resolve_secret
 from scripts.lib.ai_response import (
     AIProviderError,
     JsonValue,
@@ -21,6 +20,7 @@ from scripts.lib.ai_response import (
     json_safe_payload,
     system_prompt,
 )
+from scripts.lib.keychain import SecretStore, resolve_secret
 
 __all__ = [
     "AIProviderConfig",
@@ -36,19 +36,15 @@ class AIProviderConfigError(RuntimeError):
 
 
 class HttpResponse(Protocol):
-    def __enter__(self) -> "HttpResponse":
-        ...
+    def __enter__(self) -> HttpResponse: ...
 
-    def __exit__(self, exc_type, exc, traceback) -> bool:
-        ...
+    def __exit__(self, exc_type, exc, traceback) -> bool: ...
 
-    def read(self) -> bytes:
-        ...
+    def read(self) -> bytes: ...
 
 
 class UrlOpen(Protocol):
-    def __call__(self, request: urllib.request.Request, *, timeout: int) -> HttpResponse:
-        ...
+    def __call__(self, request: urllib.request.Request, *, timeout: int) -> HttpResponse: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,7 +61,7 @@ class AIProviderConfig:
         *,
         system_name: str | None = None,
         secret_store: SecretStore | None = None,
-    ) -> "AIProviderConfig | None":
+    ) -> AIProviderConfig | None:
         api_key = resolve_secret(
             env,
             "AI_API_KEY",
@@ -151,7 +147,9 @@ class OpenAICompatibleResearchClient:
                 try:
                     payload = self._request_json(fallback_body, headers)
                 except urllib.error.HTTPError as fallback_exc:
-                    raise AIProviderError(f"{self._config.name}: chat completion failed with HTTP {fallback_exc.code}") from fallback_exc
+                    raise AIProviderError(
+                        f"{self._config.name}: chat completion failed with HTTP {fallback_exc.code}"
+                    ) from fallback_exc
             else:
                 raise AIProviderError(f"{self._config.name}: chat completion failed with HTTP {exc.code}") from exc
         draft = extract_content_json(
@@ -176,7 +174,7 @@ class OpenAICompatibleResearchClient:
         try:
             with self._urlopen(request, timeout=self._config.timeout_seconds) as response:
                 raw = response.read()
-        except (socket.timeout, TimeoutError):
+        except TimeoutError:
             raise AIProviderError("AI provider request timed out") from None
         except urllib.error.HTTPError:
             raise
@@ -196,6 +194,7 @@ def build_research_ai_client_from_env(env: Mapping[str, str]) -> OpenAICompatibl
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
+
 
 def _build_request_payload(config: AIProviderConfig) -> dict[str, JsonValue]:
     body: dict[str, JsonValue] = {

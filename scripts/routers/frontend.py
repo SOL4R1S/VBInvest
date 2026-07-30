@@ -9,7 +9,6 @@ from fastapi.responses import FileResponse, HTMLResponse
 
 from scripts.lib.dashboard import render_dashboard_html
 from scripts.lib.version import load_version_metadata
-
 from scripts.routers.deps import (
     ShutdownBeaconPayload,
     current_user,
@@ -24,6 +23,7 @@ VERSION_METADATA = load_version_metadata()
 def _frontend_out_dir():
     """Delegate to api.frontend_out_dir so tests can monkeypatch it."""
     from scripts import api
+
     return api.frontend_out_dir()
 
 
@@ -46,17 +46,14 @@ def _frontend_asset_file(asset_path: str):
 
 def _frontend_index_response():
     import json as _json
+
     index_file = _frontend_index_file()
     if index_file is None:
         raise HTTPException(status_code=404, detail="frontend build not found")
     html = index_file.read_text(encoding="utf-8")
     session_token = os.environ.get("VBINVEST_LOCAL_SESSION_TOKEN", "")
     if session_token:
-        script = (
-            "<script>"
-            f"window.__VBINVEST_LOCAL_SESSION_TOKEN__={_json.dumps(session_token)};"
-            "</script>"
-        )
+        script = f"<script>window.__VBINVEST_LOCAL_SESSION_TOKEN__={_json.dumps(session_token)};</script>"
         html = html.replace("</head>", f"{script}</head>", 1) if "</head>" in html else f"{script}{html}"
     return HTMLResponse(html)
 
@@ -89,7 +86,9 @@ def system_shutdown(user=Depends(current_user)):
     from scripts import api  # late import to avoid circular dependency
 
     if os.environ.get("VBINVEST_LOCAL_SHUTDOWN_ENABLED") != "1" or api.LOCAL_SHUTDOWN_CALLBACK is None:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="local launcher shutdown is not available")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="local launcher shutdown is not available"
+        )
     api.LOCAL_SHUTDOWN_CALLBACK()
     return {"status": "shutting_down"}
 
@@ -99,7 +98,9 @@ def system_shutdown_beacon(payload: ShutdownBeaconPayload):
     from scripts import api  # late import to avoid circular dependency
 
     if os.environ.get("VBINVEST_LOCAL_SHUTDOWN_ENABLED") != "1" or api.LOCAL_SHUTDOWN_CALLBACK is None:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="local launcher shutdown is not available")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="local launcher shutdown is not available"
+        )
     if not payload.token or payload.token != os.environ.get("VBINVEST_LOCAL_SESSION_TOKEN", ""):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid local session token")
     api.LOCAL_SHUTDOWN_CALLBACK()

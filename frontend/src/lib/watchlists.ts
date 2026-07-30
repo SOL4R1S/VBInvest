@@ -1,4 +1,4 @@
-import { authFetchInit, authHeaders } from "@/lib/auth";
+import { apiDelete, apiGet, apiPost } from "@/lib/http";
 import { isRecord, stringField } from "@/lib/guards";
 
 export type Watchlist = {
@@ -61,15 +61,7 @@ function parseWatchlistPayload(payload: unknown): readonly Watchlist[] | null {
 }
 
 export async function fetchWatchlists(fallbackToDemo = false): Promise<readonly Watchlist[]> {
-  const init = authFetchInit();
-  const response = Object.keys(init).length === 0
-    ? await fetch("/api/watchlists")
-    : await fetch("/api/watchlists", init);
-  if (!response.ok) {
-    return fallbackToDemo ? DEFAULT_WATCHLISTS : [];
-  }
-  const payload = await response.json();
-  const parsed = parseWatchlistPayload(payload);
+  const parsed = await apiGet("/api/watchlists", parseWatchlistPayload);
   if (parsed === null) {
     return fallbackToDemo ? DEFAULT_WATCHLISTS : [];
   }
@@ -77,31 +69,15 @@ export async function fetchWatchlists(fallbackToDemo = false): Promise<readonly 
 }
 
 export async function createWatchlist(name: string): Promise<Watchlist | null> {
-  const headers = authHeaders({ "Content-Type": "application/json" });
-  const response = await fetch("/api/watchlists", {
-    method: "POST",
-    headers,
-    body: JSON.stringify({ name }),
-  });
-  if (!response.ok) {
-    return null;
-  }
-  const payload = await response.json();
-  return parseWatchlist(payload);
+  return apiPost("/api/watchlists", { name }, parseWatchlist);
 }
 
 export async function addAssetToWatchlist(watchlistId: string, symbol: string): Promise<Watchlist | null> {
-  const headers = authHeaders({ "Content-Type": "application/json" });
-  const response = await fetch(`/api/watchlists/${encodeURIComponent(watchlistId)}/assets`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({ symbol }),
-  });
-  if (!response.ok) {
-    return null;
-  }
-  const payload = await response.json();
-  const parsed = parseWatchlistPayload(payload);
+  const parsed = await apiPost(
+    `/api/watchlists/${encodeURIComponent(watchlistId)}/assets`,
+    { symbol },
+    parseWatchlistPayload,
+  );
   if (parsed === null) {
     return null;
   }
@@ -109,15 +85,10 @@ export async function addAssetToWatchlist(watchlistId: string, symbol: string): 
 }
 
 export async function deleteAssetFromWatchlist(watchlistId: string, symbol: string): Promise<Watchlist | null> {
-  const response = await fetch(`/api/watchlists/${encodeURIComponent(watchlistId)}/assets/${encodeURIComponent(symbol)}`, {
-    method: "DELETE",
-    headers: authHeaders(),
-  });
-  if (!response.ok) {
-    return null;
-  }
-  const payload = await response.json();
-  const parsed = parseWatchlistPayload(payload);
+  const parsed = await apiDelete(
+    `/api/watchlists/${encodeURIComponent(watchlistId)}/assets/${encodeURIComponent(symbol)}`,
+    parseWatchlistPayload,
+  );
   if (parsed === null) {
     return null;
   }

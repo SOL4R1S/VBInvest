@@ -87,7 +87,7 @@ class LocalScheduler:
                 dart_api_key=dart_api_key,
             )
             weekly = self._tick_weekly(settings)
-            self._last_tick_status = (daily.get("status") or "ok")
+            self._last_tick_status = daily.get("status") or "ok"
             return {
                 "running": False,
                 "last_tick_status": self._last_tick_status,
@@ -112,7 +112,12 @@ class LocalScheduler:
         if not settings.daily_refresh_enabled:
             return {"run_type": "startup-market-refresh", "status": "skipped", "reason": "daily refresh disabled"}
         if not self._store.try_acquire_job_lock(DAILY_LOCK_NAME, lock_holder, LOCK_TTL_SECONDS):
-            return {"run_type": "startup-market-refresh", "status": "skipped", "locked": True, "reason": "scheduler already running"}
+            return {
+                "run_type": "startup-market-refresh",
+                "status": "skipped",
+                "locked": True,
+                "reason": "scheduler already running",
+            }
         try:
             result = run_startup_market_refresh(
                 self._store,
@@ -180,7 +185,9 @@ class LocalScheduler:
         completed_at = row.get("completed_at") if isinstance(row, dict) else None
         if isinstance(completed_at, datetime):
             completed_at = completed_at.isoformat()
-        output_summary = row.get("output_summary") if isinstance(row, dict) and isinstance(row.get("output_summary"), str) else ""
+        output_summary = (
+            row.get("output_summary") if isinstance(row, dict) and isinstance(row.get("output_summary"), str) else ""
+        )
         summary = parse_report_run_summary(output_summary)
         return SchedulerJobSummary(
             run_type=run_type,
@@ -189,7 +196,9 @@ class LocalScheduler:
             scope_slug=row.get("scope_slug") if isinstance(row.get("scope_slug"), str) else scope_slug,
             news_items=_coerce_int(summary.get("news_items"), 0),
             disclosures=_coerce_int(summary.get("disclosures"), 0),
-            provider_disabled=summary.get("provider_disabled") if isinstance(summary.get("provider_disabled"), list) else None,
+            provider_disabled=summary.get("provider_disabled")
+            if isinstance(summary.get("provider_disabled"), list)
+            else None,
             reason=row.get("error_message") if isinstance(row.get("error_message"), str) else None,
         )
 

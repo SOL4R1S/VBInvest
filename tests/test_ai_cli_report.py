@@ -8,19 +8,18 @@ from pathlib import Path
 import pytest
 
 from scripts.lib.ai_cli_report import (
-    AICliAuthError,
     AICliCancelledError,
     AICliInvalidJSONError,
     AICliNotAuthenticatedError,
     AICliNotInstalledError,
     AICliOutputTooLargeError,
     AICliReportResult,
+    AICliRunError,
     AICliSchemaError,
     AICliTimeoutError,
-    AICliRunError,
-    sanitize_report_prompt_payload,
     run_codex_report,
     run_copilot_report,
+    sanitize_report_prompt_payload,
 )
 
 
@@ -60,7 +59,7 @@ def test_baseline_command_uses_separate_argv_and_is_injection_safe(tmp_path: Pat
             "import pathlib",
             "for idx, arg in enumerate(sys.argv):",
             "    if arg == '-o' and idx + 1 < len(sys.argv):",
-            "        pathlib.Path(sys.argv[idx + 1]).write_text('{\"opinion\":\"중립\",\"thesis\":\"t\",\"rationale\":[\"r\"],\"bull\":\"b\",\"base\":\"b\",\"bear\":\"b\",\"risks\":[],\"triggers\":[],\"confidence\":0.5}', encoding='utf-8')",
+            '        pathlib.Path(sys.argv[idx + 1]).write_text(\'{"opinion":"중립","thesis":"t","rationale":["r"],"bull":"b","base":"b","bear":"b","risks":[],"triggers":[],"confidence":0.5}\', encoding=\'utf-8\')',
             "    if arg == '--ephemeral' and idx + 1 < len(sys.argv):",
             "        prompt = pathlib.Path(sys.argv[idx + 1]).read_text(encoding='utf-8')",
             "        if '$(touch' in prompt:",
@@ -95,7 +94,7 @@ def test_run_codex_success_reads_valid_json_output_and_schema(tmp_path: Path) ->
         [
             "for idx, arg in enumerate(sys.argv):",
             "    if arg == '-o' and idx + 1 < len(sys.argv):",
-            "        pathlib.Path(sys.argv[idx + 1]).write_text('{\"opinion\":\"중립\",\"thesis\":\"base\",\"rationale\":[\"r\"],\"bull\":\"b\",\"base\":\"b\",\"bear\":\"b\",\"risks\":[],\"triggers\":[],\"confidence\":0.5}', encoding='utf-8')",
+            '        pathlib.Path(sys.argv[idx + 1]).write_text(\'{"opinion":"중립","thesis":"base","rationale":["r"],"bull":"b","base":"b","bear":"b","risks":[],"triggers":[],"confidence":0.5}\', encoding=\'utf-8\')',
         ],
     )
 

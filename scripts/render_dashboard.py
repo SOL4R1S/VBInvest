@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import os
-import shutil
 import sys
 from pathlib import Path
 
@@ -56,7 +55,9 @@ def write_outputs(html: str, output: Path, mirror: str | None) -> list[Path]:
         if mirror_path.resolve() != output.resolve():
             mirror_path.write_text(html, encoding="utf-8")
             written.append(mirror_path)
-        snapshot = mirror_path.parent / f"daily-{__import__('datetime').date.today().isoformat()}-semiconductor-prices.html"
+        snapshot = (
+            mirror_path.parent / f"daily-{__import__('datetime').date.today().isoformat()}-semiconductor-prices.html"
+        )
         snapshot.write_text(html, encoding="utf-8")
         written.append(snapshot)
     return written

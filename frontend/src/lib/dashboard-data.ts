@@ -1,3 +1,4 @@
+import { apiGet } from "@/lib/http";
 import { DEFAULT_RESEARCH, normalizeOpinion, type Opinion } from "@/lib/research";
 
 export const DASHBOARD_HISTORY_DAYS = 1260;
@@ -38,11 +39,10 @@ export type DashboardModel = {
 type JsonObject = Record<string, unknown>;
 
 export async function fetchDashboardData(slug: string): Promise<DashboardModel | null> {
-  const response = await fetch(`/api/watchlists/${encodeURIComponent(slug)}/dashboard?days=${DASHBOARD_HISTORY_DAYS}`);
-  if (!response.ok) {
-    return null;
-  }
-  return parseDashboardPayload(await response.json());
+  return apiGet(
+    `/api/watchlists/${encodeURIComponent(slug)}/dashboard?days=${DASHBOARD_HISTORY_DAYS}`,
+    parseDashboardPayload,
+  );
 }
 
 export function fallbackAsset(symbol: string): AssetCard {

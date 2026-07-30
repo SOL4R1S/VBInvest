@@ -1,38 +1,48 @@
-"""Shared dependencies, models, and helpers for VBinvest API routers."""
+"""Shared dependencies and helpers for VBinvest API routers.
+
+Pydantic models live in scripts.routers.models — re-exported here for
+backward compatibility with existing imports.
+"""
 
 from __future__ import annotations
 
 import json
 import os
 import shutil
-from dataclasses import replace
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable, Literal
+from typing import Any
 
-from fastapi import Depends, Header, HTTPException, status
-from pydantic import BaseModel, Field, StrictBool
+from fastapi import Header, HTTPException, status
 
-from scripts.lib.api_store import ApiStore
 from scripts.lib.auth import AuthError, AuthUser, verify_bearer_token
 from scripts.lib.config import (
     ConfigError,
     DatabaseMode,
     DatabaseSettings,
-    ExportMode,
     LocalConfig,
     ObsidianSettings,
     ProviderSettings,
     SchedulerSettings,
-    config_path_from_env,
     load_local_config,
-    load_opendart_api_key,
-    parse_report_run_summary,
-    provider_status,
-    write_local_config,
 )
-from scripts.lib.db_factory import build_database_from_local_config
 from scripts.lib.db_repository import DBRepository
 from scripts.lib.local_scheduler import LocalScheduler
+
+# Re-export models so existing `from scripts.routers.deps import X` still works
+from scripts.routers.models import (  # noqa: F401
+    FirstRunDatabasePayload,
+    FirstRunObsidianPayload,
+    FirstRunProviderPayload,
+    FirstRunSetupPayload,
+    LanguageSettingsPayload,
+    PortfolioHoldingCreate,
+    PortfolioHoldingUpdate,
+    SchedulerSettingsPayload,
+    ShutdownBeaconPayload,
+    WatchlistAssetChange,
+    WatchlistCreate,
+)
 
 try:
     from psycopg import OperationalError as PostgresOperationalError
@@ -46,15 +56,18 @@ ShutdownCallback = Callable[[], None]
 # DB helpers
 # ---------------------------------------------------------------------------
 
+
 def db() -> DBRepository:
     """Delegate to api.db so tests can monkeypatch api.db."""
     from scripts import api
+
     return api.db()
 
 
 def auth_db() -> Any:
     """Delegate to api.auth_db so tests can monkeypatch api.auth_db."""
     from scripts import api
+
     return api.auth_db()
 
 
@@ -80,6 +93,7 @@ def local_scheduler() -> LocalScheduler:
 # ---------------------------------------------------------------------------
 # Frontend helpers
 # ---------------------------------------------------------------------------
+
 
 def frontend_out_dir() -> Path:
     configured = os.environ.get("VBINVEST_FRONTEND_OUT_DIR")
@@ -114,11 +128,7 @@ def frontend_index_response():
     html = index_file.read_text(encoding="utf-8")
     session_token = os.environ.get("VBINVEST_LOCAL_SESSION_TOKEN", "")
     if session_token:
-        script = (
-            "<script>"
-            f"window.__VBINVEST_LOCAL_SESSION_TOKEN__={json.dumps(session_token)};"
-            "</script>"
-        )
+        script = f"<script>window.__VBINVEST_LOCAL_SESSION_TOKEN__={json.dumps(session_token)};</script>"
         html = html.replace("</head>", f"{script}</head>", 1) if "</head>" in html else f"{script}{html}"
     return HTMLResponse(html)
 
@@ -126,6 +136,7 @@ def frontend_index_response():
 # ---------------------------------------------------------------------------
 # Misc helpers
 # ---------------------------------------------------------------------------
+
 
 def hosted_monetization_disabled() -> HTTPException:
     return HTTPException(status_code=status.HTTP_410_GONE, detail="hosted monetization is disabled in local mode")
@@ -181,78 +192,9 @@ def jsonable_list(value: Any) -> list[Any]:
 
 
 # ---------------------------------------------------------------------------
-# Pydantic models
-# ---------------------------------------------------------------------------
-
-class WatchlistCreate(BaseModel):
-    name: str = Field(min_length=1, max_length=120)
-    symbols: list[str] = Field(default_factory=list)
-
-
-class WatchlistAssetChange(BaseModel):
-    symbol: str = Field(min_length=1, max_length=32)
-
-
-class PortfolioHoldingCreate(BaseModel):
-    symbol: str = Field(min_length=1, max_length=32)
-    quantity: float = Field(gt=0)
-    average_cost: float | None = Field(default=None, ge=0)
-    note: str | None = Field(default=None, max_length=500)
-
-
-class PortfolioHoldingUpdate(BaseModel):
-    quantity: float | None = Field(default=None, gt=0)
-    average_cost: float | None = Field(default=None, ge=0)
-    note: str | None = Field(default=None, max_length=500)
-
-
-class FirstRunDatabasePayload(BaseModel):
-    mode: DatabaseMode = DatabaseMode.SQLITE
-    sqlite_path: str | None = Field(default=None, max_length=1000)
-    postgres_url: str = Field(default="", max_length=1000)
-
-
-class FirstRunObsidianPayload(BaseModel):
-    vault_path: str = Field(min_length=1, max_length=1000)
-    export_mode: ExportMode = ExportMode.DIRECT
-
-
-class FirstRunProviderPayload(BaseModel):
-    opendart_api_key: str = Field(default="", max_length=200)
-    ai_mode: str = Field(default="none", max_length=40)
-    ai_provider_name: str = Field(default="", max_length=80)
-    ai_base_url: str = Field(default="", max_length=500)
-    ai_model: str = Field(default="", max_length=160)
-    ai_context_size: int = Field(default=8192, ge=1024, le=262144)
-    ai_api_key: str = Field(default="", max_length=500)
-
-
-class FirstRunSetupPayload(BaseModel):
-    language: str = Field(default="ko", max_length=10)
-    data_directory: str = Field(min_length=1, max_length=1000)
-    database: FirstRunDatabasePayload = Field(default_factory=FirstRunDatabasePayload)
-    obsidian: FirstRunObsidianPayload
-    providers: FirstRunProviderPayload = Field(default_factory=FirstRunProviderPayload)
-
-
-class LanguageSettingsPayload(BaseModel):
-    language: Literal["ko", "en"]
-
-
-class SchedulerSettingsPayload(BaseModel):
-    daily_refresh_enabled: StrictBool | None = None
-    weekly_precompute_enabled: StrictBool | None = None
-    watchlist: str | None = Field(default=None, max_length=1000)
-    include_news: StrictBool | None = None
-
-
-class ShutdownBeaconPayload(BaseModel):
-    token: str = Field(default="", max_length=200)
-
-
-# ---------------------------------------------------------------------------
 # First-run config builder
 # ---------------------------------------------------------------------------
+
 
 def build_first_run_config(payload: FirstRunSetupPayload) -> LocalConfig:
     data_dir = Path(payload.data_directory).expanduser()
@@ -294,7 +236,9 @@ def build_first_run_config(payload: FirstRunSetupPayload) -> LocalConfig:
 def build_first_run_database(payload: FirstRunDatabasePayload, data_dir: Path) -> DatabaseSettings:
     match payload.mode:
         case DatabaseMode.SQLITE:
-            sqlite_path = Path(payload.sqlite_path).expanduser() if payload.sqlite_path else data_dir / "vbinvest.sqlite3"
+            sqlite_path = (
+                Path(payload.sqlite_path).expanduser() if payload.sqlite_path else data_dir / "vbinvest.sqlite3"
+            )
             if sqlite_path.exists() and sqlite_path.is_dir():
                 raise ConfigError("database.sqlite_path", "must be a file path")
             return DatabaseSettings(mode=DatabaseMode.SQLITE, sqlite_path=sqlite_path, postgres_url="")

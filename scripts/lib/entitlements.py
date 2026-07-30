@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
-
 
 RESEARCH_UNLOCK_TYPES = {"subscriber", "ad_unlocked", "admin"}
 
@@ -14,7 +13,7 @@ class WebhookSignatureError(RuntimeError):
 
 
 def has_active_research_unlock(unlocks: list[dict[str, Any]], symbol: str, *, now: datetime | None = None) -> bool:
-    current = now or datetime.now(timezone.utc)
+    current = now or datetime.now(UTC)
     for unlock in unlocks:
         if unlock.get("status") != "active":
             continue

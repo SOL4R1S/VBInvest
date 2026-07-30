@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Final
 
-
 EXPECTED_ORIGIN_URL: Final = "https://github.com/SOL4R1S/VBInvest.git"
 
 

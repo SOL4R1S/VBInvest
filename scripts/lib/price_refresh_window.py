@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 
 import pandas as pd
 
@@ -23,7 +23,7 @@ class PriceDateRange:
 
 
 def run_date_from_fetched_at(fetched_at: datetime | None) -> date:
-    instant = fetched_at if fetched_at is not None else datetime.now(timezone.utc)
+    instant = fetched_at if fetched_at is not None else datetime.now(UTC)
     return instant.date()
 
 
@@ -69,14 +69,15 @@ def fetch_latest_price_dates(db, asset_ids: list[int]) -> dict[int, date]:
         "SELECT asset_id, max(date) AS latest_date "
         f"FROM daily_prices WHERE asset_id IN ({placeholders}) GROUP BY asset_id"
     )
-    with db.connect() as connection:
-        with connection.cursor() as cursor:
-            cursor.execute(query, asset_ids)
-            rows = cursor.fetchall()
+    with db.connect() as connection, connection.cursor() as cursor:
+        cursor.execute(query, asset_ids)
+        rows = cursor.fetchall()
     return {int(asset_id): latest_date for asset_id, latest_date in rows if latest_date is not None}
 
 
-def price_refresh_window(latest_date: date | None, run_date: date, *, earliest_date: date | None = None) -> PriceRefreshWindow:
+def price_refresh_window(
+    latest_date: date | None, run_date: date, *, earliest_date: date | None = None
+) -> PriceRefreshWindow:
     backfill_start = run_date - timedelta(days=INITIAL_BACKFILL_DAYS)
     if latest_date is None:
         return PriceRefreshWindow(fetch_start=backfill_start, persist_start=backfill_start, end=run_date)

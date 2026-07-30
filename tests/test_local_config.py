@@ -6,7 +6,14 @@ import pytest
 from fastapi.testclient import TestClient
 
 from scripts.api import app
-from scripts.lib.config import ConfigError, DatabaseMode, ExportMode, load_local_config, provider_status, write_local_config
+from scripts.lib.config import (
+    ConfigError,
+    DatabaseMode,
+    ExportMode,
+    load_local_config,
+    provider_status,
+    write_local_config,
+)
 
 
 def test_missing_config_loads_safe_defaults(tmp_path: Path) -> None:
@@ -34,17 +41,17 @@ def test_valid_config_loads_and_redacts_secrets(tmp_path: Path) -> None:
         "\n".join(
             [
                 "first_run_completed = true",
-                "language = \"en\"",
+                'language = "en"',
                 "[database]",
-                "mode = \"postgres_url\"",
-                "postgres_url = \"postgresql://vbinvest:secret@127.0.0.1:5432/vbinvest\"",
+                'mode = "postgres_url"',
+                'postgres_url = "postgresql://vbinvest:secret@127.0.0.1:5432/vbinvest"',
                 "[obsidian]",
-                f"vault_path = \"{tmp_path}\"",
-                "export_mode = \"direct\"",
+                f'vault_path = "{tmp_path}"',
+                'export_mode = "direct"',
                 "[providers]",
-                "opendart_api_key = \"dart-secret\"",
-                "ai_base_url = \"http://127.0.0.1:11434/v1\"",
-                "ai_api_key = \"ai-secret\"",
+                'opendart_api_key = "dart-secret"',
+                'ai_base_url = "http://127.0.0.1:11434/v1"',
+                'ai_api_key = "ai-secret"',
             ]
         ),
         encoding="utf-8",
@@ -66,9 +73,9 @@ def test_load_config_prefers_macos_keychain_for_provider_secrets(tmp_path: Path)
         "\n".join(
             [
                 "[providers]",
-                "opendart_api_key = \"toml-dart\"",
-                "ai_base_url = \"https://api.example.com/v1\"",
-                "ai_api_key = \"toml-ai\"",
+                'opendart_api_key = "toml-dart"',
+                'ai_base_url = "https://api.example.com/v1"',
+                'ai_api_key = "toml-ai"',
             ]
         ),
         encoding="utf-8",
@@ -89,7 +96,7 @@ def test_load_config_prefers_macos_keychain_for_provider_secrets(tmp_path: Path)
 
 def test_invalid_database_mode_returns_typed_error(tmp_path: Path) -> None:
     config_path = tmp_path / "config.toml"
-    config_path.write_text("[database]\nmode = \"mysql\"\n", encoding="utf-8")
+    config_path.write_text('[database]\nmode = "mysql"\n', encoding="utf-8")
 
     with pytest.raises(ConfigError, match="database.mode"):
         load_local_config(config_path=config_path)
@@ -97,7 +104,7 @@ def test_invalid_database_mode_returns_typed_error(tmp_path: Path) -> None:
 
 def test_malformed_ai_provider_url_returns_typed_error(tmp_path: Path) -> None:
     config_path = tmp_path / "config.toml"
-    config_path.write_text("[providers]\nai_base_url = \"not a url\"\n", encoding="utf-8")
+    config_path.write_text('[providers]\nai_base_url = "not a url"\n', encoding="utf-8")
 
     with pytest.raises(ConfigError, match="providers.ai_base_url"):
         load_local_config(config_path=config_path)
@@ -165,8 +172,8 @@ def test_settings_endpoint_returns_redacted_config(monkeypatch: pytest.MonkeyPat
         "\n".join(
             [
                 "[providers]",
-                "ai_api_key = \"ai-secret\"",
-                "ai_base_url = \"http://127.0.0.1:11434/v1\"",
+                'ai_api_key = "ai-secret"',
+                'ai_base_url = "http://127.0.0.1:11434/v1"',
             ]
         ),
         encoding="utf-8",

@@ -41,7 +41,12 @@ class FakeAuthDB:
         self.report_runs = []
 
     def fetch_profile_by_auth_user(self, auth_user_id: str):
-        return {"profile_id": 1, "auth_user_id": auth_user_id, "slug": auth_user_id, "email": f"{auth_user_id}@example.com"}
+        return {
+            "profile_id": 1,
+            "auth_user_id": auth_user_id,
+            "slug": auth_user_id,
+            "email": f"{auth_user_id}@example.com",
+        }
 
     def list_user_watchlists(self, auth_user_id: str):
         return [item for item in self.watchlists.values() if item["owner_auth_user_id"] == auth_user_id]
@@ -83,7 +88,9 @@ class FakeAuthDB:
     def list_user_portfolio_holdings(self, auth_user_id: str):
         return [item for item in self.holdings.values() if item["owner_auth_user_id"] == auth_user_id]
 
-    def create_user_portfolio_holding(self, auth_user_id: str, symbol: str, quantity: float, average_cost: float | None, note: str | None):
+    def create_user_portfolio_holding(
+        self, auth_user_id: str, symbol: str, quantity: float, average_cost: float | None, note: str | None
+    ):
         holding = {
             "holding_id": f"holding-{len(self.holdings) + 1}",
             "owner_auth_user_id": auth_user_id,
@@ -95,7 +102,9 @@ class FakeAuthDB:
         self.holdings[holding["holding_id"]] = holding
         return holding
 
-    def update_user_portfolio_holding(self, auth_user_id: str, holding_id: str, quantity: float | None, average_cost: float | None, note: str | None):
+    def update_user_portfolio_holding(
+        self, auth_user_id: str, holding_id: str, quantity: float | None, average_cost: float | None, note: str | None
+    ):
         holding = self.holdings.get(holding_id)
         if not holding or holding["owner_auth_user_id"] != auth_user_id:
             return None
@@ -151,7 +160,9 @@ class FakeAuthDB:
         self.entitlements[ad_event_id] = entitlement
         return entitlement
 
-    def record_payment_webhook(self, event_id: str, provider: str, event_type: str, payload: dict, signature_valid: bool):
+    def record_payment_webhook(
+        self, event_id: str, provider: str, event_type: str, payload: dict, signature_valid: bool
+    ):
         if event_id in self.webhook_events:
             return {"status": "ignored", "duplicate": True}
         self.webhook_events[event_id] = {

@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Mapping, Protocol
+from typing import Any, Protocol
 
 from scripts.lib.ai_provider import AIProviderConfigError, AIProviderError, build_research_ai_client_from_env
 from scripts.lib.config import ConfigError, ProviderSettings, load_local_config
@@ -25,17 +26,13 @@ class OnDemandReportPaths:
 
 
 class OnDemandReportStore(Protocol):
-    def fetch_profile_by_auth_user(self, auth_user_id: str) -> dict[str, Any] | None:
-        ...
+    def fetch_profile_by_auth_user(self, auth_user_id: str) -> dict[str, Any] | None: ...
 
-    def fetch_asset_dashboard_item(self, symbol: str, *, days: int = 1260) -> dict[str, Any] | None:
-        ...
+    def fetch_asset_dashboard_item(self, symbol: str, *, days: int = 1260) -> dict[str, Any] | None: ...
 
-    def upsert_research_views(self, rows: list[dict[str, Any]]) -> int:
-        ...
+    def upsert_research_views(self, rows: list[dict[str, Any]]) -> int: ...
 
-    def record_report_run(self, **kwargs: object) -> str:
-        ...
+    def record_report_run(self, **kwargs: object) -> str: ...
 
 
 def generate_on_demand_research_for_asset(
@@ -82,7 +79,9 @@ def generate_on_demand_research_for_asset(
 def _build_research_row(item: dict[str, Any], environ: Mapping[str, str]) -> dict[str, Any]:
     history = item["history"]
     latest = history.iloc[-1].to_dict()
-    packet = build_source_packet(item["asset"], latest, news=item.get("news", []), disclosures=item.get("disclosures", []))
+    packet = build_source_packet(
+        item["asset"], latest, news=item.get("news", []), disclosures=item.get("disclosures", [])
+    )
     ai_client = build_research_ai_client_from_env(_ai_environ(environ))
     return build_on_demand_research_view(
         item["asset"],
@@ -126,7 +125,10 @@ def _merge_provider_settings(environ: dict[str, str], providers: ProviderSetting
 
 
 def _has_ai_api_key(environ: Mapping[str, str]) -> bool:
-    return any(environ.get(key, "").strip() for key in ("AI_API_KEY", "AI_PROVIDER_API_KEY", "OPENAI_API_KEY", "DEEPSEEK_API_KEY"))
+    return any(
+        environ.get(key, "").strip()
+        for key in ("AI_API_KEY", "AI_PROVIDER_API_KEY", "OPENAI_API_KEY", "DEEPSEEK_API_KEY")
+    )
 
 
 def _safe_ai_error_message(exc: AIProviderConfigError | AIProviderError | GuardrailError) -> str:

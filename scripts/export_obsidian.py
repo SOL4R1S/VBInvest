@@ -12,7 +12,6 @@ if __package__ is None or __package__ == "":
 from scripts.lib.db import DatabaseConfig, VBinvestDB
 from scripts.lib.obsidian import export_research_rows
 
-
 DEFAULT_VAULT = "/Volumes/nv6000t/ObsidianVault/옵시디언"
 
 

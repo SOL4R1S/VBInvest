@@ -4,14 +4,13 @@ import json
 import os
 import platform
 import tomllib
+from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from enum import StrEnum
 from pathlib import Path
-from typing import Mapping
 from urllib.parse import urlsplit, urlunsplit
 
 from scripts.lib.keychain import SecretStore, SecretWriteStore, platform_secret_store, resolve_secret
-
 
 type TomlScalar = str | bool | int | float
 type TomlValue = TomlScalar | dict[str, TomlValue]
@@ -351,10 +350,7 @@ def _opendart_status(
     configured = False
     system = system_name or platform.system()
     store = secret_store or platform_secret_store(system)
-    if _text_from_env(environ, "OPENDART_API_KEY"):
-        source = "env"
-        configured = True
-    elif _text_from_env(environ, "DART_API_KEY"):
+    if _text_from_env(environ, "OPENDART_API_KEY") or _text_from_env(environ, "DART_API_KEY"):
         source = "env"
         configured = True
     elif system in {"Darwin", "Windows"} and store.get("OPENDART_API_KEY"):

@@ -1,5 +1,5 @@
-import { authHeaders } from "@/lib/auth";
-import { boolField, isRecord, readJsonPayload, stringOrEmpty } from "@/lib/guards";
+import { apiGet, apiPatch } from "@/lib/http";
+import { boolField, isRecord, stringOrEmpty } from "@/lib/guards";
 
 export type SchedulerSettings = {
   readonly dailyRefreshEnabled: boolean;
@@ -23,15 +23,7 @@ export const FALLBACK_SCHEDULER_SETTINGS: SchedulerSettings = {
 };
 
 export async function fetchSchedulerSettings(): Promise<SchedulerSettings | null> {
-  const response = await fetch("/api/scheduler/settings", { headers: authHeaders() });
-  if (!response.ok) {
-    return null;
-  }
-  const payload = await readJsonPayload(response);
-  if (payload === null) {
-    return null;
-  }
-  return parseSchedulerSettings(payload);
+  return apiGet("/api/scheduler/settings", parseSchedulerSettings);
 }
 
 export async function patchSchedulerSettings(payload: SchedulerSettingsPatch): Promise<SchedulerSettings | null> {
@@ -39,19 +31,7 @@ export async function patchSchedulerSettings(payload: SchedulerSettingsPatch): P
   if (Object.keys(encoded).length === 0) {
     return null;
   }
-  const response = await fetch("/api/scheduler/settings", {
-    method: "PATCH",
-    headers: { ...authHeaders(), "Content-Type": "application/json" },
-    body: JSON.stringify(encoded),
-  });
-  if (!response.ok) {
-    return null;
-  }
-  const responsePayload = await readJsonPayload(response);
-  if (responsePayload === null) {
-    return null;
-  }
-  return parseSchedulerSettings(responsePayload);
+  return apiPatch("/api/scheduler/settings", encoded, parseSchedulerSettings);
 }
 
 export function parseSchedulerSettings(payload: unknown): SchedulerSettings | null {

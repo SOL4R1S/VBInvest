@@ -4,7 +4,9 @@ from scripts import api
 
 
 class FakeLocalModeDB:
-    def record_payment_webhook(self, event_id: str, provider: str, event_type: str, payload: dict, signature_valid: bool):
+    def record_payment_webhook(
+        self, event_id: str, provider: str, event_type: str, payload: dict, signature_valid: bool
+    ):
         raise AssertionError("local mode must not process hosted payment webhooks")
 
     def grant_ad_unlock(self, auth_user_id: str, symbol: str, ad_event_id: str):

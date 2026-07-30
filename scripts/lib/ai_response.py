@@ -117,6 +117,7 @@ def system_prompt() -> str:
 # Internal helpers
 # ---------------------------------------------------------------------------
 
+
 def _parse_content_json_object(content: str) -> JsonValue:
     try:
         return json.loads(content)

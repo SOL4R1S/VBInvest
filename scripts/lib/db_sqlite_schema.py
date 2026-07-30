@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-
 SQLITE_SCHEMA = """
 CREATE TABLE IF NOT EXISTS profiles (
   profile_id INTEGER PRIMARY KEY AUTOINCREMENT,

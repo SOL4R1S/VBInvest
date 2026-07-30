@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from typing import Any
 
 
@@ -25,16 +25,16 @@ class SQLiteValueMixin:
 
     def _to_db_timestamp(self, value: Any) -> str | Any:
         if isinstance(value, datetime):
-            return value.astimezone(timezone.utc).isoformat()
+            return value.astimezone(UTC).isoformat()
         if isinstance(value, date):
-            return datetime(value.year, value.month, value.day, tzinfo=timezone.utc).isoformat()
+            return datetime(value.year, value.month, value.day, tzinfo=UTC).isoformat()
         return value
 
     def _coerce_datetime(self, value: Any) -> datetime | None:
         if isinstance(value, datetime):
             if value.tzinfo is None:
-                return value.replace(tzinfo=timezone.utc)
-            return value.astimezone(timezone.utc)
+                return value.replace(tzinfo=UTC)
+            return value.astimezone(UTC)
         if isinstance(value, str):
             try:
                 parsed = datetime.fromisoformat(value)

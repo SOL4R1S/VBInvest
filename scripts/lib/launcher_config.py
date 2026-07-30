@@ -6,7 +6,6 @@ from pathlib import Path
 
 from scripts.lib.config import app_data_dir
 
-
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PREFERRED_PORT = 4173
 DEFAULT_SCAN_START = 4174

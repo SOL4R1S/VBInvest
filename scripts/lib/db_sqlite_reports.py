@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import date, datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -25,7 +25,7 @@ class SQLiteReportsMixin:
         error_message: str | None = None,
     ) -> str:
         run_id = str(uuid.uuid4())
-        completed_at = datetime.now(timezone.utc)
+        completed_at = datetime.now(UTC)
         with self.connect() as conn:
             conn.execute(
                 """
@@ -59,7 +59,7 @@ class SQLiteReportsMixin:
                     error_message = 'canceled by user'
                 WHERE run_id = ? AND status IN ('queued', 'running')
                 """,
-                (self._to_db_timestamp(datetime.now(timezone.utc)), run_id),
+                (self._to_db_timestamp(datetime.now(UTC)), run_id),
             )
         return self._fetch_report_run(run_id)
 
@@ -182,7 +182,9 @@ class SQLiteReportsMixin:
             obsidian_vault_path=obsidian_vault_path,
         )
 
-    def _fetch_latest_report_run(self, run_type: str, scope_slug: str | None, *, successful_only: bool) -> dict[str, Any] | None:
+    def _fetch_latest_report_run(
+        self, run_type: str, scope_slug: str | None, *, successful_only: bool
+    ) -> dict[str, Any] | None:
         status_clause = "AND status = 'ok'" if successful_only else ""
         with self.connect() as conn:
             row = conn.execute(

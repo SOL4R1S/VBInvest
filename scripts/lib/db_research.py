@@ -2,19 +2,16 @@
 
 from __future__ import annotations
 
-import json
 import hashlib
 from pathlib import Path
 from typing import Any
 
-from scripts.lib.db_base import json_dumps, _research_source_type
+from scripts.lib.db_base import _research_source_type, json_dumps
 from scripts.lib.on_demand_report import generate_on_demand_research_for_asset
 
 
 class ResearchMixin:
-
     """Mixin — requires self.connect() from VBinvestDB."""
-
 
     def upsert_research_views(self, rows: list[dict[str, Any]]) -> int:
         if not rows:
@@ -48,7 +45,6 @@ class ResearchMixin:
             cur.executemany(sql, rows)
             return len(rows)
 
-
     def record_research_sources(self, rows: list[dict[str, Any]]) -> int:
         if not rows:
             return 0
@@ -79,7 +75,9 @@ class ResearchMixin:
                     "title": source.get("title") or source.get("kind") or row["target_slug"],
                     "url": source.get("url"),
                     "published_at": source.get("published_at"),
-                    "content_hash": hashlib.sha256(f"{row['target_slug']}|{row['report_date']}|{raw_json}".encode("utf-8")).hexdigest(),
+                    "content_hash": hashlib.sha256(
+                        f"{row['target_slug']}|{row['report_date']}|{raw_json}".encode()
+                    ).hexdigest(),
                     "citation_label": f"{row['target_slug']} {source_type}",
                     "raw_json": raw_json,
                 }
@@ -87,7 +85,6 @@ class ResearchMixin:
         with self.connect() as conn, conn.cursor() as cur:
             cur.executemany(sql, prepared)
             return len(prepared)
-
 
     def record_obsidian_export(
         self,
@@ -134,7 +131,6 @@ class ResearchMixin:
         with self.connect() as conn, conn.cursor() as cur:
             cur.execute(sql, params)
 
-
     def fetch_latest_research_views(self, slug: str) -> dict[str, dict[str, Any]]:
         query = """
         WITH wl_assets AS (
@@ -170,7 +166,6 @@ class ResearchMixin:
                 }
             return views
 
-
     def fetch_latest_research_for_asset(self, symbol: str) -> dict[str, Any] | None:
         query = """
         SELECT target_slug, opinion, thesis, bull, base, bear, risks, triggers, sources, report_date
@@ -197,7 +192,6 @@ class ResearchMixin:
                 "report_date": row[9],
             }
 
-
     def generate_research_for_asset(
         self,
         auth_user_id: str,
@@ -211,7 +205,6 @@ class ResearchMixin:
             symbol,
             obsidian_vault_path=obsidian_vault_path,
         )
-
 
     def fetch_recent_news_for_asset(self, asset_id: int, *, limit: int = 10) -> list[dict[str, Any]]:
         query = """
@@ -234,7 +227,6 @@ class ResearchMixin:
                 }
                 for row in cur.fetchall()
             ]
-
 
     def fetch_recent_disclosures_for_asset(self, asset_id: int, *, limit: int = 10) -> list[dict[str, Any]]:
         query = """

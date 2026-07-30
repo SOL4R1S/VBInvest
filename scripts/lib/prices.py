@@ -6,10 +6,11 @@ import random
 import urllib.error
 import urllib.parse
 import urllib.request
+from collections.abc import Callable
+from datetime import UTC, date, datetime, timedelta
 from difflib import SequenceMatcher
-from datetime import date, datetime, timedelta, timezone
 from io import StringIO
-from typing import Any, Callable, Final, TypedDict
+from typing import Any, Final, TypedDict
 
 import pandas as pd
 
@@ -106,7 +107,7 @@ def parse_yahoo_chart(symbol: str, payload: dict[str, Any]) -> pd.DataFrame:
             continue
         rows.append(
             {
-                "date": datetime.fromtimestamp(ts, tz=timezone.utc).date(),
+                "date": datetime.fromtimestamp(ts, tz=UTC).date(),
                 "open": _at(quote.get("open"), i),
                 "high": _at(quote.get("high"), i),
                 "low": _at(quote.get("low"), i),
@@ -176,19 +177,24 @@ def normalize_yfinance_history(symbol: str, frame: pd.DataFrame, *, currency: st
         raise PriceFetchError(f"{symbol}: yfinance returned no rows")
     result = frame.reset_index()
     date_column = "Date" if "Date" in result.columns else result.columns[0]
-    return pd.DataFrame(
-        {
-            "date": pd.to_datetime(result[date_column]).dt.date,
-            "open": pd.to_numeric(result.get("Open"), errors="coerce"),
-            "high": pd.to_numeric(result.get("High"), errors="coerce"),
-            "low": pd.to_numeric(result.get("Low"), errors="coerce"),
-            "close": pd.to_numeric(result.get("Close"), errors="coerce"),
-            "adj_close": pd.to_numeric(result.get("Adj Close", result.get("Close")), errors="coerce"),
-            "volume": pd.to_numeric(result.get("Volume"), errors="coerce"),
-            "currency": currency,
-            "provider": "yfinance",
-        }
-    ).dropna(subset=["close"]).sort_values("date").reset_index(drop=True)
+    return (
+        pd.DataFrame(
+            {
+                "date": pd.to_datetime(result[date_column]).dt.date,
+                "open": pd.to_numeric(result.get("Open"), errors="coerce"),
+                "high": pd.to_numeric(result.get("High"), errors="coerce"),
+                "low": pd.to_numeric(result.get("Low"), errors="coerce"),
+                "close": pd.to_numeric(result.get("Close"), errors="coerce"),
+                "adj_close": pd.to_numeric(result.get("Adj Close", result.get("Close")), errors="coerce"),
+                "volume": pd.to_numeric(result.get("Volume"), errors="coerce"),
+                "currency": currency,
+                "provider": "yfinance",
+            }
+        )
+        .dropna(subset=["close"])
+        .sort_values("date")
+        .reset_index(drop=True)
+    )
 
 
 def _fast_info_currency(info) -> str | None:
@@ -219,19 +225,24 @@ def fetch_stooq_history(symbol: str) -> pd.DataFrame:
     required = {"Date", "Open", "High", "Low", "Close", "Volume"}
     if frame.empty or not required.issubset(frame.columns):
         raise PriceFetchError(f"{symbol}: stooq returned no valid rows")
-    return pd.DataFrame(
-        {
-            "date": pd.to_datetime(frame["Date"]).dt.date,
-            "open": pd.to_numeric(frame["Open"], errors="coerce"),
-            "high": pd.to_numeric(frame["High"], errors="coerce"),
-            "low": pd.to_numeric(frame["Low"], errors="coerce"),
-            "close": pd.to_numeric(frame["Close"], errors="coerce"),
-            "adj_close": pd.to_numeric(frame["Close"], errors="coerce"),
-            "volume": pd.to_numeric(frame["Volume"], errors="coerce"),
-            "currency": None,
-            "provider": "stooq",
-        }
-    ).dropna(subset=["close"]).sort_values("date").reset_index(drop=True)
+    return (
+        pd.DataFrame(
+            {
+                "date": pd.to_datetime(frame["Date"]).dt.date,
+                "open": pd.to_numeric(frame["Open"], errors="coerce"),
+                "high": pd.to_numeric(frame["High"], errors="coerce"),
+                "low": pd.to_numeric(frame["Low"], errors="coerce"),
+                "close": pd.to_numeric(frame["Close"], errors="coerce"),
+                "adj_close": pd.to_numeric(frame["Close"], errors="coerce"),
+                "volume": pd.to_numeric(frame["Volume"], errors="coerce"),
+                "currency": None,
+                "provider": "stooq",
+            }
+        )
+        .dropna(subset=["close"])
+        .sort_values("date")
+        .reset_index(drop=True)
+    )
 
 
 def fetch_price_history(
@@ -427,7 +438,11 @@ def validate_ticker_symbol(
         return _invalid_ticker_result(normalized, "ticker_not_found", suggestion_searcher=suggestion_searcher)
     if frame.empty:
         return _invalid_ticker_result(normalized, "ticker_not_found", suggestion_searcher=suggestion_searcher)
-    provider = str(frame["provider"].dropna().iloc[0]) if "provider" in frame and not frame["provider"].dropna().empty else "unknown"
+    provider = (
+        str(frame["provider"].dropna().iloc[0])
+        if "provider" in frame and not frame["provider"].dropna().empty
+        else "unknown"
+    )
     return {"symbol": normalized, "valid": True, "provider": provider}
 
 

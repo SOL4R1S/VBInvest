@@ -6,9 +6,8 @@ import sys
 from pathlib import Path
 from typing import Final
 
-
 HOOKS: Final = {
-    "commit-msg": "./.venv/bin/python scripts/git_hooks/check_commit_msg.py \"$1\"",
+    "commit-msg": './.venv/bin/python scripts/git_hooks/check_commit_msg.py "$1"',
     "pre-commit": "git diff --cached --name-only --diff-filter=ACMRT | ./.venv/bin/python scripts/git_hooks/check_paths.py",
     "pre-push": "./.venv/bin/python scripts/git_hooks/check_pre_push.py",
 }

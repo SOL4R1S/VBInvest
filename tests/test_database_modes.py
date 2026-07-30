@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 import pandas as pd
@@ -71,14 +71,46 @@ def test_shared_repository_roundtrip_works_for_sqlite_mode(tmp_path: Path) -> No
 
     price_frame = pd.DataFrame(
         [
-            {"date": date(2026, 6, 1), "open": 100, "high": 102, "low": 99, "close": 101, "volume": 1000, "source": "yfinance"},
-            {"date": date(2026, 6, 2), "open": 101, "high": 105, "low": 100, "close": 104, "volume": 1200, "source": "yfinance"},
+            {
+                "date": date(2026, 6, 1),
+                "open": 100,
+                "high": 102,
+                "low": 99,
+                "close": 101,
+                "volume": 1000,
+                "source": "yfinance",
+            },
+            {
+                "date": date(2026, 6, 2),
+                "open": 101,
+                "high": 105,
+                "low": 100,
+                "close": 104,
+                "volume": 1200,
+                "source": "yfinance",
+            },
         ]
     )
     indicator_frame = pd.DataFrame(
         [
-            {"date": date(2026, 6, 1), "return_1d": 0.01, "ma5": 100.5, "ma20": 98.2, "ma50": 95.5, "ma120": 91.0, "rsi14": 61.0},
-            {"date": date(2026, 6, 2), "return_1d": 0.03, "ma5": 101.2, "ma20": 98.9, "ma50": 95.8, "ma120": 91.1, "rsi14": 64.1},
+            {
+                "date": date(2026, 6, 1),
+                "return_1d": 0.01,
+                "ma5": 100.5,
+                "ma20": 98.2,
+                "ma50": 95.5,
+                "ma120": 91.0,
+                "rsi14": 61.0,
+            },
+            {
+                "date": date(2026, 6, 2),
+                "return_1d": 0.03,
+                "ma5": 101.2,
+                "ma20": 98.9,
+                "ma50": 95.8,
+                "ma120": 91.1,
+                "rsi14": 64.1,
+            },
         ]
     )
     asset_id = repo.fetch_watchlist_assets(created["slug"])[0]["asset_id"]
@@ -169,7 +201,7 @@ def test_sqlite_source_upserts_match_partial_unique_indexes(tmp_path: Path) -> N
         "url": "https://example.com/news?id=1",
         "canonical_url": "https://example.com/news",
         "title": "Same item",
-        "published_at": datetime(2026, 6, 1, tzinfo=timezone.utc),
+        "published_at": datetime(2026, 6, 1, tzinfo=UTC),
         "content_hash": "hash-1",
         "language": "en",
         "summary": "A",
@@ -182,7 +214,7 @@ def test_sqlite_source_upserts_match_partial_unique_indexes(tmp_path: Path) -> N
         "provider": "sec-submissions",
         "provider_disclosure_id": "0000320193-26-000001",
         "title": "10-Q Quarterly report",
-        "published_at": datetime(2026, 6, 1, tzinfo=timezone.utc),
+        "published_at": datetime(2026, 6, 1, tzinfo=UTC),
         "url": "https://sec.example.com/aapl.htm",
         "raw_json": {"id": 1},
     }
@@ -202,8 +234,20 @@ def test_sqlite_fetch_dashboard_items_includes_latest_research_views(tmp_path: P
     watchlist = repo.create_user_watchlist("user-1", "핵심", ["NVDA", "TSM"])
     watchlist_assets = repo.fetch_watchlist_assets(watchlist["slug"])
     assert watchlist_assets == [
-        {"asset_id": watchlist_assets[0]["asset_id"], "symbol": "NVDA", "display_name_ko": None, "exchange": None, "currency": None},
-        {"asset_id": watchlist_assets[1]["asset_id"], "symbol": "TSM", "display_name_ko": None, "exchange": None, "currency": None},
+        {
+            "asset_id": watchlist_assets[0]["asset_id"],
+            "symbol": "NVDA",
+            "display_name_ko": None,
+            "exchange": None,
+            "currency": None,
+        },
+        {
+            "asset_id": watchlist_assets[1]["asset_id"],
+            "symbol": "TSM",
+            "display_name_ko": None,
+            "exchange": None,
+            "currency": None,
+        },
     ]
 
     nvda_asset_id = watchlist_assets[0]["asset_id"]
@@ -211,24 +255,72 @@ def test_sqlite_fetch_dashboard_items_includes_latest_research_views(tmp_path: P
 
     nvda_prices = pd.DataFrame(
         [
-            {"date": date(2026, 6, 1), "open": 100, "high": 105, "low": 99, "close": 102, "volume": 1000, "source": "yfinance"},
-            {"date": date(2026, 6, 2), "open": 102, "high": 106, "low": 101, "close": 105, "volume": 1200, "source": "yfinance"},
+            {
+                "date": date(2026, 6, 1),
+                "open": 100,
+                "high": 105,
+                "low": 99,
+                "close": 102,
+                "volume": 1000,
+                "source": "yfinance",
+            },
+            {
+                "date": date(2026, 6, 2),
+                "open": 102,
+                "high": 106,
+                "low": 101,
+                "close": 105,
+                "volume": 1200,
+                "source": "yfinance",
+            },
         ]
     )
     tsm_prices = pd.DataFrame(
         [
-            {"date": date(2026, 6, 1), "open": 45, "high": 47, "low": 44, "close": 46, "volume": 800, "source": "yfinance"},
+            {
+                "date": date(2026, 6, 1),
+                "open": 45,
+                "high": 47,
+                "low": 44,
+                "close": 46,
+                "volume": 800,
+                "source": "yfinance",
+            },
         ]
     )
     nvda_indicators = pd.DataFrame(
         [
-            {"date": date(2026, 6, 1), "return_1d": 0.01, "ma5": 100.0, "ma20": 99.0, "ma50": 98.0, "ma120": 97.0, "rsi14": 50.0},
-            {"date": date(2026, 6, 2), "return_1d": 0.03, "ma5": 101.0, "ma20": 100.0, "ma50": 98.5, "ma120": 97.2, "rsi14": 52.0},
+            {
+                "date": date(2026, 6, 1),
+                "return_1d": 0.01,
+                "ma5": 100.0,
+                "ma20": 99.0,
+                "ma50": 98.0,
+                "ma120": 97.0,
+                "rsi14": 50.0,
+            },
+            {
+                "date": date(2026, 6, 2),
+                "return_1d": 0.03,
+                "ma5": 101.0,
+                "ma20": 100.0,
+                "ma50": 98.5,
+                "ma120": 97.2,
+                "rsi14": 52.0,
+            },
         ]
     )
     tsm_indicators = pd.DataFrame(
         [
-            {"date": date(2026, 6, 1), "return_1d": -0.01, "ma5": 45.0, "ma20": 44.5, "ma50": 44.0, "ma120": 43.0, "rsi14": 48.0},
+            {
+                "date": date(2026, 6, 1),
+                "return_1d": -0.01,
+                "ma5": 45.0,
+                "ma20": 44.5,
+                "ma50": 44.0,
+                "ma120": 43.0,
+                "rsi14": 48.0,
+            },
         ]
     )
 

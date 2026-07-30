@@ -45,7 +45,13 @@ def create_user_portfolio_holding(
             """,
             (holding_id, profile[0], asset[0], quantity, average_cost, note),
         )
-    return {"holding_id": holding_id, "symbol": symbol, "quantity": quantity, "average_cost": average_cost, "note": note}
+    return {
+        "holding_id": holding_id,
+        "symbol": symbol,
+        "quantity": quantity,
+        "average_cost": average_cost,
+        "note": note,
+    }
 
 
 def update_user_portfolio_holding(

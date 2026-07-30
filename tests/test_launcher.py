@@ -58,7 +58,9 @@ def test_launcher_exposes_public_api() -> None:
 
 def test_port_selector_prefers_preferred_port() -> None:
     preferred = _free_port()
-    selector = launcher.PortSelector(preferred_port=preferred, host="127.0.0.1", scan_start=preferred + 1, scan_end=preferred + 3)
+    selector = launcher.PortSelector(
+        preferred_port=preferred, host="127.0.0.1", scan_start=preferred + 1, scan_end=preferred + 3
+    )
 
     reserved = selector.reserve()
 
@@ -71,8 +73,12 @@ def test_port_selector_prefers_preferred_port() -> None:
 
 def test_port_selector_falls_back_to_scan_range() -> None:
     preferred = _free_port()
-    blocker = launcher.PortSelector(preferred_port=preferred, host="127.0.0.1", scan_start=preferred + 1, scan_end=preferred + 1).reserve()
-    selector = launcher.PortSelector(preferred_port=preferred, host="127.0.0.1", scan_start=preferred + 1, scan_end=preferred + 3)
+    blocker = launcher.PortSelector(
+        preferred_port=preferred, host="127.0.0.1", scan_start=preferred + 1, scan_end=preferred + 1
+    ).reserve()
+    selector = launcher.PortSelector(
+        preferred_port=preferred, host="127.0.0.1", scan_start=preferred + 1, scan_end=preferred + 3
+    )
 
     try:
         reserved = selector.reserve()
@@ -209,7 +215,9 @@ def test_local_launcher_wait_for_health_prefers_expected_payload(tmp_path, monke
 
 
 def test_local_launcher_health_validation_rejects_bad_payload(tmp_path, monkeypatch) -> None:
-    config = launcher.LauncherConfig(host="127.0.0.1", preferred_port=4173, app_data_dir=tmp_path / "app_data", health_timeout_seconds=0.2)
+    config = launcher.LauncherConfig(
+        host="127.0.0.1", preferred_port=4173, app_data_dir=tmp_path / "app_data", health_timeout_seconds=0.2
+    )
     server = launcher.LocalLauncher(config)
     reserved = launcher.PortSelector(preferred_port=4173, host="127.0.0.1", scan_start=4174, scan_end=4174).reserve()
     server._reserved = reserved

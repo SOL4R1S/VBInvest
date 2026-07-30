@@ -4,8 +4,9 @@ import re
 import sys
 from pathlib import Path
 
-
-SECRET_ASSIGNMENT = re.compile(r"^(?P<key>[A-Z0-9_]*(?:PASSWORD|SECRET|SERVICE_ROLE|CLIENT_SECRET)[A-Z0-9_]*)=(?P<value>.+)$")
+SECRET_ASSIGNMENT = re.compile(
+    r"^(?P<key>[A-Z0-9_]*(?:PASSWORD|SECRET|SERVICE_ROLE|CLIENT_SECRET)[A-Z0-9_]*)=(?P<value>.+)$"
+)
 DEFAULT_PATHS = [Path("README.md"), Path("docs"), Path("postgres/.env.example"), Path("frontend/.env.example")]
 
 

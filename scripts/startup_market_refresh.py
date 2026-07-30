@@ -4,10 +4,10 @@ import argparse
 import os
 import sys
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Callable
 from zoneinfo import ZoneInfo
 
 if __package__ is None or __package__ == "":
@@ -19,11 +19,15 @@ from scripts.lib.disclosures import collect_disclosures_for_asset
 from scripts.lib.indicators import add_indicators
 from scripts.lib.market_calendar import summarize_trade_dates
 from scripts.lib.news import collect_news_for_asset
-from scripts.lib.price_refresh_window import PriceRefreshWindow, build_price_refresh_windows, filter_history_for_persistence, run_date_from_fetched_at
+from scripts.lib.price_refresh_window import (
+    PriceRefreshWindow,
+    build_price_refresh_windows,
+    filter_history_for_persistence,
+    run_date_from_fetched_at,
+)
 from scripts.lib.prices import PriceFetchError, fetch_price_history
 from scripts.lib.source_ingest import collect_asset_sources, format_provider_disabled
 from scripts.lib.watchlists import SEMICONDUCTOR_CORE, get_watchlist_symbols
-
 
 KST = ZoneInfo("Asia/Seoul")
 
@@ -107,9 +111,7 @@ def ingest_assets(
     price_rows = indicator_rows = news_items = disclosures = 0
     lock_acquired = False
     refresh_windows = (
-        build_price_refresh_windows(assets, db, run_date_from_fetched_at(options.fetched_at))
-        if db is not None
-        else {}
+        build_price_refresh_windows(assets, db, run_date_from_fetched_at(options.fetched_at)) if db is not None else {}
     )
 
     if db is not None and options.job_name:
@@ -211,7 +213,7 @@ def main() -> int:
     except ValueError as exc:
         print(str(exc), file=sys.stderr)
         return 2
-    fetched_at = at_kst.astimezone(timezone.utc)
+    fetched_at = at_kst.astimezone(UTC)
     now = fetched_at.isoformat(timespec="seconds")
     mode = "dry-run" if args.dry_run else "write"
     network = "disabled" if args.no_network else "enabled"
@@ -260,9 +262,13 @@ def main() -> int:
 
     print("VBinvest startup market refresh")
     print(f"status={result.status} mode={mode} network={network} at={now}")
-    print(f"watchlist={args.watchlist} assets={len(assets)} price_rows={result.price_rows} indicator_rows={result.indicator_rows}")
+    print(
+        f"watchlist={args.watchlist} assets={len(assets)} price_rows={result.price_rows} indicator_rows={result.indicator_rows}"
+    )
     print(f"trade_dates={summarize_trade_dates(assets, at_kst)}")
-    print(f"news_items={result.news_items} disclosures={result.disclosures} provider_disabled={format_provider_disabled(result.provider_disabled)}")
+    print(
+        f"news_items={result.news_items} disclosures={result.disclosures} provider_disabled={format_provider_disabled(result.provider_disabled)}"
+    )
     print(f"db={config.safe_summary()}")
     print("failed=" + (",".join(result.failures) if result.failures else "none"))
     if run_id:
