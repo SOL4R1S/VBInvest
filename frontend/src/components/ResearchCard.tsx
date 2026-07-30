@@ -137,8 +137,8 @@ export function ResearchCard({ symbol, labels }: ResearchCardProps) {
         {reportState.status === "generating" ? labels.generating : labels.generateAction}
       </button>
       {isGenerating ? (
-        <div className="report-generation-backdrop" data-testid="report-generation-backdrop">
-          <div className="report-generation-modal" role="dialog" aria-label={labels.modalTitle}>
+        <div className="report-generation-backdrop" data-testid="report-generation-backdrop" onKeyDown={(event) => { if (event.key === "Escape") void cancelGeneration(); }}>
+          <div className="report-generation-modal" role="dialog" aria-modal="true" aria-label={labels.modalTitle}>
             <div className="research-status generating" role="status" aria-live="polite">
               {labels.generating}
             </div>

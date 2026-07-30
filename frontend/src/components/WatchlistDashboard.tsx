@@ -634,8 +634,8 @@ export function WatchlistDashboard() {
       {setupRequired ? null : (
         <>
       {settingsOpen ? (
-        <div className="settings-modal-backdrop">
-          <div className="settings-modal" role="dialog" aria-label={labels.controls.settingsAction}>
+        <div className="settings-modal-backdrop" onKeyDown={(event) => { if (event.key === "Escape") setSettingsOpen(false); }}>
+          <div className="settings-modal" role="dialog" aria-modal="true" aria-label={labels.controls.settingsAction}>
             <SetupWizard
               onCompleted={completeSetup}
               onCancel={() => setSettingsOpen(false)}
@@ -652,7 +652,7 @@ export function WatchlistDashboard() {
       {startupInProgress ? (
         <div className="startup-refresh-modal" role="status" aria-live="polite">
           <strong>{labels.startup.checkingText}</strong>
-          <div className="startup-refresh-progress" aria-label={labels.startup.progressLabel}>
+          <div className="startup-refresh-progress" role="progressbar" aria-valuenow={startupProgress.percent} aria-valuemin={0} aria-valuemax={100} aria-label={labels.startup.progressLabel}>
             <span style={{ width: `${startupProgress.percent}%` }} />
           </div>
           <div className="startup-refresh-progress-copy">
