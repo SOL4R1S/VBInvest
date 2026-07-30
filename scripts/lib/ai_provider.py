@@ -110,7 +110,7 @@ class OpenAICompatibleResearchClient:
         body = _build_request_payload(self._config)
         try:
             body["messages"] = [
-                {"role": "system", "content": system_prompt()},
+                {"role": "system", "content": system_prompt(asset)},
                 {
                     "role": "user",
                     "content": json.dumps(

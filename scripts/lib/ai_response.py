@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import json
 import math
-from typing import TypeAlias, TypeGuard, cast
+from typing import Any, TypeAlias, TypeGuard, cast
 
 JsonValue: TypeAlias = str | int | float | bool | None | list["JsonValue"] | dict[str, "JsonValue"]
 
@@ -100,17 +100,26 @@ def normalize_draft_schema(draft: dict[str, JsonValue], *, repair_local_model: b
     return normalized
 
 
-def system_prompt() -> str:
+def system_prompt(asset: dict[str, Any] | None = None) -> str:
     """System prompt for the research generation model."""
-    return (
+    base = (
         "You are the VBinvest on-demand research analyst. Return JSON only. "
         "Use only the provided packet. Approved opinion labels are 매수, 아웃퍼폼, 중립, 언더퍼폼, 매도. "
         "Do not promise returns or present licensed investment advice. "
         "Required keys: opinion, thesis, rationale, bull, base, bear, risks, triggers, confidence. "
         "Use arrays of short strings for rationale, risks, and triggers. Use a numeric confidence between 0 and 1. "
         "If no collected source states a target price, estimate a target price from the provided price, RSI, moving averages, returns, and scenarios; "
-        "keep the estimate conservative and explain the basis in rationale."
+        "keep the estimate conservative and explain the basis in rationale. "
+        "Each claim in rationale MUST reference a source by index (e.g., [source:0]). "
+        "If no source supports a claim, mark it as [inference]."
     )
+    if asset is not None:
+        from scripts.lib.ai_prompt_templates import resolve_sector_template
+
+        template = resolve_sector_template(asset)
+        if template.system_addendum:
+            base = f"{base} {template.system_addendum}"
+    return base
 
 
 # ---------------------------------------------------------------------------
