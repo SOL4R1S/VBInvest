@@ -4,12 +4,12 @@ import json
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from scripts.lib.db import json_dumps
 from scripts.lib.db_mixin_base import DBMixinBase
 from scripts.lib.db_sqlite_values import json_loads_list
-from scripts.lib.on_demand_report import generate_on_demand_research_for_asset
+from scripts.lib.on_demand_report import OnDemandReportStore, generate_on_demand_research_for_asset
 
 
 class SQLiteReportsMixin(DBMixinBase):
@@ -177,7 +177,7 @@ class SQLiteReportsMixin(DBMixinBase):
         obsidian_vault_path: str | Path | None = None,
     ) -> dict[str, Any]:
         return generate_on_demand_research_for_asset(
-            self,  # type: ignore[arg-type]
+            cast(OnDemandReportStore, self),
             auth_user_id,
             symbol,
             obsidian_vault_path=obsidian_vault_path,
