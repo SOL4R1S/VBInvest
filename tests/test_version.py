@@ -11,12 +11,14 @@ from scripts.lib.version import (
 
 
 def _fake_git(responses: dict[str, str]):
-    """Return a git_runner that returns canned responses keyed by the subcommand."""
+    """Return a git_runner that returns canned responses keyed by a prefix of the subcommand."""
 
     def runner(args: tuple[str, ...], cwd: Path) -> GitResult:
-        key = " ".join(args[1:3]) if len(args) > 2 else args[-1]
-        stdout = responses.get(key, "")
-        return GitResult(stdout=stdout, returncode=0 if stdout else 1)
+        joined = " ".join(args[1:])
+        for key, stdout in responses.items():
+            if joined.startswith(key):
+                return GitResult(stdout=stdout, returncode=0)
+        return GitResult(stdout="", returncode=1)
 
     return runner
 
