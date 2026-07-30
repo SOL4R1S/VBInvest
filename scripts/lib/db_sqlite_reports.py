@@ -7,11 +7,12 @@ from pathlib import Path
 from typing import Any
 
 from scripts.lib.db import json_dumps
+from scripts.lib.db_mixin_base import DBMixinBase
 from scripts.lib.db_sqlite_values import json_loads_list
 from scripts.lib.on_demand_report import generate_on_demand_research_for_asset
 
 
-class SQLiteReportsMixin:
+class SQLiteReportsMixin(DBMixinBase):
     def record_report_run(
         self,
         *,
@@ -176,7 +177,7 @@ class SQLiteReportsMixin:
         obsidian_vault_path: str | Path | None = None,
     ) -> dict[str, Any]:
         return generate_on_demand_research_for_asset(
-            self,
+            self,  # type: ignore[arg-type]
             auth_user_id,
             symbol,
             obsidian_vault_path=obsidian_vault_path,

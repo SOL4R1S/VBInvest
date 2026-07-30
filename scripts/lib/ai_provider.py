@@ -93,7 +93,7 @@ class OpenAICompatibleResearchClient:
     _max_tokens = 1024
     _local_max_tokens = 2048
 
-    def __init__(self, config: AIProviderConfig, *, urlopen: UrlOpen = urllib.request.urlopen) -> None:
+    def __init__(self, config: AIProviderConfig, *, urlopen: UrlOpen = urllib.request.urlopen) -> None:  # type: ignore[assignment]
         self._config = config
         self._urlopen = urlopen
 

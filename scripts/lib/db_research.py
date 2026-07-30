@@ -7,10 +7,11 @@ from pathlib import Path
 from typing import Any
 
 from scripts.lib.db_base import _research_source_type, json_dumps
+from scripts.lib.db_mixin_base import DBMixinBase
 from scripts.lib.on_demand_report import generate_on_demand_research_for_asset
 
 
-class ResearchMixin:
+class ResearchMixin(DBMixinBase):
     """Mixin — requires self.connect() from VBinvestDB."""
 
     def upsert_research_views(self, rows: list[dict[str, Any]]) -> int:
@@ -200,7 +201,7 @@ class ResearchMixin:
         obsidian_vault_path: str | Path | None = None,
     ) -> dict[str, Any]:
         return generate_on_demand_research_for_asset(
-            self,
+            self,  # type: ignore[arg-type]
             auth_user_id,
             symbol,
             obsidian_vault_path=obsidian_vault_path,

@@ -5,10 +5,11 @@ from typing import Any
 
 import pandas as pd
 
+from scripts.lib.db_mixin_base import DBMixinBase
 from scripts.lib.db_sqlite_values import json_loads_list
 
 
-class SQLiteMarketMixin:
+class SQLiteMarketMixin(DBMixinBase):
     def upsert_prices(self, rows: list[dict[str, Any]]) -> int:
         if not rows:
             return 0

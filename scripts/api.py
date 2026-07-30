@@ -30,7 +30,7 @@ from scripts.routers import frontend, portfolio, research, scheduler, settings, 
 try:
     from psycopg import OperationalError as PostgresOperationalError
 except ImportError:
-    PostgresOperationalError = RuntimeError
+    PostgresOperationalError = RuntimeError  # type: ignore[assignment,misc]
 
 VERSION_METADATA = load_version_metadata()
 

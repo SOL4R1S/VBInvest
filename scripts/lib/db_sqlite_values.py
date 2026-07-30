@@ -4,6 +4,8 @@ import json
 from datetime import UTC, date, datetime
 from typing import Any
 
+from scripts.lib.db_mixin_base import DBMixinBase
+
 
 def json_loads_list(value: str | None) -> list[Any]:
     if not value:
@@ -15,7 +17,7 @@ def json_loads_list(value: str | None) -> list[Any]:
     return parsed if isinstance(parsed, list) else []
 
 
-class SQLiteValueMixin:
+class SQLiteValueMixin(DBMixinBase):
     def _to_db_date(self, value: Any) -> str | Any:
         if isinstance(value, datetime):
             return value.date().isoformat()

@@ -74,7 +74,7 @@ class WindowsCredentialApi:
         from ctypes import wintypes
 
         credential_pointer = ctypes.POINTER(_windows_credential_struct())()
-        ok = ctypes.windll.advapi32.CredReadW(target_name, 1, 0, ctypes.byref(credential_pointer))
+        ok = ctypes.windll.advapi32.CredReadW(target_name, 1, 0, ctypes.byref(credential_pointer))  # type: ignore[attr-defined]
         if not ok:
             return ""
         try:
@@ -82,7 +82,7 @@ class WindowsCredentialApi:
             blob = ctypes.string_at(credential.CredentialBlob, credential.CredentialBlobSize)
             return blob.decode("utf-16-le")
         finally:
-            ctypes.windll.advapi32.CredFree(wintypes.LPVOID(credential_pointer))
+            ctypes.windll.advapi32.CredFree(wintypes.LPVOID(credential_pointer))  # type: ignore[attr-defined]
 
     def write(self, target_name: str, value: str) -> None:
         import ctypes
@@ -97,7 +97,7 @@ class WindowsCredentialApi:
         credential.CredentialBlob = ctypes.cast(blob, ctypes.POINTER(ctypes.c_ubyte))
         credential.Persist = 2
         credential.UserName = KEYCHAIN_SERVICE
-        ok = ctypes.windll.advapi32.CredWriteW(ctypes.byref(credential), 0)
+        ok = ctypes.windll.advapi32.CredWriteW(ctypes.byref(credential), 0)  # type: ignore[attr-defined]
         if not ok:
             raise RuntimeError(f"failed to save {target_name} to Windows Credential Manager")
 

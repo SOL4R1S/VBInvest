@@ -167,7 +167,7 @@ def _backfill_scenario_fields(draft: dict[str, JsonValue]) -> None:
     for key, fallback in defaults.items():
         value = draft.get(key)
         if _is_string_list(value):
-            draft[key] = " / ".join(value)
+            draft[key] = " / ".join(value)  # type: ignore[arg-type]
             continue
         if not isinstance(value, str) or not value.strip():
             draft[key] = fallback

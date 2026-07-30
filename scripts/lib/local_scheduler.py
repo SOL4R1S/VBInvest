@@ -120,7 +120,7 @@ class LocalScheduler:
             }
         try:
             result = run_startup_market_refresh(
-                self._store,
+                self._store,  # type: ignore[arg-type]
                 watchlist=settings.watchlist,
                 dry_run=dry_run,
                 no_network=no_network,
@@ -196,7 +196,7 @@ class LocalScheduler:
             scope_slug=row.get("scope_slug") if isinstance(row.get("scope_slug"), str) else scope_slug,
             news_items=_coerce_int(summary.get("news_items"), 0),
             disclosures=_coerce_int(summary.get("disclosures"), 0),
-            provider_disabled=summary.get("provider_disabled")
+            provider_disabled=summary.get("provider_disabled")  # type: ignore[arg-type]
             if isinstance(summary.get("provider_disabled"), list)
             else None,
             reason=row.get("error_message") if isinstance(row.get("error_message"), str) else None,

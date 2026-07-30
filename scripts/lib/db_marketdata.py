@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date
 from typing import Any
 
 import pandas as pd
 
 from scripts.lib.db_base import _collection_status
+from scripts.lib.db_mixin_base import DBMixinBase
 
 
-class MarketDataMixin:
+class MarketDataMixin(DBMixinBase):
     """Mixin — requires self.connect() from VBinvestDB."""
 
     def fetch_watchlist_assets(self, slug: str) -> list[dict[str, Any]]:
@@ -128,7 +129,7 @@ class MarketDataMixin:
             cur.executemany(sql, rows)
             return len(rows)
 
-    def fetch_latest_price_dates(self, asset_ids: list[int]) -> dict[int, datetime.date]:
+    def fetch_latest_price_dates(self, asset_ids: list[int]) -> dict[int, date]:
         if not asset_ids:
             return {}
         placeholders = ",".join(["%s"] * len(asset_ids))
@@ -141,7 +142,7 @@ class MarketDataMixin:
             rows = cur.fetchall()
         return {int(asset_id): latest_date for asset_id, latest_date in rows if latest_date is not None}
 
-    def fetch_price_date_ranges(self, asset_ids: list[int]) -> dict[int, dict[str, datetime.date]]:
+    def fetch_price_date_ranges(self, asset_ids: list[int]) -> dict[int, dict[str, date]]:
         if not asset_ids:
             return {}
         placeholders = ",".join(["%s"] * len(asset_ids))

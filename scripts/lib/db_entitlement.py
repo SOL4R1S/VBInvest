@@ -7,9 +7,10 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from scripts.lib.db_base import json_dumps
+from scripts.lib.db_mixin_base import DBMixinBase
 
 
-class EntitlementMixin:
+class EntitlementMixin(DBMixinBase):
     """Mixin — requires self.connect() from VBinvestDB."""
 
     def user_has_research_entitlement(self, auth_user_id: str, symbol: str) -> bool:

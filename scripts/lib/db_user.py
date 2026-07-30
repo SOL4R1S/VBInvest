@@ -6,9 +6,10 @@ import re
 from typing import Any
 
 from scripts.lib.db_base import _profile_slug, hashlib_sha
+from scripts.lib.db_mixin_base import DBMixinBase
 
 
-class UserMixin:
+class UserMixin(DBMixinBase):
     """Mixin — requires self.connect() from VBinvestDB."""
 
     def fetch_profile_by_auth_user(self, auth_user_id: str) -> dict[str, Any] | None:

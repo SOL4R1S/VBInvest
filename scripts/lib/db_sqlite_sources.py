@@ -3,9 +3,10 @@ from __future__ import annotations
 from typing import Any
 
 from scripts.lib.db import json_dumps
+from scripts.lib.db_mixin_base import DBMixinBase
 
 
-class SQLiteSourcesMixin:
+class SQLiteSourcesMixin(DBMixinBase):
     def upsert_news_items(self, rows: list[dict[str, Any]]) -> int:
         if not rows:
             return 0
