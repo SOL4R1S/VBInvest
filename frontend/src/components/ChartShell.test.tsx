@@ -24,7 +24,7 @@ const mockSetHeight = vi.fn();
 const mockPanes = vi.fn(() => [{ setHeight: mockSetHeight }, { setHeight: mockSetHeight }]);
 const mockPriceScale = vi.fn(() => ({ applyOptions: vi.fn() }));
 const mockRemove = vi.fn();
-const mockCreateChart = vi.fn(() => ({
+const mockCreateChart = vi.fn((_container: unknown, _options?: unknown) => ({
   addSeries: mockAddSeries,
   timeScale: mockTimeScale,
   panes: mockPanes,
