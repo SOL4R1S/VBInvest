@@ -5,7 +5,7 @@ import type { LocalizedLabels } from "@/lib/i18n";
 
 type AssetDetailPanelProps = {
   readonly asset: AssetCard;
-  readonly points: readonly ChartPoint[];
+  readonly points: ChartPoint[];
   readonly labels: LocalizedLabels;
 };
 
