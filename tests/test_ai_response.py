@@ -1,6 +1,5 @@
 """Tests for scripts.lib.ai_response — parsing, validation, normalization."""
 
-import math
 
 import pytest
 
@@ -12,7 +11,6 @@ from scripts.lib.ai_response import (
     system_prompt,
     validate_draft_schema,
 )
-
 
 # ---------------------------------------------------------------------------
 # json_safe_payload
