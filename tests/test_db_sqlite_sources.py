@@ -154,6 +154,11 @@ class TestUpsertNewsItemsEdgeCases:
             "raw_json": None,
             "relevance": 0.8,
         }
-        row_msft = {**row_aapl, "asset_id": msft_id, "source_id": "cnbc-002"}
+        row_msft = {
+            **row_aapl,
+            "asset_id": msft_id,
+            "source_id": "cnbc-002",
+            "canonical_url": "https://cnbc.com/tech-msft",
+        }
         count = db.upsert_news_items([row_aapl, row_msft])
         assert count == 2

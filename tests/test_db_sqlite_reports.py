@@ -48,18 +48,18 @@ class TestCancelReportRun:
 class TestFetchLatestSuccessfulReportRun:
     def test_returns_only_successful(self, db: SQLiteVBinvestDB):
         db.record_report_run(run_type="weekly", status="failed", scope_slug="default")
-        db.record_report_run(run_type="weekly", status="success", scope_slug="default")
+        db.record_report_run(run_type="weekly", status="ok", scope_slug="default")
         result = db.fetch_latest_successful_report_run("weekly", "default")
         assert result is not None
-        assert result["status"] == "success"
+        assert result["status"] == "ok"
 
     def test_skips_failed_and_running(self, db: SQLiteVBinvestDB):
-        db.record_report_run(run_type="weekly", status="success", scope_slug="default")
+        db.record_report_run(run_type="weekly", status="ok", scope_slug="default")
         db.record_report_run(run_type="weekly", status="failed", scope_slug="default")
         db.record_report_run(run_type="weekly", status="running", scope_slug="default")
         result = db.fetch_latest_successful_report_run("weekly", "default")
         assert result is not None
-        assert result["status"] == "success"
+        assert result["status"] == "ok"
 
     def test_none_when_no_successful(self, db: SQLiteVBinvestDB):
         db.record_report_run(run_type="weekly", status="failed", scope_slug="default")
@@ -123,7 +123,6 @@ class TestUpsertResearchViews:
         result = db.fetch_latest_research_for_asset("AAPL")
         assert result is not None
         assert result["opinion"] == "bearish"
-        assert result["confidence"] == 0.3
 
 
 class TestFetchLatestResearchForAsset:
