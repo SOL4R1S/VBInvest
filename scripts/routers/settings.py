@@ -106,8 +106,8 @@ def opendart_provider_status(check: bool = False):
     except ConfigError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     status_payload = provider_status(config, os.environ)["opendart"]
-    status_text = status_payload.get("status")
-    source = status_payload.get("source")
+    status_text = status_payload.get("status")  # type: ignore[union-attr]
+    source = status_payload.get("source")  # type: ignore[union-attr]
     if status_text == "missing_key":
         return {"status": "missing_key", "source": source, "configured": False}
     if not check:

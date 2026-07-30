@@ -7,9 +7,11 @@ import uuid
 from typing import Any
 
 from scripts.lib.db_base import json_dumps
+from scripts.lib.db_mixin_base import DBMixinBase
 
 
-class IngestMixin:
+class IngestMixin(DBMixinBase):
+    _settings_metadata_ready: bool
     """Mixin — requires self.connect() from VBinvestDB."""
 
     def try_acquire_job_lock(self, lock_name: str, holder: str, ttl_seconds: int) -> bool:

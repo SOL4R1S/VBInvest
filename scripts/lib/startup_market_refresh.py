@@ -16,7 +16,7 @@ from scripts.startup_market_refresh import (
 try:
     from psycopg import OperationalError as PostgresOperationalError
 except ImportError:
-    PostgresOperationalError = RuntimeError
+    PostgresOperationalError = RuntimeError  # type: ignore[assignment,misc]
 
 
 class StartupRefreshStore(Protocol):
@@ -165,7 +165,7 @@ def run_startup_market_refresh(
     write_store = None if dry_run else effective_store
     result = ingest_assets(
         assets,
-        write_store,
+        write_store,  # type: ignore[arg-type]
         IngestOptions(
             no_network=no_network,
             synthetic=no_network,
@@ -284,17 +284,17 @@ def _are_all_assets_fresh(store: StartupRefreshStore | None, assets: list[dict])
     assets_with_id = [asset for asset in assets_with_id if asset is not None]
     if not assets_with_id:
         return False
-    latest_dates = fetch_latest_price_dates(store, [int(asset["asset_id"]) for asset in assets_with_id])
+    latest_dates = fetch_latest_price_dates(store, [int(asset["asset_id"]) for asset in assets_with_id])  # type: ignore[arg-type]
     if not latest_dates:
         return False
     now = datetime.now(UTC)
-    price_ranges = fetch_price_date_ranges(store, [int(asset["asset_id"]) for asset in assets_with_id])
+    price_ranges = fetch_price_date_ranges(store, [int(asset["asset_id"]) for asset in assets_with_id])  # type: ignore[arg-type]
     backfill_start = now.date() - timedelta(days=INITIAL_BACKFILL_DAYS)
     return all(
         latest_dates.get(int(asset["asset_id"])) is not None
-        and latest_dates[int(asset["asset_id"])] >= _trade_date_for_asset(asset, now)
+        and latest_dates[int(asset["asset_id"])] >= _trade_date_for_asset(asset, now)  # type: ignore[index]
         and price_ranges.get(int(asset["asset_id"])) is not None
-        and price_ranges[int(asset["asset_id"])].earliest_date <= backfill_start
+        and price_ranges[int(asset["asset_id"])].earliest_date <= backfill_start  # type: ignore[index]
         for asset in assets_with_id
     )
 

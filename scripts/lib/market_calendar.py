@@ -30,7 +30,7 @@ def summarize_trade_dates(assets: list[dict], at_kst: datetime) -> str:
         family = market_family(asset.get("exchange"))
         dates[family] = completed_trade_date(asset.get("exchange"), at_kst)
 
-    ordered = [family for family in ("KRX", "US") if family in dates]
+    ordered: list[str] = [family for family in ("KRX", "US") if family in dates]
     ordered.extend(sorted(family for family in dates if family not in ordered))
     return ",".join(f"{family}:{dates[family].isoformat()}" for family in ordered)
 

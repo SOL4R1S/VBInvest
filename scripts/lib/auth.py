@@ -64,7 +64,7 @@ def verify_bearer_token(token: str, env: dict[str, str] | None = None) -> AuthUs
 
 
 def _encode_hs256(payload: dict[str, str | int], secret: str) -> str:
-    header = {"alg": "HS256", "typ": "JWT"}
+    header: dict[str, str | int] = {"alg": "HS256", "typ": "JWT"}
     signing_input = ".".join(
         [
             _b64url_json(header),

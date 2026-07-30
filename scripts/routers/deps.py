@@ -47,7 +47,7 @@ from scripts.routers.models import (  # noqa: F401
 try:
     from psycopg import OperationalError as PostgresOperationalError
 except ImportError:
-    PostgresOperationalError = RuntimeError
+    PostgresOperationalError = RuntimeError  # type: ignore[assignment,misc]
 
 ShutdownCallback = Callable[[], None]
 

@@ -6,9 +6,10 @@ import uuid
 from typing import Any
 
 from scripts.lib.db import _profile_slug
+from scripts.lib.db_mixin_base import DBMixinBase
 
 
-class SQLiteIdentityMixin:
+class SQLiteIdentityMixin(DBMixinBase):
     def fetch_watchlist_assets(self, slug: str) -> list[dict[str, Any]]:
         with self.connect() as conn:
             rows = conn.execute(

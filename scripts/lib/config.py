@@ -15,7 +15,7 @@ from scripts.lib.keychain import SecretStore, SecretWriteStore, platform_secret_
 type TomlScalar = str | bool | int | float
 type TomlValue = TomlScalar | dict[str, TomlValue]
 type TomlTable = dict[str, TomlValue]
-type RedactedValue = str | bool | dict[str, "RedactedValue"]
+type RedactedValue = str | bool | int | None | dict[str, "RedactedValue"]
 
 
 class ConfigError(Exception):

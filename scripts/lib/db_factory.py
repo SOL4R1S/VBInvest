@@ -20,10 +20,10 @@ def build_database_from_local_config(
     config = load_local_config(config_path=config_path, environ=env)
     mode = config.database.mode
     if mode is DatabaseMode.SQLITE:
-        return SQLiteVBinvestDB(config.database.sqlite_path)
+        return SQLiteVBinvestDB(config.database.sqlite_path)  # type: ignore[return-value]
     if mode is DatabaseMode.POSTGRES_URL:
-        return VBinvestDB(_database_config_from_url(config.database.postgres_url))
-    return VBinvestDB(DatabaseConfig.from_env(env))
+        return VBinvestDB(_database_config_from_url(config.database.postgres_url))  # type: ignore[return-value]
+    return VBinvestDB(DatabaseConfig.from_env(env))  # type: ignore[return-value]
 
 
 def _database_config_from_url(url: str) -> DatabaseConfig:

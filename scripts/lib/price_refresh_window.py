@@ -33,9 +33,9 @@ def build_price_refresh_windows(assets: list[dict], db, run_date: date) -> dict[
     latest_dates = fetch_latest_price_dates(db, asset_ids)
     return {
         asset_id: price_refresh_window(
-            price_ranges.get(asset_id).latest_date if asset_id in price_ranges else latest_dates.get(asset_id),
+            price_ranges[asset_id].latest_date if asset_id in price_ranges else latest_dates.get(asset_id),
             run_date,
-            earliest_date=price_ranges.get(asset_id).earliest_date if asset_id in price_ranges else None,
+            earliest_date=price_ranges[asset_id].earliest_date if asset_id in price_ranges else None,
         )
         for asset_id in asset_ids
     }
