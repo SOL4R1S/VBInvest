@@ -28,7 +28,8 @@ class FakePGMixin:
 
 
 class FakeEntitlementDB(FakePGMixin, EntitlementMixin):
-    pass
+    def _ensure_profile(self, conn, auth_user_id: str) -> int:
+        return 1
 
 
 class FakeIngestDB(FakePGMixin, IngestMixin):
@@ -59,7 +60,7 @@ class TestEntitlementMixin:
     def test_grant_subscription_entitlement(self):
         db = FakeEntitlementDB()
         db._mock_cursor.fetchone.return_value = (1,)
-        result = db.grant_subscription_entitlement("user-1", "subscriber", days=30)
+        result = db.grant_subscription_entitlement("user-1", "stripe", "sub-123")
         assert result["granted"] is True
 
 

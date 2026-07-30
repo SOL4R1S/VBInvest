@@ -35,6 +35,7 @@ class TestUpsertPrices:
                 "low": 95,
                 "close": 105,
                 "volume": 1000,
+                "fetched_at": "2026-01-15T10:00:00Z",
             },
             {
                 "asset_id": asset_id,
@@ -44,6 +45,7 @@ class TestUpsertPrices:
                 "low": 100,
                 "close": 112,
                 "volume": 1200,
+                "fetched_at": "2026-01-16T10:00:00Z",
             },
         ]
         assert db.upsert_prices(rows) == 2
@@ -57,6 +59,7 @@ class TestUpsertPrices:
             "low": 95,
             "close": 105,
             "volume": 1000,
+            "fetched_at": "2026-01-15T10:00:00Z",
         }
         db.upsert_prices([row])
         updated = {**row, "close": 999}
@@ -101,8 +104,8 @@ class TestPriceDateQueries:
     def test_latest_price_dates(self, db: SQLiteVBinvestDB, asset_id: int):
         db.upsert_prices(
             [
-                {"asset_id": asset_id, "date": "2026-01-10", "close": 100},
-                {"asset_id": asset_id, "date": "2026-01-15", "close": 105},
+                {"asset_id": asset_id, "date": "2026-01-10", "close": 100, "fetched_at": "2026-01-10T10:00:00Z"},
+                {"asset_id": asset_id, "date": "2026-01-15", "close": 105, "fetched_at": "2026-01-15T10:00:00Z"},
             ]
         )
         result = db.fetch_latest_price_dates([asset_id])
@@ -114,8 +117,8 @@ class TestPriceDateQueries:
     def test_price_date_ranges(self, db: SQLiteVBinvestDB, asset_id: int):
         db.upsert_prices(
             [
-                {"asset_id": asset_id, "date": "2026-01-10", "close": 100},
-                {"asset_id": asset_id, "date": "2026-01-15", "close": 105},
+                {"asset_id": asset_id, "date": "2026-01-10", "close": 100, "fetched_at": "2026-01-10T10:00:00Z"},
+                {"asset_id": asset_id, "date": "2026-01-15", "close": 105, "fetched_at": "2026-01-15T10:00:00Z"},
             ]
         )
         result = db.fetch_price_date_ranges([asset_id])
@@ -124,8 +127,8 @@ class TestPriceDateQueries:
 
 
 class TestCollectionStatus:
-    def test_status_ok(self, db: SQLiteVBinvestDB):
-        assert db._collection_status(100, False) == "ok"
+    def test_status_collected(self, db: SQLiteVBinvestDB):
+        assert db._collection_status(100, False) == "collected"
 
     def test_status_partial(self, db: SQLiteVBinvestDB):
         assert db._collection_status(0, False) == "missing"
