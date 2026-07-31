@@ -149,6 +149,25 @@ class MarketDataMixin(DBMixinBase):
             cols = [desc[0] for desc in cur.description]
             return [dict(zip(cols, row)) for row in cur.fetchall()]
 
+    def fetch_watchlist_price_history(self, auth_user_id: str, slug: str, *, days: int = 365) -> list[dict[str, Any]]:
+        """Return price history for all assets in a watchlist (for CSV export)."""
+        sql = """
+        SELECT a.symbol, p.date, p.open, p.high, p.low, p.close, p.volume
+        FROM daily_prices p
+        JOIN assets a ON a.asset_id = p.asset_id
+        JOIN watchlist_assets wa ON wa.asset_id = a.asset_id
+        JOIN watchlists w ON w.watchlist_id = wa.watchlist_id
+        JOIN profiles pr ON pr.profile_id = w.profile_id
+        WHERE pr.auth_user_id = %s
+          AND w.slug = %s
+          AND p.date >= CURRENT_DATE - %s
+        ORDER BY a.symbol, p.date DESC
+        """
+        with self.connect() as conn, conn.cursor() as cur:
+            cur.execute(sql, (auth_user_id, slug, days))
+            cols = [desc[0] for desc in cur.description]
+            return [dict(zip(cols, row)) for row in cur.fetchall()]
+
     def fetch_latest_price_dates(self, asset_ids: list[int]) -> dict[int, date]:
         if not asset_ids:
             return {}
