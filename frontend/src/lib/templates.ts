@@ -40,16 +40,20 @@ function parseTemplate(data: unknown): TemplateItem {
   return data as TemplateItem;
 }
 
-export function fetchTemplates(): Promise<readonly TemplateItem[]> {
-  return apiGet("/api/templates", parseTemplates);
+export async function fetchTemplates(): Promise<readonly TemplateItem[]> {
+  return (await apiGet("/api/templates", parseTemplates)) ?? [];
 }
 
-export function fetchTemplate(templateId: string): Promise<TemplateItem> {
-  return apiGet(`/api/templates/${encodeURIComponent(templateId)}`, parseTemplate);
+export async function fetchTemplate(templateId: string): Promise<TemplateItem> {
+  const result = await apiGet(`/api/templates/${encodeURIComponent(templateId)}`, parseTemplate);
+  if (result === null) throw new Error(`template '${templateId}' not found`);
+  return result;
 }
 
-export function createTemplate(payload: TemplateCreatePayload): Promise<TemplateItem> {
-  return apiPost("/api/templates", payload, parseTemplate);
+export async function createTemplate(payload: TemplateCreatePayload): Promise<TemplateItem> {
+  const result = await apiPost("/api/templates", payload, parseTemplate);
+  if (result === null) throw new Error("failed to create template");
+  return result;
 }
 
 export async function deleteTemplate(templateId: string): Promise<void> {
