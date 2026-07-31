@@ -16,6 +16,27 @@ export interface NotificationItem {
   readonly created_at: string;
 }
 
+// -- parse helpers --------------------------------------------------------
+
+function parseNotifications(payload: unknown): readonly NotificationItem[] | null {
+  if (typeof payload !== "object" || payload === null) return null;
+  const obj = payload as Record<string, unknown>;
+  if (!Array.isArray(obj.notifications)) return null;
+  return obj.notifications as NotificationItem[];
+}
+
+function parseUpdated(payload: unknown): boolean | null {
+  if (typeof payload !== "object" || payload === null) return null;
+  const obj = payload as Record<string, unknown>;
+  return typeof obj.updated === "boolean" ? obj.updated : null;
+}
+
+function parseUpdatedCount(payload: unknown): number | null {
+  if (typeof payload !== "object" || payload === null) return null;
+  const obj = payload as Record<string, unknown>;
+  return typeof obj.updated_count === "number" ? obj.updated_count : null;
+}
+
 // -- API ------------------------------------------------------------------
 
 export async function fetchNotifications(
@@ -25,16 +46,16 @@ export async function fetchNotifications(
   const params = new URLSearchParams();
   if (unreadOnly) params.set("unread", "true");
   params.set("limit", String(limit));
-  const result = await apiGet<{ notifications: NotificationItem[] }>(`/api/notifications?${params}`);
-  return result?.notifications ?? [];
+  const result = await apiGet(`/api/notifications?${params}`, parseNotifications);
+  return result ?? [];
 }
 
 export async function markNotificationRead(notificationId: string): Promise<boolean> {
-  const result = await apiPost<{ updated: boolean }>(`/api/notifications/${notificationId}/read`);
-  return result?.updated ?? false;
+  const result = await apiPost(`/api/notifications/${notificationId}/read`, {}, parseUpdated);
+  return result ?? false;
 }
 
 export async function markAllNotificationsRead(): Promise<number> {
-  const result = await apiPost<{ updated_count: number }>("/api/notifications/read-all");
-  return result?.updated_count ?? 0;
+  const result = await apiPost("/api/notifications/read-all", {}, parseUpdatedCount);
+  return result ?? 0;
 }
