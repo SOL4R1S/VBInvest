@@ -129,6 +129,26 @@ class MarketDataMixin(DBMixinBase):
             cur.executemany(sql, rows)
             return len(rows)
 
+    def list_daily_indicators(self, auth_user_id: str, *, limit: int = 50) -> list[dict[str, Any]]:
+        """Return latest daily indicators per asset for price alert checks."""
+        sql = """
+        SELECT a.symbol, di.date, di.return_1d, di.return_1w, di.return_1m,
+               di.rsi14, di.drawdown_52w
+        FROM daily_indicators di
+        JOIN assets a ON a.asset_id = di.asset_id
+        JOIN watchlist_assets wa ON wa.asset_id = a.asset_id
+        JOIN watchlists w ON w.watchlist_id = wa.watchlist_id
+        JOIN profiles p ON p.profile_id = w.profile_id
+        WHERE p.auth_user_id = %s
+          AND di.date = (SELECT MAX(d2.date) FROM daily_indicators d2 WHERE d2.asset_id = di.asset_id)
+        ORDER BY a.symbol
+        LIMIT %s
+        """
+        with self.connect() as conn, conn.cursor() as cur:
+            cur.execute(sql, (auth_user_id, limit))
+            cols = [desc[0] for desc in cur.description]
+            return [dict(zip(cols, row)) for row in cur.fetchall()]
+
     def fetch_latest_price_dates(self, asset_ids: list[int]) -> dict[int, date]:
         if not asset_ids:
             return {}

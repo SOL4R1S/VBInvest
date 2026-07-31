@@ -235,6 +235,9 @@ class ApiStore:
     def fetch_portfolio_snapshots(self, auth_user_id: str, *, days: int = 365) -> list[dict[str, Any]]:
         return api_portfolio_store.fetch_portfolio_snapshots(self.db, auth_user_id, days=days)
 
+    def list_daily_indicators(self, auth_user_id: str, *, limit: int = 50) -> list[dict[str, Any]]:
+        return self.db.list_daily_indicators(auth_user_id, limit=limit)
+
     # Notifications — delegate to api_notification_store (PG-compatible)
     def list_notifications(
         self, auth_user_id: str, *, unread_only: bool = False, limit: int = 20
