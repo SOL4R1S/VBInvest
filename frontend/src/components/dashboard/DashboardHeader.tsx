@@ -1,4 +1,5 @@
 import { NotificationBell } from "@/components/notifications/NotificationBell";
+import type { Theme } from "@/hooks/useTheme";
 import type { Language, LocalizedLabels } from "@/lib/i18n";
 import { isLanguage } from "@/lib/i18n";
 
@@ -9,6 +10,8 @@ type DashboardHeaderProps = {
   readonly onSettingsOpen: () => void;
   readonly onAlertRulesOpen: () => void;
   readonly onShutdown: () => void;
+  readonly theme: Theme;
+  readonly onThemeToggle: () => void;
   readonly systemShuttingDown: boolean;
   readonly systemShutdownComplete: boolean;
   readonly systemShutdownMessage: string | null;
@@ -21,6 +24,8 @@ export function DashboardHeader({
   onSettingsOpen,
   onAlertRulesOpen,
   onShutdown,
+  theme,
+  onThemeToggle,
   systemShuttingDown,
   systemShutdownComplete,
   systemShutdownMessage,
@@ -37,6 +42,14 @@ export function DashboardHeader({
           <NotificationBell />
           <button type="button" className="hero-action-button" onClick={onAlertRulesOpen} aria-label="가격 알림 설정">
             🔔
+          </button>
+          <button
+            type="button"
+            className="hero-action-button"
+            onClick={onThemeToggle}
+            aria-label={theme === "dark" ? "라이트 모드로 전환" : "다크 모드로 전환"}
+          >
+            {theme === "dark" ? "☀️" : "🌙"}
           </button>
           <button type="button" className="hero-action-button" onClick={onSettingsOpen}>
             {labels.controls.settingsAction}
