@@ -21,12 +21,12 @@ def _make_frame(days: int = 5) -> pd.DataFrame:
     dates = pd.date_range(end=date.today(), periods=days, freq="B")
     return pd.DataFrame(
         {
-            "Date": dates,
-            "Open": [100.0] * days,
-            "High": [105.0] * days,
-            "Low": [95.0] * days,
-            "Close": [102.0] * days,
-            "Volume": [1000] * days,
+            "date": dates,
+            "open": [100.0] * days,
+            "high": [105.0] * days,
+            "low": [95.0] * days,
+            "close": [102.0] * days,
+            "volume": [1000] * days,
         }
     )
 
