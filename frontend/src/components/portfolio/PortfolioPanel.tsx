@@ -5,6 +5,8 @@
 
 import { usePortfolio } from "@/hooks/usePortfolio";
 import { HoldingsTable } from "@/components/portfolio/HoldingsTable";
+import { PortfolioAllocationBar } from "@/components/portfolio/PortfolioAllocationBar";
+import { PortfolioReturnChart } from "@/components/portfolio/PortfolioReturnChart";
 import { PortfolioSummaryCard } from "@/components/portfolio/PortfolioSummaryCard";
 import { TransactionForm } from "@/components/portfolio/TransactionForm";
 
@@ -29,6 +31,8 @@ export function PortfolioPanel() {
   return (
     <div className="portfolio-panel">
       {returns?.summary && <PortfolioSummaryCard summary={returns.summary} />}
+      <PortfolioAllocationBar holdings={returns?.holdings ?? []} />
+      <PortfolioReturnChart history={returns?.history ?? []} />
       <HoldingsTable holdings={returns?.holdings ?? []} />
       <TransactionForm holdings={holdings} onCreated={() => void refresh()} />
     </div>
