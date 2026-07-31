@@ -262,29 +262,40 @@ def fetch_price_history(
             return synthetic_history(symbol, days=days, start_date=start_date)
         return filter_price_history_window(synthetic_history(symbol), start_date=start_date, end_date=end_date)
 
-    failures: list[str] = []
-    for provider, fetcher in (
-        ("yahoo", yahoo_fetcher),
-        ("yfinance", yfinance_fetcher),
-        ("stooq", stooq_fetcher),
+    # If custom fetchers are provided (test overrides), use legacy fallback chain
+    if (
+        yahoo_fetcher is not fetch_yahoo_chart
+        or yfinance_fetcher is not fetch_yfinance_history
+        or stooq_fetcher is not fetch_stooq_history
     ):
-        try:
-            if provider == "yfinance" and (start_date is not None or end_date is not None):
-                frame = fetcher(symbol, start_date=start_date, end_date=end_date)
-            else:
-                frame = fetcher(symbol)
-        except PriceFetchError as exc:
-            failures.append(f"{provider} failed: {exc}")
-            continue
-        filtered = filter_price_history_window(frame, start_date=start_date, end_date=end_date)
-        if filtered.empty:
-            failures.append(f"{provider} failed: empty frame")
-            continue
-        if not covers_requested_start(filtered, start_date=start_date):
-            failures.append(f"{provider} failed: missing requested start")
-            continue
-        return filtered
-    raise PriceFetchError(f"{symbol}: all price providers failed: {'; '.join(failures)}")
+        failures: list[str] = []
+        for provider, fetcher in (
+            ("yahoo", yahoo_fetcher),
+            ("yfinance", yfinance_fetcher),
+            ("stooq", stooq_fetcher),
+        ):
+            try:
+                if provider == "yfinance" and (start_date is not None or end_date is not None):
+                    frame = fetcher(symbol, start_date=start_date, end_date=end_date)
+                else:
+                    frame = fetcher(symbol)
+            except PriceFetchError as exc:
+                failures.append(f"{provider} failed: {exc}")
+                continue
+            filtered = filter_price_history_window(frame, start_date=start_date, end_date=end_date)
+            if filtered.empty:
+                failures.append(f"{provider} failed: empty frame")
+                continue
+            if not covers_requested_start(filtered, start_date=start_date):
+                failures.append(f"{provider} failed: missing requested start")
+                continue
+            return filtered
+        raise PriceFetchError(f"{symbol}: all price providers failed: {'; '.join(failures)}")
+
+    # Default path: use pluggable registry
+    from scripts.lib.data_source import default_registry
+
+    return default_registry.fetch(symbol, start_date=start_date, end_date=end_date)
 
 
 def yfinance_search_quotes(query: str, limit: int) -> list[TickerSearchResult]:
