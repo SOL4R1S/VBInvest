@@ -45,6 +45,7 @@ import { CollectionStatusStrip } from "@/components/dashboard/CollectionStatusSt
 import { SettingsModal } from "@/components/dashboard/SettingsModal";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { AlertRulesPanel } from "@/components/notifications/AlertRulesPanel";
+import { useTheme } from "@/hooks/useTheme";
 import { ControlPanel } from "@/components/dashboard/ControlPanel";
 import { SymbolSidebar } from "@/components/dashboard/SymbolSidebar";
 import { AssetDetailPanel } from "@/components/dashboard/AssetDetailPanel";
@@ -75,6 +76,7 @@ export function WatchlistDashboard() {
   const [setupRequired, setSetupRequired] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [alertRulesOpen, setAlertRulesOpen] = useState(false);
+  const { theme, toggleTheme } = useTheme();
   const [runtimeSetupValues, setRuntimeSetupValues] = useState<RuntimeSetupValues | null>(null);
   const [setupRevision, setSetupRevision] = useState(0);
   const [schedulerSettings, setSchedulerSettings] = useState<SchedulerSettings>(FALLBACK_SCHEDULER_SETTINGS);
@@ -444,6 +446,8 @@ export function WatchlistDashboard() {
         onSettingsOpen={() => setSettingsOpen(true)}
         onAlertRulesOpen={() => setAlertRulesOpen(true)}
         onShutdown={() => void shutdownLocalProgram()}
+        theme={theme}
+        onThemeToggle={toggleTheme}
         systemShuttingDown={systemShuttingDown}
         systemShutdownComplete={systemShutdownComplete}
         systemShutdownMessage={systemShutdownMessage}
