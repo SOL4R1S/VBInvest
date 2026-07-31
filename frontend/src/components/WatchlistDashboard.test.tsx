@@ -203,6 +203,9 @@ function withSchedulerFallback(fetchMock: FetchMock): FetchMock {
     if (String(input).includes("/api/notifications")) {
       return jsonResponse({ notifications: [] });
     }
+    if (String(input).includes("/api/alert-rules")) {
+      return jsonResponse([]);
+    }
     if (init === undefined) {
       return fetchMock(input);
     }
@@ -229,6 +232,9 @@ describe("WatchlistDashboard", () => {
         }
         if (String(input).includes("/api/notifications")) {
           return jsonResponse({ notifications: [] });
+        }
+        if (String(input).includes("/api/alert-rules")) {
+          return jsonResponse([]);
         }
         if (String(input).includes("/api/watchlists")) {
           return watchlistsResponse();

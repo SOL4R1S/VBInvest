@@ -3,6 +3,7 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
+from scripts.lib.db_sqlite_alert_rules import SQLiteAlertRulesMixin
 from scripts.lib.db_sqlite_identity import SQLiteIdentityMixin
 from scripts.lib.db_sqlite_market import SQLiteMarketMixin
 from scripts.lib.db_sqlite_notifications import SQLiteNotificationsMixin
@@ -20,6 +21,7 @@ class SQLiteVBinvestDB(
     SQLiteReportsMixin,
     SQLitePortfolioMixin,
     SQLiteNotificationsMixin,
+    SQLiteAlertRulesMixin,
     SQLiteValueMixin,
 ):
     def __init__(self, sqlite_path: Path):
