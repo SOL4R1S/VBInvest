@@ -43,6 +43,13 @@ async function routeStartupOk(page: Page) {
       body: JSON.stringify({ daily_refresh_enabled: false, weekly_precompute_enabled: false }),
     });
   });
+  await page.route("**/api/notifications**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ notifications: [] }),
+    });
+  });
 }
 
 test("dashboard chart interactions preserve stable stroke width", async ({ page }) => {
