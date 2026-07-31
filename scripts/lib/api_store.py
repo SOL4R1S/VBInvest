@@ -292,6 +292,29 @@ class ApiStore:
             "access_tier": row[10],
         }
 
+    def list_research_history(self, symbol: str, *, limit: int = 20) -> list[dict[str, Any]]:
+        query = """
+        SELECT target_slug, opinion, thesis, confidence, report_date, created_at
+        FROM research_views
+        WHERE target_type = 'asset' AND horizon = 'on_demand' AND target_slug = %s
+        ORDER BY report_date DESC, updated_at DESC
+        LIMIT %s
+        """
+        with self.db.connect() as conn, conn.cursor() as cur:
+            cur.execute(query, (symbol, limit))
+            rows = cur.fetchall()
+        return [
+            {
+                "target_slug": r[0],
+                "opinion": r[1],
+                "thesis": r[2],
+                "confidence": r[3],
+                "report_date": str(r[4]) if r[4] else None,
+                "created_at": str(r[5]) if r[5] else None,
+            }
+            for r in rows
+        ]
+
     def generate_research_for_asset(
         self, auth_user_id: str, symbol: str, *, obsidian_vault_path=None
     ) -> dict[str, Any]:
