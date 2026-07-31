@@ -132,6 +132,9 @@ def run_scheduler_tick(
 def _emit_tick_notifications(auth_user_id: str, result: dict) -> None:
     """Create scheduler_result + price_alert notifications after a tick."""
     store = db()
+    if not hasattr(store, "create_notification"):
+        return
+
     status = result.get("last_tick_status") or "unknown"
     daily = result.get("daily") or {}
     succeeded = daily.get("succeeded", 0)
@@ -146,6 +149,8 @@ def _emit_tick_notifications(auth_user_id: str, result: dict) -> None:
     )
 
     # price_alert: check daily_indicators for ±5% moves
+    if not hasattr(store, "list_daily_indicators"):
+        return
     try:
         rows = store.list_daily_indicators(auth_user_id, limit=50)
         for row in rows:
