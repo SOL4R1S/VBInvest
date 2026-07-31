@@ -26,6 +26,7 @@ from scripts.lib.prices import search_ticker_suggestions, validate_ticker_symbol
 from scripts.lib.ticker_catalog import refresh_ticker_catalog  # noqa: F401 — re-exported for tests
 from scripts.lib.version import load_version_metadata
 from scripts.routers import (
+    alert_rules,
     export,
     frontend,
     notifications,
@@ -91,6 +92,7 @@ app.include_router(watchlists.router)
 app.include_router(portfolio.router)
 app.include_router(research.router)
 app.include_router(notifications.router)
+app.include_router(alert_rules.router)
 app.include_router(export.router)
 app.include_router(templates.router)
 app.include_router(frontend.router)  # catch-all /{asset_path:path} must be last

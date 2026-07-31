@@ -148,22 +148,49 @@ def _emit_tick_notifications(auth_user_id: str, result: dict) -> None:
         f"성공 {succeeded}건, 실패 {failed}건",
     )
 
-    # price_alert: check daily_indicators for ±5% moves
-    if not hasattr(store, "list_daily_indicators"):
+    # price_alert: evaluate user-configured alert rules
+    if not hasattr(store, "list_alert_rules") or not hasattr(store, "list_daily_indicators"):
         return
     try:
-        rows = store.list_daily_indicators(auth_user_id, limit=50)
+        rules = store.list_alert_rules(auth_user_id, enabled_only=True)
+        if not rules:
+            return
+        rows = store.list_daily_indicators(auth_user_id, limit=200)
+        indicators_by_symbol: dict[str, dict] = {}
         for row in rows:
-            ret = row.get("return_1d")
-            if ret is not None and abs(float(ret)) >= 0.05:
-                symbol = row.get("symbol", "?")
-                pct = float(ret) * 100
+            sym = row.get("symbol")
+            if sym:
+                indicators_by_symbol[sym] = row
+        for rule in rules:
+            symbol = rule.get("symbol", "")
+            condition = rule.get("condition", "")
+            threshold = float(rule.get("threshold", 0))
+            ind = indicators_by_symbol.get(symbol)
+            if ind is None:
+                continue
+            close = ind.get("close")
+            ret_1d = ind.get("return_1d")
+            triggered = False
+            detail = ""
+            if condition == "above" and close is not None and float(close) >= threshold:
+                triggered = True
+                detail = f"현재가 {float(close):,.0f} ≥ 임계값 {threshold:,.0f}"
+            elif condition == "below" and close is not None and float(close) <= threshold:
+                triggered = True
+                detail = f"현재가 {float(close):,.0f} ≤ 임계값 {threshold:,.0f}"
+            elif condition == "change_pct" and ret_1d is not None and abs(float(ret_1d)) * 100 >= threshold:
+                triggered = True
+                pct = float(ret_1d) * 100
                 direction = "상승" if pct > 0 else "하락"
+                detail = f"일일 수익률 {pct:+.1f}% — 임계값(±{threshold:.0f}%) 초과 {direction}"
+            if triggered:
                 store.create_notification(
                     auth_user_id,
                     "price_alert",
-                    f"{symbol} 일일 {abs(pct):.1f}% {direction}",
-                    f"일일 수익률 {pct:+.1f}% — 임계값(±5%) 초과",
+                    f"{symbol} 가격 알림",
+                    detail,
                 )
+                if hasattr(store, "touch_alert_rule_triggered"):
+                    store.touch_alert_rule_triggered(auth_user_id, rule.get("rule_id", ""))
     except Exception:
         pass  # price alerts are best-effort

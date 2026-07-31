@@ -7,6 +7,7 @@ type DashboardHeaderProps = {
   readonly language: Language;
   readonly onLanguageChange: (language: Language) => void;
   readonly onSettingsOpen: () => void;
+  readonly onAlertRulesOpen: () => void;
   readonly onShutdown: () => void;
   readonly systemShuttingDown: boolean;
   readonly systemShutdownComplete: boolean;
@@ -18,6 +19,7 @@ export function DashboardHeader({
   language,
   onLanguageChange,
   onSettingsOpen,
+  onAlertRulesOpen,
   onShutdown,
   systemShuttingDown,
   systemShutdownComplete,
@@ -33,6 +35,9 @@ export function DashboardHeader({
       <div className="hero-actions" aria-label="application actions">
         <div className="hero-action-row">
           <NotificationBell />
+          <button type="button" className="hero-action-button" onClick={onAlertRulesOpen} aria-label="가격 알림 설정">
+            🔔
+          </button>
           <button type="button" className="hero-action-button" onClick={onSettingsOpen}>
             {labels.controls.settingsAction}
           </button>

@@ -169,3 +169,32 @@ class DBRepository(Protocol):
     def mark_notification_read(self, auth_user_id: str, notification_id: str) -> bool: ...
 
     def mark_all_notifications_read(self, auth_user_id: str) -> int: ...
+
+    # Alert rules
+    def list_alert_rules(
+        self,
+        auth_user_id: str,
+        *,
+        enabled_only: bool = False,
+    ) -> list[dict[str, Any]]: ...
+
+    def create_alert_rule(
+        self,
+        auth_user_id: str,
+        symbol: str,
+        condition: str,
+        threshold: float,
+    ) -> dict[str, Any]: ...
+
+    def update_alert_rule(
+        self,
+        auth_user_id: str,
+        rule_id: str,
+        *,
+        enabled: bool | None = None,
+        threshold: float | None = None,
+    ) -> bool: ...
+
+    def delete_alert_rule(self, auth_user_id: str, rule_id: str) -> bool: ...
+
+    def touch_alert_rule_triggered(self, auth_user_id: str, rule_id: str) -> None: ...
