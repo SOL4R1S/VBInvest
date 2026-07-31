@@ -1,0 +1,49 @@
+name: 버그 리포트
+description: 재현 가능한 버그를 신고합니다.
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: 버그 설명
+      description: 어떤 문제가 발생했나요?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 재현 단계
+      description: 문제를 재현하는 단계를 순서대로 적어주세요.
+      placeholder: |
+        1. '...' 페이지로 이동
+        2. '...' 버튼 클릭
+        3. 에러 발생
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 기대 동작
+      description: 원래 어떻게 동작해야 하나요?
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: 환경
+      description: OS, Python 버전, Node 버전, 브라우저 등을 적어주세요.
+      placeholder: |
+        - OS: macOS 15 / Ubuntu 24.04
+        - Python: 3.14.x
+        - Node: 22.x
+        - Browser: Chrome 130
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: 로그 / 스크린샷
+      description: 관련 로그나 스크린샷이 있으면 첨부해주세요.
+    validations:
+      required: false

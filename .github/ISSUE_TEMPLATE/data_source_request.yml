@@ -1,0 +1,57 @@
+name: 데이터 소스 요청
+description: 새로운 가격/뉴스 데이터 소스 추가를 요청합니다.
+title: "[DataSource] "
+labels: ["data-source", "enhancement"]
+body:
+  - type: input
+    id: source_name
+    attributes:
+      label: 데이터 소스 이름
+      placeholder: "예: Alpha Vantage, FRED, 한국거래소 Open API"
+    validations:
+      required: true
+  - type: input
+    id: api_docs
+    attributes:
+      label: API 문서 링크
+      placeholder: "https://..."
+    validations:
+      required: true
+  - type: dropdown
+    id: auth
+    attributes:
+      label: 인증 방식
+      options:
+        - API Key
+        - OAuth 2.0
+        - 인증 불필요
+        - 기타
+    validations:
+      required: true
+  - type: dropdown
+    id: data_type
+    attributes:
+      label: 데이터 유형
+      options:
+        - 가격 (OHLCV)
+        - 지표 (기술적)
+        - 뉴스
+        - 공시
+        - 펀더멘털
+        - 기타
+    validations:
+      required: true
+  - type: textarea
+    id: rationale
+    attributes:
+      label: 요청 이유
+      description: 기존 소스(yfinance, Yahoo Chart, Stooq)로 부족한 점을 설명해주세요.
+    validations:
+      required: true
+  - type: textarea
+    id: coverage
+    attributes:
+      label: 커버리지
+      description: "어떤 시장/심볼을 지원하나요? (예: 한국 주식, 미국 ETF, 암호화폐)"
+    validations:
+      required: false
