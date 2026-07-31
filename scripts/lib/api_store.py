@@ -238,6 +238,9 @@ class ApiStore:
     def list_daily_indicators(self, auth_user_id: str, *, limit: int = 50) -> list[dict[str, Any]]:
         return self.db.list_daily_indicators(auth_user_id, limit=limit)
 
+    def fetch_watchlist_price_history(self, auth_user_id: str, slug: str, *, days: int = 365) -> list[dict[str, Any]]:
+        return self.db.fetch_watchlist_price_history(auth_user_id, slug, days=days)
+
     # Notifications — delegate to api_notification_store (PG-compatible)
     def list_notifications(
         self, auth_user_id: str, *, unread_only: bool = False, limit: int = 20

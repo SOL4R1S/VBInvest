@@ -134,6 +134,37 @@ class SQLiteMarketMixin(DBMixinBase):
             for row in rows
         ]
 
+    def fetch_watchlist_price_history(self, auth_user_id: str, slug: str, *, days: int = 365) -> list[dict[str, Any]]:
+        """Return price history for all assets in a watchlist (for CSV export)."""
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT a.symbol, p.date, p.open, p.high, p.low, p.close, p.volume
+                FROM daily_prices p
+                JOIN assets a ON a.asset_id = p.asset_id
+                JOIN watchlist_assets wa ON wa.asset_id = a.asset_id
+                JOIN watchlists w ON w.watchlist_id = wa.watchlist_id
+                JOIN profiles pr ON pr.profile_id = w.profile_id
+                WHERE pr.auth_user_id = ?
+                  AND w.slug = ?
+                  AND p.date >= date('now', ?)
+                ORDER BY a.symbol, p.date DESC
+                """,
+                (auth_user_id, slug, f"-{days} days"),
+            ).fetchall()
+        return [
+            {
+                "symbol": row["symbol"],
+                "date": row["date"],
+                "open": row["open"],
+                "high": row["high"],
+                "low": row["low"],
+                "close": row["close"],
+                "volume": row["volume"],
+            }
+            for row in rows
+        ]
+
     def try_acquire_job_lock(self, lock_name: str, holder: str, ttl_seconds: int) -> bool:
         now = datetime.now(UTC)
         expires_at = now + timedelta(seconds=ttl_seconds)
