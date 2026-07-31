@@ -1,3 +1,4 @@
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 import type { Language, LocalizedLabels } from "@/lib/i18n";
 import { isLanguage } from "@/lib/i18n";
 
@@ -31,6 +32,7 @@ export function DashboardHeader({
       </div>
       <div className="hero-actions" aria-label="application actions">
         <div className="hero-action-row">
+          <NotificationBell />
           <button type="button" className="hero-action-button" onClick={onSettingsOpen}>
             {labels.controls.settingsAction}
           </button>
