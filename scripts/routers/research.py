@@ -25,6 +25,16 @@ def latest_research(symbol: str, user=Depends(current_user)):
     return jsonable_research(row, locked=False)
 
 
+@router.get("/api/research/{symbol}/history")
+def research_history(symbol: str, limit: int = 20, user=Depends(current_user)):
+    store = auth_db()
+    if not hasattr(store, "list_research_history"):
+        return {"symbol": symbol, "history": []}
+    safe_limit = max(1, min(limit, 100))
+    rows = store.list_research_history(symbol, limit=safe_limit)
+    return {"symbol": symbol, "history": rows}
+
+
 @router.post("/api/research/{symbol}/generate", status_code=status.HTTP_201_CREATED)
 def generate_research(symbol: str, user=Depends(current_user)):
     store = auth_db()

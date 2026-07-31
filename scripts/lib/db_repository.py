@@ -67,6 +67,8 @@ class DBRepository(Protocol):
 
     def fetch_latest_research_for_asset(self, symbol: str) -> dict[str, Any] | None: ...
 
+    def list_research_history(self, symbol: str, *, limit: int = 20) -> list[dict[str, Any]]: ...
+
     def generate_research_for_asset(
         self,
         auth_user_id: str,

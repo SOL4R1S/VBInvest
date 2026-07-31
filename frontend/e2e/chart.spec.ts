@@ -50,6 +50,13 @@ async function routeStartupOk(page: Page) {
       body: JSON.stringify({ notifications: [] }),
     });
   });
+  await page.route("**/api/research/*/history**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ symbol: "TEST", history: [] }),
+    });
+  });
 }
 
 test("dashboard chart interactions preserve stable stroke width", async ({ page }) => {

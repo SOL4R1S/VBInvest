@@ -127,6 +127,30 @@ class SQLiteReportsMixin(DBMixinBase):
             "report_date": row["report_date"],
         }
 
+    def list_research_history(self, symbol: str, *, limit: int = 20) -> list[dict[str, Any]]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT target_slug, opinion, thesis, confidence, report_date, created_at
+                FROM research_views
+                WHERE target_type = 'asset' AND target_slug = ? AND horizon = 'on_demand'
+                ORDER BY report_date DESC, updated_at DESC
+                LIMIT ?
+                """,
+                (symbol, limit),
+            ).fetchall()
+        return [
+            {
+                "target_slug": r["target_slug"],
+                "opinion": r["opinion"],
+                "thesis": r["thesis"],
+                "confidence": r["confidence"],
+                "report_date": r["report_date"],
+                "created_at": r["created_at"],
+            }
+            for r in rows
+        ]
+
     def record_obsidian_export(
         self,
         *,

@@ -1,5 +1,6 @@
 import { ChartShell } from "@/components/ChartShell";
 import { ResearchCard } from "@/components/ResearchCard";
+import { ResearchHistoryPanel } from "@/components/ResearchHistoryPanel";
 import { formatMa, formatNumber, type AssetCard, type ChartPoint } from "@/lib/dashboard-data";
 import type { LocalizedLabels } from "@/lib/i18n";
 
@@ -33,6 +34,8 @@ export function AssetDetailPanel({ asset, points, labels }: AssetDetailPanelProp
       <ChartShell symbol={asset.symbol} points={points} labels={labels.chart} />
 
       <ResearchCard symbol={asset.symbol} labels={labels.report} />
+
+      <ResearchHistoryPanel symbol={asset.symbol} />
     </section>
   );
 }
