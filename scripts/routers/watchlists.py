@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
+import json
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import StreamingResponse
 
 from scripts.lib.dashboard_payload import serialize_dashboard_items
 from scripts.routers.deps import (
@@ -24,6 +27,55 @@ def list_watchlists(user=Depends(current_user)):
 @router.post("/api/watchlists", status_code=status.HTTP_201_CREATED)
 def create_watchlist(payload: WatchlistCreate, user=Depends(current_user)):
     return auth_db().create_user_watchlist(user.auth_user_id, payload.name, payload.symbols)
+
+
+@router.get("/api/watchlists/export/all")
+def export_all_watchlists(user=Depends(current_user)):
+    """Export all user watchlists as a JSON backup."""
+    watchlists = auth_db().list_user_watchlists(user.auth_user_id)
+    export_data = {
+        "version": 1,
+        "watchlists": watchlists,
+    }
+    content = json.dumps(export_data, ensure_ascii=False, indent=2)
+    return StreamingResponse(
+        iter([content]),
+        media_type="application/json; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="vbinvest-watchlists.json"'},
+    )
+
+
+@router.post("/api/watchlists/import", status_code=status.HTTP_201_CREATED)
+async def import_watchlists(request: Request, user=Depends(current_user)):
+    """Import watchlists from a JSON backup. Creates new watchlists; skips duplicates by name."""
+    try:
+        body = await request.json()
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="invalid JSON body") from exc
+
+    watchlists = body.get("watchlists") if isinstance(body, dict) else body
+    if not isinstance(watchlists, list):
+        raise HTTPException(status_code=400, detail="expected 'watchlists' array")
+
+    existing = auth_db().list_user_watchlists(user.auth_user_id)
+    existing_names = {w.get("name", "").lower() for w in existing}
+
+    created = 0
+    skipped = 0
+    for item in watchlists:
+        name = item.get("name", "").strip()
+        symbols = item.get("symbols", [])
+        if not name or not isinstance(symbols, list):
+            skipped += 1
+            continue
+        if name.lower() in existing_names:
+            skipped += 1
+            continue
+        auth_db().create_user_watchlist(user.auth_user_id, name, symbols)
+        existing_names.add(name.lower())
+        created += 1
+
+    return {"created": created, "skipped": skipped}
 
 
 @router.get("/api/watchlists/{watchlist_id}")
