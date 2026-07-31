@@ -49,3 +49,12 @@ docker-postgres-smoke:
 	else \
 		echo "docker-postgres-smoke: SKIP (docker unavailable)"; \
 	fi
+
+docker-up:
+	docker compose up -d --build
+
+docker-down:
+	docker compose down
+
+docker-logs:
+	docker compose logs --tail=100 vbinvest

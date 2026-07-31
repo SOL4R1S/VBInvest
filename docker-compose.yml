@@ -1,0 +1,41 @@
+services:
+  vbinvest:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - vbinvest-data:/data
+      - ${OBSIDIAN_VAULT_PATH:-./vault}:/vault
+    environment:
+      - VBINVEST_DATA_DIRECTORY=/data
+      - VBINVEST_DATABASE_MODE=postgres_url
+      - VBINVEST_DATABASE_URL=postgresql://vbinvest:***@db:5432/vbinvest
+      - VBINVEST_OBSIDIAN_VAULT_PATH=/vault
+      - AI_API_KEY=${AI_API_KEY:-}
+      - AI_PROVIDER_BASE_URL=${AI_PROVIDER_BASE_URL:-}
+      - AI_PROVIDER_MODEL=${AI_PROVIDER_MODEL:-}
+      - OPENDART_API_KEY=${OPENDART_API_KEY:-}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: vbinvest
+      POSTGRES_USER: vbinvest
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-vbinvest}
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vbinvest"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  vbinvest-data:
+  pg-data:
