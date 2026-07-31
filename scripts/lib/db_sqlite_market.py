@@ -102,6 +102,38 @@ class SQLiteMarketMixin(DBMixinBase):
             )
         return len(rows)
 
+    def list_daily_indicators(self, auth_user_id: str, *, limit: int = 50) -> list[dict[str, Any]]:
+        """Return latest daily indicators per asset for price alert checks."""
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT a.symbol, di.date, di.return_1d, di.return_1w, di.return_1m,
+                       di.rsi14, di.drawdown_52w
+                FROM daily_indicators di
+                JOIN assets a ON a.asset_id = di.asset_id
+                JOIN watchlist_assets wa ON wa.asset_id = a.asset_id
+                JOIN watchlists w ON w.watchlist_id = wa.watchlist_id
+                JOIN profiles p ON p.profile_id = w.profile_id
+                WHERE p.auth_user_id = ?
+                  AND di.date = (SELECT MAX(d2.date) FROM daily_indicators d2 WHERE d2.asset_id = di.asset_id)
+                ORDER BY a.symbol
+                LIMIT ?
+                """,
+                (auth_user_id, limit),
+            ).fetchall()
+        return [
+            {
+                "symbol": row["symbol"],
+                "date": row["date"],
+                "return_1d": row["return_1d"],
+                "return_1w": row["return_1w"],
+                "return_1m": row["return_1m"],
+                "rsi14": row["rsi14"],
+                "drawdown_52w": row["drawdown_52w"],
+            }
+            for row in rows
+        ]
+
     def try_acquire_job_lock(self, lock_name: str, holder: str, ttl_seconds: int) -> bool:
         now = datetime.now(UTC)
         expires_at = now + timedelta(seconds=ttl_seconds)

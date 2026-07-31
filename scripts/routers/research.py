@@ -38,6 +38,14 @@ def generate_research(symbol: str, user=Depends(current_user)):
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    # research_ready notification
+    opinion = row.get("opinion", "—")
+    store.create_notification(
+        user.auth_user_id,
+        "research_ready",
+        f"{symbol} 리서치 생성 완료",
+        f"의견: {opinion}",
+    )
     return jsonable_research(row, locked=False)
 
 

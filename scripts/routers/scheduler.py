@@ -113,7 +113,7 @@ def run_scheduler_tick(
     try:
         from scripts import api
 
-        return local_scheduler().tick(
+        result = local_scheduler().tick(
             dry_run=dry_run,
             no_network=no_network,
             include_news=include_news,
@@ -123,3 +123,42 @@ def run_scheduler_tick(
         )
     except (ConfigError, ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    # Post-tick notifications
+    _emit_tick_notifications(user.auth_user_id, result)
+    return result
+
+
+def _emit_tick_notifications(auth_user_id: str, result: dict) -> None:
+    """Create scheduler_result + price_alert notifications after a tick."""
+    store = db()
+    status = result.get("last_tick_status") or "unknown"
+    daily = result.get("daily") or {}
+    succeeded = daily.get("succeeded", 0)
+    failed = daily.get("failed", 0)
+
+    # scheduler_result notification
+    store.create_notification(
+        auth_user_id,
+        "scheduler_result",
+        f"스케줄러 실행 완료 ({status})",
+        f"성공 {succeeded}건, 실패 {failed}건",
+    )
+
+    # price_alert: check daily_indicators for ±5% moves
+    try:
+        rows = store.list_daily_indicators(auth_user_id, limit=50)
+        for row in rows:
+            ret = row.get("return_1d")
+            if ret is not None and abs(float(ret)) >= 0.05:
+                symbol = row.get("symbol", "?")
+                pct = float(ret) * 100
+                direction = "상승" if pct > 0 else "하락"
+                store.create_notification(
+                    auth_user_id,
+                    "price_alert",
+                    f"{symbol} 일일 {abs(pct):.1f}% {direction}",
+                    f"일일 수익률 {pct:+.1f}% — 임계값(±5%) 초과",
+                )
+    except Exception:
+        pass  # price alerts are best-effort
