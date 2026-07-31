@@ -10,6 +10,21 @@ VBInvest에 관심을 가져주셔서 감사합니다! 이 문서는 개발 환�
 4. 의존성: `pip install -r requirements.txt -r requirements-dev.txt`
 5. 프론트엔드: `cd frontend && npm ci`
 
+## Git Hooks
+
+이 프로젝트는 자체 git hook 스크립트를 사용합니다. pre-commit 패키지는 필수(pre-commit package is not required)가 아닙니다.
+
+```bash
+python scripts/git_hooks/install_hooks.py
+```
+
+설치되는 hooks:
+- `check_paths.py` — 수정 금지 경로 보호
+- `check_commit_msg.py` — 커밋 메시지 컨벤션 검증
+- `check_pre_push.py` — push 전 테스트 실행
+
+pre-commit 패키지는 필수(pre-commit 패키지는 필수)가 아니므로 별도 설치 없이 위 스크립트만으로 충분합니다.
+
 ## 코드 스타일
 
 - **Backend:** `ruff check --fix scripts/ tests/`, `ruff format scripts/ tests/`, `mypy scripts/`
