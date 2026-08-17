@@ -6,9 +6,10 @@ import sys
 from pathlib import Path
 from typing import Final
 
+
 HOOKS: Final = {
-    "commit-msg": './.venv/bin/python scripts/git_hooks/check_commit_msg.py "$1"',
-    "pre-commit": "git diff --cached --name-only --diff-filter=ACMRT | ./.venv/bin/python scripts/git_hooks/check_paths.py",
+    "commit-msg": "./.venv/bin/python scripts/git_hooks/check_commit_msg.py \"$1\"",
+    "pre-commit": "git diff --cached --name-only --diff-filter=ACMRT | ./.venv/bin/python scripts/git_hooks/check_paths.py && git diff --cached --name-only --diff-filter=ACMRT | xargs -r ./.venv/bin/python scripts/secret_scan.py",
     "pre-push": "./.venv/bin/python scripts/git_hooks/check_pre_push.py",
 }
 
@@ -26,13 +27,13 @@ def install_hooks(project_root: Path) -> list[Path]:
 
 
 def _hook_body(project_root: Path, command: str) -> str:
-    python_bin = project_root / ".venv" / "bin" / "python"
     return "\n".join(
         [
             "#!/bin/sh",
             "set -eu",
-            f"cd {str(project_root)!r}",
-            f"export PATH={str(python_bin.parent)!r}:$PATH",
+            'PROJECT_ROOT="$(git rev-parse --show-toplevel)"',
+            'cd "$PROJECT_ROOT"',
+            'export PATH="$PROJECT_ROOT/.venv/bin:$PATH"',
             command,
             "",
         ]

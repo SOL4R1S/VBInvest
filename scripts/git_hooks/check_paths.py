@@ -31,19 +31,17 @@ def _forbidden_reason(path: PurePosixPath) -> str:
         return "local orchestration state must not be committed"
     if first in {".agents", ".apm"} or path.as_posix() in {"AGENTS.md", "HERMES.md", "SOURCE_OF_TRUTH.md"}:
         return "local agent/operator context must not be committed"
-    legacy_period = "".join(["w", "e", "e", "k", "l", "y"])
     blocked_scheduled_research_paths = {
-        f"scripts/{legacy_period}_pipeline.py",
-        f"scripts/{legacy_period}_research_analysis.py",
-        f"frontend/app/api/cron/{legacy_period}-research/route.ts",
+        "scripts/weekly_pipeline.py",
+        "scripts/weekly_research_analysis.py",
+        "frontend/app/api/cron/weekly-research/route.ts",
     }
     if path.as_posix() in blocked_scheduled_research_paths:
         return "scheduled recurring research pipeline must not be committed"
-    legacy_market_period = "".join(["d", "a", "i", "l", "y"])
     blocked_scheduled_market_paths = {
-        f"scripts/{legacy_market_period}_market_ingest.py",
-        f"scripts/lib/{legacy_market_period}_scheduler.py",
-        f"frontend/app/api/cron/{legacy_market_period}-ingest/route.ts",
+        "scripts/daily_market_ingest.py",
+        "scripts/lib/daily_scheduler.py",
+        "frontend/app/api/cron/daily-ingest/route.ts",
     }
     if path.as_posix() in blocked_scheduled_market_paths:
         return "scheduled market ingest surface must not be committed"
